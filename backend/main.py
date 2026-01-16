@@ -259,44 +259,58 @@ async def get_word(strong_number: str):
         conn.close()
 
 
-@app.get("/api/verse/{reference}/interlinear")
-async def get_verse_interlinear(
+@app.get("/api/passage/{reference}/interlinear")
+async def get_passage_interlinear(
     reference: str,
     translation: str = Query(default="WEB", description="Bible translation")
 ):
-    """Get interlinear (original language) data for a verse."""
+    """Get interlinear (original language) data for an entire chapter."""
     conn = get_db_connection()
     try:
         parsed = parse_reference(reference)
         if not parsed:
             raise HTTPException(status_code=400, detail=f"Invalid reference: {reference}")
 
-        book, chapter, verse_start, verse_end, _ = parsed
+        book, chapter, _, _, _ = parsed
 
-        # Get words with lexicon data for this verse
+        # Get all words for the chapter with lexicon data
         cursor = conn.execute("""
-            SELECT w.position, w.text as original_text, w.strong_number, w.parsing, w.translation,
+            SELECT v.verse, w.position, w.text as original_text, w.strong_number, w.parsing, w.translation,
                    l.original as lexeme, l.transliteration, l.pronunciation, l.definition,
                    l.language
             FROM words w
             JOIN verses v ON w.verse_id = v.id
             LEFT JOIN lexicon l ON w.strong_number = l.strong_number
-            WHERE v.book = ? AND v.chapter = ? AND v.verse = ? AND v.translation_id = ?
-            ORDER BY w.position
-        """, (book, chapter, verse_start, translation))
+            WHERE v.book = ? AND v.chapter = ? AND v.translation_id = ?
+            ORDER BY v.verse, w.position
+        """, (book, chapter, translation))
 
-        words = [dict(w) for w in cursor.fetchall()]
+        rows = cursor.fetchall()
 
-        # Determine language
+        # Group words by verse
+        verses_data = {}
         language = None
-        if words:
-            language = words[0].get('language') or ('hebrew' if book == 'Genesis' else 'greek' if book == 'Matthew' else None)
+        for row in rows:
+            verse_num = row['verse']
+            if verse_num not in verses_data:
+                verses_data[verse_num] = []
+            word_data = dict(row)
+            del word_data['verse']  # Remove verse from individual word
+            verses_data[verse_num].append(word_data)
+            if not language and word_data.get('language'):
+                language = word_data['language']
+
+        # Fallback language detection
+        if not language and verses_data:
+            language = 'hebrew' if book == 'Genesis' else 'greek' if book == 'Matthew' else None
 
         return {
             "reference": reference,
+            "book": book,
+            "chapter": chapter,
             "language": language,
-            "words": words,
-            "has_interlinear": len(words) > 0
+            "verses": verses_data,
+            "has_interlinear": len(verses_data) > 0
         }
     finally:
         conn.close()
