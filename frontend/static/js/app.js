@@ -321,8 +321,8 @@ function bibleApp() {
                 // Load commentary
                 await this.loadCommentary();
 
-                // Load interlinear data if available (Genesis or Matthew)
-                if (this.currentBook === 'Genesis' || this.currentBook === 'Matthew') {
+                // Load interlinear data if available (OT books or Matthew)
+                if (OT_BOOKS.includes(this.currentBook) || this.currentBook === 'Matthew') {
                     await this.loadInterlinearData();
                 } else {
                     this.interlinearData = {};

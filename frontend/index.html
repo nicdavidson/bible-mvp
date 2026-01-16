@@ -103,8 +103,8 @@
                     </div>
                 </div>
 
-                <!-- Interlinear toggle for Genesis/Matthew -->
-                <div x-show="!loading && !error && verses.length > 0 && (currentBook === 'Genesis' || currentBook === 'Matthew')" class="interlinear-toggle">
+                <!-- Interlinear toggle for OT books and Matthew -->
+                <div x-show="!loading && !error && verses.length > 0 && (otBooks.includes(currentBook) || currentBook === 'Matthew')" class="interlinear-toggle">
                     <label class="toggle-label">
                         <input type="checkbox" x-model="showInterlinear" class="toggle-checkbox">
                         <span class="toggle-text">Show original language</span>

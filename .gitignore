@@ -55,3 +55,9 @@ Thumbs.db
 # Local config
 .env.local
 .env.*.local
+
+# Interlinear source data (downloaded at import time)
+data/*.xml
+data/*.csv
+data/*.zip
+data/__MACOSX/
