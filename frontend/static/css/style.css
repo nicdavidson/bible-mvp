@@ -413,10 +413,12 @@ body {
 .interlinear-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px dashed var(--color-border);
+    gap: 0.5rem 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: var(--radius);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
 }
 
 .interlinear-row.hebrew {
@@ -432,15 +434,19 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 0.25rem 0.5rem;
+    padding: 0.5rem 0.625rem;
     border-radius: var(--radius);
     cursor: pointer;
-    transition: background 0.15s;
-    min-width: 2rem;
+    transition: background 0.15s, box-shadow 0.15s;
+    min-width: 3rem;
+    background: var(--color-surface);
+    border: 1px solid transparent;
 }
 
 .interlinear-word:hover {
     background: var(--color-highlight);
+    border-color: rgba(245, 158, 11, 0.3);
+    box-shadow: var(--shadow-sm);
 }
 
 .interlinear-word.has-strong {
@@ -450,36 +456,51 @@ body {
 .interlinear-word.selected {
     background: var(--color-primary);
     color: white;
+    border-color: var(--color-primary);
 }
 
-.interlinear-word.selected .word-gloss {
-    color: rgba(255, 255, 255, 0.8);
+.interlinear-word.selected .word-gloss,
+.interlinear-word.selected .word-transliteration {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 .original-text {
-    font-size: 1.25rem;
+    font-size: 1.375rem;
     font-weight: 500;
-    line-height: 1.4;
+    line-height: 1.3;
+    margin-bottom: 0.125rem;
 }
 
 .interlinear-row.hebrew .original-text {
     font-family: "SBL Hebrew", "Ezra SIL", "Times New Roman", serif;
-    font-size: 1.375rem;
+    font-size: 1.5rem;
 }
 
 .interlinear-row.greek .original-text {
     font-family: "SBL Greek", "Gentium Plus", "Times New Roman", serif;
+    font-size: 1.375rem;
+}
+
+.interlinear-word .word-transliteration {
+    font-size: 0.6875rem;
+    font-style: italic;
+    color: var(--color-text-secondary);
+    opacity: 0.8;
+    direction: ltr;
+    margin-bottom: 0.125rem;
 }
 
 .word-gloss {
-    font-size: 0.6875rem;
-    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text);
     text-align: center;
-    max-width: 80px;
+    max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     direction: ltr;
+    line-height: 1.3;
 }
 
 /* Word Details Panel Enhancements */
@@ -534,6 +555,15 @@ body {
     background: #451a03;
     border-color: #d97706;
     color: #fcd34d;
+}
+
+/* Dark mode interlinear enhancements */
+.dark .interlinear-word {
+    background: var(--color-surface);
+}
+
+.dark .interlinear-word:hover {
+    background: var(--color-highlight);
 }
 
 .dark .strong-badge.greek {
