@@ -627,12 +627,52 @@ function bibleApp() {
             }
         },
 
+        // Note editing state
+        noteEndVerse: null,
+        showNoteRange: false,
+
+        // Get the current start verse for notes
+        getNoteStartVerse() {
+            return this.highlightedVerses.length > 0 ? this.highlightedVerses[0] : 1;
+        },
+
+        // Format note reference display
+        formatNoteReference(note) {
+            if (note.endVerse && note.endVerse !== note.startVerse) {
+                return `${note.book} ${note.chapter}:${note.startVerse}-${note.endVerse}`;
+            }
+            return `${note.book} ${note.chapter}:${note.startVerse}`;
+        },
+
+        // Check if note applies to current verse
+        noteMatchesCurrentVerse(note) {
+            if (note.book !== this.currentBook || note.chapter !== this.currentChapter) {
+                return false;
+            }
+            const currentVerse = this.highlightedVerses[0];
+            if (!currentVerse) return true; // Show all notes for chapter if no verse selected
+            const start = note.startVerse || 1;
+            const end = note.endVerse || start;
+            return currentVerse >= start && currentVerse <= end;
+        },
+
+        // Get notes that match current selection
+        getRelevantNotes() {
+            return this.notes.filter(note => this.noteMatchesCurrentVerse(note));
+        },
+
         async saveNote() {
-            if (!this.currentNote.trim() || !this.currentReference) return;
+            if (!this.currentNote.trim() || !this.currentBook) return;
+
+            const startVerse = this.getNoteStartVerse();
+            const endVerse = this.showNoteRange && this.noteEndVerse ? parseInt(this.noteEndVerse) : startVerse;
 
             const note = {
                 id: Date.now(),
-                reference: this.currentReference,
+                book: this.currentBook,
+                chapter: this.currentChapter,
+                startVerse: startVerse,
+                endVerse: endVerse,
                 content: this.currentNote,
                 created_at: new Date().toISOString()
             };
@@ -640,6 +680,14 @@ function bibleApp() {
             this.notes.unshift(note);
             localStorage.setItem('bible-notes', JSON.stringify(this.notes));
             this.currentNote = '';
+            this.noteEndVerse = null;
+            this.showNoteRange = false;
+        },
+
+        // Delete a note
+        deleteNote(noteId) {
+            this.notes = this.notes.filter(n => n.id !== noteId);
+            localStorage.setItem('bible-notes', JSON.stringify(this.notes));
         },
 
         // Format date

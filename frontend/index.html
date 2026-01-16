@@ -141,6 +141,12 @@
                     <span class="drag-indicator"></span>
                 </button>
                 <button
+                    class="btn-close-panel"
+                    @click="resourcesPanelExpanded = false"
+                    x-show="resourcesPanelExpanded"
+                    aria-label="Close panel"
+                >×</button>
+                <button
                     @click="activeTab = 'commentary'; resourcesPanelExpanded = true"
                     :class="{ 'active': activeTab === 'commentary' }"
                     class="tab-btn"
@@ -176,25 +182,56 @@
 
                 <!-- Notes Tab -->
                 <div x-show="activeTab === 'notes'" class="tab-content">
-                    <div class="notes-editor">
-                        <textarea
-                            x-model="currentNote"
-                            placeholder="Add your notes for this passage..."
-                            class="note-textarea"
-                        ></textarea>
-                        <button @click="saveNote" class="btn-save" :disabled="!currentNote.trim()">
-                            Save Note
-                        </button>
-                    </div>
+                    <template x-if="!currentBook">
+                        <p class="empty-state">Select a passage to add notes.</p>
+                    </template>
+                    <template x-if="currentBook">
+                        <div class="notes-editor">
+                            <div class="note-reference-row">
+                                <span class="note-for">Note for:</span>
+                                <span class="note-ref" x-text="currentBook + ' ' + currentChapter + ':' + getNoteStartVerse()"></span>
+                                <template x-if="showNoteRange">
+                                    <span class="note-range-to">
+                                        -<input
+                                            type="number"
+                                            x-model="noteEndVerse"
+                                            :min="getNoteStartVerse()"
+                                            :max="verses.length"
+                                            class="input-end-verse"
+                                            placeholder="end"
+                                        >
+                                    </span>
+                                </template>
+                                <button
+                                    @click="showNoteRange = !showNoteRange; if(!showNoteRange) noteEndVerse = null"
+                                    class="btn-range-toggle"
+                                    :title="showNoteRange ? 'Single verse' : 'Add verse range'"
+                                    x-text="showNoteRange ? '−' : '+'"
+                                ></button>
+                            </div>
+                            <textarea
+                                x-model="currentNote"
+                                placeholder="Add your notes for this passage..."
+                                class="note-textarea"
+                            ></textarea>
+                            <button @click="saveNote" class="btn-save" :disabled="!currentNote.trim()">
+                                Save Note
+                            </button>
+                        </div>
+                    </template>
                     <div class="saved-notes">
-                        <template x-for="note in notes" :key="note.id">
+                        <template x-for="note in getRelevantNotes()" :key="note.id">
                             <div class="note-card">
                                 <div class="note-meta">
-                                    <span x-text="note.reference"></span>
+                                    <span x-text="formatNoteReference(note)"></span>
                                     <span x-text="formatDate(note.created_at)"></span>
+                                    <button @click="deleteNote(note.id)" class="btn-delete-note" title="Delete note">×</button>
                                 </div>
                                 <div class="note-content" x-text="note.content"></div>
                             </div>
+                        </template>
+                        <template x-if="getRelevantNotes().length === 0 && currentBook">
+                            <p class="empty-state">No notes for this verse yet.</p>
                         </template>
                     </div>
                 </div>
