@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Import interlinear (original language) data for Genesis (Hebrew) and Matthew (Greek).
+Import interlinear (original language) data for the Old Testament (Hebrew) and Matthew (Greek).
 
 Sources:
 - Hebrew: Open Scriptures Hebrew Bible (morphhb) - CC-BY 4.0
@@ -12,6 +12,7 @@ Usage:
 import csv
 import re
 import sqlite3
+import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -20,6 +21,68 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 # OSIS namespace for Hebrew XML
 OSIS_NS = {'osis': 'http://www.bibletechnologies.net/2003/OSIS/namespace'}
+
+# OSIS abbreviation to database book name mapping
+OSIS_TO_BOOK = {
+    'Gen': 'Genesis',
+    'Exod': 'Exodus',
+    'Lev': 'Leviticus',
+    'Num': 'Numbers',
+    'Deut': 'Deuteronomy',
+    'Josh': 'Joshua',
+    'Judg': 'Judges',
+    'Ruth': 'Ruth',
+    '1Sam': '1 Samuel',
+    '2Sam': '2 Samuel',
+    '1Kgs': '1 Kings',
+    '2Kgs': '2 Kings',
+    '1Chr': '1 Chronicles',
+    '2Chr': '2 Chronicles',
+    'Ezra': 'Ezra',
+    'Neh': 'Nehemiah',
+    'Esth': 'Esther',
+    'Job': 'Job',
+    'Ps': 'Psalms',
+    'Prov': 'Proverbs',
+    'Eccl': 'Ecclesiastes',
+    'Song': 'Song of Solomon',
+    'Isa': 'Isaiah',
+    'Jer': 'Jeremiah',
+    'Lam': 'Lamentations',
+    'Ezek': 'Ezekiel',
+    'Dan': 'Daniel',
+    'Hos': 'Hosea',
+    'Joel': 'Joel',
+    'Amos': 'Amos',
+    'Obad': 'Obadiah',
+    'Jonah': 'Jonah',
+    'Mic': 'Micah',
+    'Nah': 'Nahum',
+    'Hab': 'Habakkuk',
+    'Zeph': 'Zephaniah',
+    'Hag': 'Haggai',
+    'Zech': 'Zechariah',
+    'Mal': 'Malachi',
+}
+
+# Hebrew XML files from Open Scriptures
+HEBREW_BASE_URL = "https://raw.githubusercontent.com/openscriptures/morphhb/master/wlc/"
+HEBREW_FILES = [
+    'Gen.xml', 'Exod.xml', 'Lev.xml', 'Num.xml', 'Deut.xml',
+    'Josh.xml', 'Judg.xml', 'Ruth.xml', '1Sam.xml', '2Sam.xml',
+    '1Kgs.xml', '2Kgs.xml', '1Chr.xml', '2Chr.xml', 'Ezra.xml',
+    'Neh.xml', 'Esth.xml', 'Job.xml', 'Ps.xml', 'Prov.xml',
+    'Eccl.xml', 'Song.xml', 'Isa.xml', 'Jer.xml', 'Lam.xml',
+    'Ezek.xml', 'Dan.xml', 'Hos.xml', 'Joel.xml', 'Amos.xml',
+    'Obad.xml', 'Jonah.xml', 'Mic.xml', 'Nah.xml', 'Hab.xml',
+    'Zeph.xml', 'Hag.xml', 'Zech.xml', 'Mal.xml'
+]
+
+
+def download_file(url, dest_path):
+    """Download a file from URL to destination path."""
+    print(f"    Downloading {url}...")
+    urllib.request.urlretrieve(url, dest_path)
 
 
 def get_verse_id(conn, book, chapter, verse, translation='WEB'):
@@ -33,19 +96,19 @@ def get_verse_id(conn, book, chapter, verse, translation='WEB'):
     return result[0] if result else None
 
 
-def parse_hebrew_genesis(xml_path):
-    """Parse Genesis Hebrew XML from Open Scriptures Hebrew Bible."""
-    print(f"  Parsing {xml_path}...")
+def parse_hebrew_xml(xml_path, osis_abbrev):
+    """Parse Hebrew XML from Open Scriptures Hebrew Bible."""
     tree = ET.parse(xml_path)
     root = tree.getroot()
 
+    book_name = OSIS_TO_BOOK.get(osis_abbrev, osis_abbrev)
     words_data = []
 
     # Find all chapters
     for chapter_elem in root.findall('.//osis:chapter', OSIS_NS):
         chapter_id = chapter_elem.get('osisID', '')
-        # Format: Gen.1
-        match = re.match(r'Gen\.(\d+)', chapter_id)
+        # Format: Gen.1, Ps.119, etc.
+        match = re.match(rf'{re.escape(osis_abbrev)}\.(\d+)', chapter_id)
         if not match:
             continue
         chapter = int(match.group(1))
@@ -53,8 +116,8 @@ def parse_hebrew_genesis(xml_path):
         # Find all verses in this chapter
         for verse_elem in chapter_elem.findall('.//osis:verse', OSIS_NS):
             verse_id = verse_elem.get('osisID', '')
-            # Format: Gen.1.1
-            vmatch = re.match(r'Gen\.(\d+)\.(\d+)', verse_id)
+            # Format: Gen.1.1, Ps.119.176, etc.
+            vmatch = re.match(rf'{re.escape(osis_abbrev)}\.(\d+)\.(\d+)', verse_id)
             if not vmatch:
                 continue
             verse = int(vmatch.group(2))
@@ -85,7 +148,7 @@ def parse_hebrew_genesis(xml_path):
                 morph = w_elem.get('morph', '')
 
                 words_data.append({
-                    'book': 'Genesis',
+                    'book': book_name,
                     'chapter': chapter,
                     'verse': verse,
                     'position': position,
@@ -171,18 +234,19 @@ def parse_greek_matthew(csv_path):
     return words_data
 
 
-def import_words(conn, words_data):
+def import_words(conn, words_data, clear_existing=True):
     """Import words into the database."""
     cursor = conn.cursor()
 
-    # Clear existing words for these books
-    books = set(w['book'] for w in words_data)
-    for book in books:
-        cursor.execute("""
-            DELETE FROM words WHERE verse_id IN (
-                SELECT id FROM verses WHERE book = ? AND translation_id = 'WEB'
-            )
-        """, (book,))
+    if clear_existing:
+        # Clear existing words for these books
+        books = set(w['book'] for w in words_data)
+        for book in books:
+            cursor.execute("""
+                DELETE FROM words WHERE verse_id IN (
+                    SELECT id FROM verses WHERE book = ? AND translation_id = 'WEB'
+                )
+            """, (book,))
 
     imported = 0
     skipped = 0
@@ -211,22 +275,37 @@ def import_words(conn, words_data):
 
 
 def main():
-    print("BibleMVP - Interlinear Data Import")
-    print("=" * 40)
+    print("BibleMVP - Full Interlinear Data Import")
+    print("=" * 50)
 
     conn = sqlite3.connect(DATABASE_PATH)
 
     try:
-        # Import Hebrew Genesis
-        print("\n1. Importing Hebrew Genesis...")
-        genesis_xml = DATA_DIR / "Gen.xml"
-        if not genesis_xml.exists():
-            print(f"   ERROR: {genesis_xml} not found!")
-            print("   Download from: https://raw.githubusercontent.com/openscriptures/morphhb/master/wlc/Gen.xml")
-        else:
-            hebrew_words = parse_hebrew_genesis(genesis_xml)
+        # Import all Hebrew OT books
+        print("\n1. Importing Hebrew Old Testament...")
+        total_hebrew_words = 0
+        total_skipped = 0
+
+        for i, xml_file in enumerate(HEBREW_FILES, 1):
+            osis_abbrev = xml_file.replace('.xml', '')
+            book_name = OSIS_TO_BOOK.get(osis_abbrev, osis_abbrev)
+            xml_path = DATA_DIR / xml_file
+
+            # Download if not exists
+            if not xml_path.exists():
+                url = HEBREW_BASE_URL + xml_file
+                download_file(url, xml_path)
+
+            print(f"  [{i}/{len(HEBREW_FILES)}] {book_name}...", end=" ", flush=True)
+            hebrew_words = parse_hebrew_xml(xml_path, osis_abbrev)
             imported, skipped = import_words(conn, hebrew_words)
-            print(f"   Imported {imported} Hebrew words, skipped {skipped}")
+            total_hebrew_words += imported
+            total_skipped += skipped
+            print(f"{imported} words")
+
+        print(f"\n  Total Hebrew words imported: {total_hebrew_words}")
+        if total_skipped:
+            print(f"  Skipped (verse not found): {total_skipped}")
 
         # Import Greek Matthew
         print("\n2. Importing Greek Matthew...")
@@ -243,7 +322,8 @@ def main():
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM words")
         total = cursor.fetchone()[0]
-        print(f"\nTotal words in database: {total}")
+        print(f"\n" + "=" * 50)
+        print(f"Total words in database: {total:,}")
 
         # Sample data
         print("\nSample Hebrew (Genesis 1:1):")
@@ -254,23 +334,23 @@ def main():
             LEFT JOIN lexicon l ON w.strong_number = l.strong_number
             WHERE v.book = 'Genesis' AND v.chapter = 1 AND v.verse = 1
             ORDER BY w.position
-            LIMIT 5
+            LIMIT 3
         """)
         for row in cursor.fetchall():
-            print(f"  {row[0]} | {row[1]} | {row[3]} | {row[4][:50] if row[4] else 'N/A'}...")
+            print(f"  {row[0]} | {row[1]} | {(row[4] or 'N/A')[:40]}...")
 
-        print("\nSample Greek (Matthew 1:1):")
+        print("\nSample Hebrew (Psalms 23:1):")
         cursor.execute("""
-            SELECT w.text, w.strong_number, w.parsing, w.translation, l.transliteration
+            SELECT w.text, w.strong_number, l.definition
             FROM words w
             JOIN verses v ON w.verse_id = v.id
             LEFT JOIN lexicon l ON w.strong_number = l.strong_number
-            WHERE v.book = 'Matthew' AND v.chapter = 1 AND v.verse = 1
+            WHERE v.book = 'Psalms' AND v.chapter = 23 AND v.verse = 1
             ORDER BY w.position
-            LIMIT 5
+            LIMIT 3
         """)
         for row in cursor.fetchall():
-            print(f"  {row[0]} | {row[1]} | {row[3]} | {row[4]}")
+            print(f"  {row[0]} | {row[1]} | {(row[2] or 'N/A')[:40]}...")
 
     finally:
         conn.close()

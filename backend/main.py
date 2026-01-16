@@ -300,9 +300,19 @@ async def get_passage_interlinear(
             if not language and word_data.get('language'):
                 language = word_data['language']
 
-        # Fallback language detection
+        # Fallback language detection based on testament
+        OT_BOOKS = [
+            "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+            "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+            "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
+            "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+            "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+            "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+            "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
+            "Haggai", "Zechariah", "Malachi"
+        ]
         if not language and verses_data:
-            language = 'hebrew' if book == 'Genesis' else 'greek' if book == 'Matthew' else None
+            language = 'hebrew' if book in OT_BOOKS else 'greek' if book == 'Matthew' else None
 
         return {
             "reference": reference,
