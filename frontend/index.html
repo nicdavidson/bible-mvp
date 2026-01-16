@@ -107,7 +107,7 @@
                 <div x-show="!loading && !error && verses.length > 0 && (currentBook === 'Genesis' || currentBook === 'Matthew')" class="interlinear-toggle">
                     <label class="toggle-label">
                         <input type="checkbox" x-model="showInterlinear" class="toggle-checkbox">
-                        <span class="toggle-text">Show <span x-text="currentBook === 'Genesis' ? 'Hebrew' : 'Greek'"></span></span>
+                        <span class="toggle-text">Show original language</span>
                     </label>
                 </div>
 
@@ -134,7 +134,8 @@
                                         :title="word.transliteration + (word.strong_number ? ' (' + word.strong_number + ')' : '')"
                                     >
                                         <span class="original-text" x-text="word.original_text"></span>
-                                        <span class="word-gloss" x-text="word.translation || '—'"></span>
+                                        <span class="word-transliteration" x-text="word.transliteration || ''"></span>
+                                        <span class="word-gloss" x-text="getWordGloss(word)"></span>
                                     </span>
                                 </template>
                             </div>

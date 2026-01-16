@@ -578,6 +578,31 @@ function bibleApp() {
             return this.interlinearData[verseNum]?.language || 'unknown';
         },
 
+        // Get gloss for a word (translation for Greek, short definition for Hebrew)
+        getWordGloss(word) {
+            // Greek words have translation field from OpenGNT
+            if (word.translation) {
+                return word.translation;
+            }
+            // Hebrew words - extract first part of definition
+            if (word.definition) {
+                // Get first clause/phrase (up to comma, semicolon, or 40 chars)
+                let def = word.definition;
+                const comma = def.indexOf(',');
+                const semi = def.indexOf(';');
+                let cutoff = Math.min(
+                    comma > 0 ? comma : 999,
+                    semi > 0 ? semi : 999,
+                    40
+                );
+                if (cutoff < def.length) {
+                    def = def.substring(0, cutoff);
+                }
+                return def;
+            }
+            return '·';
+        },
+
         // Format verse text with clickable words
         formatVerseText(text) {
             // Just wrap each word in a span for click handling
