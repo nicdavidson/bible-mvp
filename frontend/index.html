@@ -160,6 +160,9 @@
             <div class="panel-body">
                 <!-- Commentary Tab -->
                 <div x-show="activeTab === 'commentary'" class="tab-content">
+                    <template x-if="!currentReference">
+                        <p class="empty-state">Select a passage to see commentary.</p>
+                    </template>
                     <template x-if="commentary.length === 0 && currentReference">
                         <p class="empty-state">No commentary available for this passage.</p>
                     </template>
@@ -198,8 +201,11 @@
 
                 <!-- Cross-References Tab -->
                 <div x-show="activeTab === 'crossrefs'" class="tab-content">
+                    <template x-if="!currentReference">
+                        <p class="empty-state">Select a verse to see cross-references.</p>
+                    </template>
                     <template x-if="crossRefs.length === 0 && currentReference">
-                        <p class="empty-state">No cross-references found.</p>
+                        <p class="empty-state">No cross-references found for this verse.</p>
                     </template>
                     <ul class="crossref-list">
                         <template x-for="ref in crossRefs" :key="ref.target_book + ref.target_chapter + ref.target_verse">
