@@ -534,31 +534,32 @@ function bibleApp() {
             this.versePreview.show = false;
         },
 
-        // Load interlinear data for highlighted verses
+        // Load interlinear data for the entire chapter
         async loadInterlinearData() {
             this.interlinearData = {};
 
-            // Load interlinear for each verse in the chapter
-            const versesToLoad = this.highlightedVerses.length > 0
-                ? this.highlightedVerses
-                : this.verses.map(v => v.verse);
+            try {
+                const ref = `${this.currentBook} ${this.currentChapter}`;
+                const response = await fetch(
+                    `/api/passage/${encodeURIComponent(ref)}/interlinear?translation=${this.translation}`
+                );
 
-            for (const verseNum of versesToLoad) {
-                try {
-                    const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
-                    const response = await fetch(
-                        `/api/verse/${encodeURIComponent(ref)}/interlinear?translation=${this.translation}`
-                    );
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.has_interlinear && data.words.length > 0) {
-                            this.interlinearData[verseNum] = data;
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.has_interlinear && data.verses) {
+                        // Store language for the chapter
+                        this.interlinearLanguage = data.language;
+                        // Convert verses object to our format
+                        for (const [verseNum, words] of Object.entries(data.verses)) {
+                            this.interlinearData[parseInt(verseNum)] = {
+                                language: data.language,
+                                words: words
+                            };
                         }
                     }
-                } catch (err) {
-                    console.error(`Failed to load interlinear for verse ${verseNum}:`, err);
                 }
+            } catch (err) {
+                console.error('Failed to load interlinear data:', err);
             }
         },
 
