@@ -41,6 +41,7 @@ function bibleApp() {
         darkMode: false,
         activeTab: 'commentary',
         showSearch: false,
+        showHelp: false,
         searchQuery: '',
         searchScope: 'all',
         searchResults: [],
@@ -91,6 +92,80 @@ function bibleApp() {
                 if (pathRef) {
                     this.referenceInput = pathRef;
                     this.loadPassage();
+                }
+            });
+
+            // Setup keyboard shortcuts
+            this.setupKeyboardShortcuts();
+        },
+
+        // Keyboard shortcuts
+        setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                // Ignore if typing in an input
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    // But allow Escape to blur inputs
+                    if (e.key === 'Escape') {
+                        e.target.blur();
+                        this.showSearch = false;
+                        this.showHelp = false;
+                        this.selectedWord = null;
+                    }
+                    return;
+                }
+
+                switch (e.key) {
+                    case 'ArrowLeft':
+                        if (this.currentReference) {
+                            e.preventDefault();
+                            this.previousChapter();
+                        }
+                        break;
+                    case 'ArrowRight':
+                        if (this.currentReference) {
+                            e.preventDefault();
+                            this.nextChapter();
+                        }
+                        break;
+                    case 'ArrowUp':
+                        if (this.currentReference && this.canGoPrevVerse()) {
+                            e.preventDefault();
+                            this.previousVerse();
+                        }
+                        break;
+                    case 'ArrowDown':
+                        if (this.currentReference && this.canGoNextVerse()) {
+                            e.preventDefault();
+                            this.nextVerse();
+                        }
+                        break;
+                    case '/':
+                        e.preventDefault();
+                        this.showSearch = true;
+                        this.$nextTick(() => this.$refs.searchInput?.focus());
+                        break;
+                    case 'Escape':
+                        this.showSearch = false;
+                        this.showHelp = false;
+                        this.selectedWord = null;
+                        break;
+                    case 'd':
+                        this.toggleDarkMode();
+                        break;
+                    case 'c':
+                        if (this.highlightedVerses.length === 1) {
+                            const verse = this.verses.find(v => v.verse === this.highlightedVerses[0]);
+                            if (verse) this.copyVerse(verse);
+                        }
+                        break;
+                    case '?':
+                        e.preventDefault();
+                        this.showHelp = !this.showHelp;
+                        break;
+                    case 'g':
+                        e.preventDefault();
+                        this.$refs.referenceInput?.focus();
+                        break;
                 }
             });
         },
