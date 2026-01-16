@@ -3,8 +3,8 @@
  * A free, open-source Bible study platform.
  */
 
-// All Bible books for autocomplete
-const BIBLE_BOOKS = [
+// Old Testament books
+const OT_BOOKS = [
     "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
     "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
     "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
@@ -12,7 +12,11 @@ const BIBLE_BOOKS = [
     "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
     "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
     "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
-    "Haggai", "Zechariah", "Malachi",
+    "Haggai", "Zechariah", "Malachi"
+];
+
+// New Testament books
+const NT_BOOKS = [
     "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
     "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
     "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
@@ -21,8 +25,15 @@ const BIBLE_BOOKS = [
     "Jude", "Revelation"
 ];
 
+// All Bible books for autocomplete
+const BIBLE_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
+
 function bibleApp() {
     return {
+        // Book lists for selector
+        otBooks: OT_BOOKS,
+        ntBooks: NT_BOOKS,
+
         // State
         referenceInput: '',
         translation: 'WEB',

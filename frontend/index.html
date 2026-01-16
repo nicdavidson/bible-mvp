@@ -81,7 +81,29 @@
             <div class="panel-body">
                 <div x-show="loading" class="loading">Loading...</div>
                 <div x-show="error" class="error" x-text="error"></div>
-                <div x-show="!loading && !error" class="verses">
+
+                <!-- Book selector when no passage loaded -->
+                <div x-show="!loading && !error && verses.length === 0" class="book-selector">
+                    <p class="book-selector-intro">Select a book to begin reading:</p>
+                    <div class="book-section">
+                        <h3>Old Testament</h3>
+                        <div class="book-grid">
+                            <template x-for="book in otBooks" :key="book">
+                                <button @click="loadReference(book + ' 1')" class="book-btn" x-text="book"></button>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="book-section">
+                        <h3>New Testament</h3>
+                        <div class="book-grid">
+                            <template x-for="book in ntBooks" :key="book">
+                                <button @click="loadReference(book + ' 1')" class="book-btn" x-text="book"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="!loading && !error && verses.length > 0" class="verses">
                     <template x-for="verse in verses" :key="verse.id">
                         <div
                             class="verse-box"

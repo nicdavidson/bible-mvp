@@ -377,6 +377,60 @@ body {
     font-weight: 500;
 }
 
+/* Book Selector */
+.book-selector {
+    padding: 1rem 0;
+}
+
+.book-selector-intro {
+    color: var(--color-text-secondary);
+    margin-bottom: 1.5rem;
+    font-size: 1.0625rem;
+}
+
+.book-section {
+    margin-bottom: 2rem;
+}
+
+.book-section:last-child {
+    margin-bottom: 0;
+}
+
+.book-section h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.book-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.5rem;
+}
+
+.book-btn {
+    padding: 0.5rem 0.75rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+}
+
+.book-btn:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
 /* Resources Panel */
 .panel-resources {
     max-height: calc(100vh - 100px);
