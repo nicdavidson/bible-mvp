@@ -109,22 +109,30 @@
         </section>
 
         <!-- Resources Panel -->
-        <section class="panel panel-resources">
+        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded }">
             <div class="panel-tabs">
                 <button
-                    @click="activeTab = 'commentary'"
+                    class="tab-drag-handle"
+                    @click="resourcesPanelExpanded = !resourcesPanelExpanded"
+                    aria-label="Toggle resources panel"
+                >
+                    <span class="drag-indicator"></span>
+                </button>
+                <button
+                    @click="activeTab = 'commentary'; resourcesPanelExpanded = true"
                     :class="{ 'active': activeTab === 'commentary' }"
                     class="tab-btn"
                 >Commentary</button>
                 <button
-                    @click="activeTab = 'notes'"
+                    @click="activeTab = 'notes'; resourcesPanelExpanded = true"
                     :class="{ 'active': activeTab === 'notes' }"
                     class="tab-btn"
                 >Notes</button>
                 <button
-                    @click="activeTab = 'crossrefs'"
+                    @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true"
                     :class="{ 'active': activeTab === 'crossrefs' }"
                     class="tab-btn"
+                    x-text="'Cross-Refs' + (crossRefs.length ? ' (' + crossRefs.length + ')' : '')"
                 >Cross-Refs</button>
             </div>
             <div class="panel-body">

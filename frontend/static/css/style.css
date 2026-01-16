@@ -387,6 +387,11 @@ body {
     border-bottom: 1px solid var(--color-border);
 }
 
+/* Drag handle - hidden on desktop */
+.tab-drag-handle {
+    display: none;
+}
+
 .tab-btn {
     flex: 1;
     padding: 0.75rem;
@@ -944,6 +949,70 @@ body {
     .tab-btn {
         padding: 0.625rem 0.5rem;
         font-size: 0.875rem;
+    }
+
+    /* Resources panel as bottom sheet on mobile */
+    .panel-resources {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: none;
+        height: auto;
+        border-radius: 1rem 1rem 0 0;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        z-index: 50;
+        transform: translateY(calc(100% - 48px));
+        transition: transform 0.3s ease;
+    }
+
+    .panel-resources.expanded {
+        transform: translateY(0);
+        max-height: 60vh;
+    }
+
+    .panel-resources .panel-tabs {
+        position: relative;
+    }
+
+    .panel-resources .panel-body {
+        max-height: calc(60vh - 48px);
+        overflow-y: auto;
+    }
+
+    /* Drag handle visible on mobile */
+    .tab-drag-handle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 48px;
+        height: 24px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        z-index: 1;
+    }
+
+    .drag-indicator {
+        width: 32px;
+        height: 4px;
+        background: var(--color-border);
+        border-radius: 2px;
+    }
+
+    /* Give main content room for collapsed panel */
+    .main-content {
+        padding-bottom: 60px;
+    }
+
+    .panel-text {
+        max-height: calc(100vh - 160px);
     }
 
     /* Modals */

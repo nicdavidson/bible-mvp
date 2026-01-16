@@ -64,8 +64,17 @@ function bibleApp() {
         // Copy feedback
         copyFeedback: null,
 
+        // Touch detection
+        isTouchDevice: false,
+
+        // Mobile resources panel state
+        resourcesPanelExpanded: false,
+
         // Initialize
         async init() {
+            // Detect touch device
+            this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
             // Load dark mode preference
             this.darkMode = localStorage.getItem('darkMode') === 'true';
 
@@ -402,7 +411,14 @@ function bibleApp() {
 
         // Handle click on verse box - select verse unless clicking a word
         async handleVerseBoxClick(event, verseNum) {
-            // If clicked on a word, handle word click instead
+            // On touch devices, always select the verse (don't trigger word lookup)
+            // Word lookup is a power feature better suited for desktop
+            if (this.isTouchDevice) {
+                await this.selectVerse(verseNum);
+                return;
+            }
+
+            // On desktop, if clicked on a word, handle word click instead
             const wordEl = event.target.closest('.word');
             if (wordEl) {
                 this.handleWordClick(event);
@@ -453,8 +469,11 @@ function bibleApp() {
             }
         },
 
-        // Show verse preview on hover
+        // Show verse preview on hover (desktop only)
         async previewVerse(ref, event) {
+            // Don't show preview on touch devices - it's annoying
+            if (this.isTouchDevice) return;
+
             // Clear any pending timeout
             if (this.previewTimeout) {
                 clearTimeout(this.previewTimeout);
