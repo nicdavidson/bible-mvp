@@ -4,6 +4,10 @@ Uses SQLite with FTS5 for full-text search.
 """
 import sqlite3
 from pathlib import Path
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
 
@@ -17,14 +21,29 @@ def get_db_connection() -> sqlite3.Connection:
 
 def init_db():
     """Initialize the database schema."""
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Database path: {DATABASE_PATH}")
+    logger.info(f"Database exists: {DATABASE_PATH.exists()}")
 
-    conn = get_db_connection()
-    try:
-        conn.executescript(SCHEMA)
-        conn.commit()
-    finally:
-        conn.close()
+    if DATABASE_PATH.exists():
+        # Check if it has data
+        conn = get_db_connection()
+        try:
+            cursor = conn.execute("SELECT COUNT(*) FROM verses")
+            count = cursor.fetchone()[0]
+            logger.info(f"Verses in database: {count}")
+        except Exception as e:
+            logger.error(f"Error checking database: {e}")
+        finally:
+            conn.close()
+    else:
+        logger.warning("Database file not found! Creating empty schema...")
+        DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = get_db_connection()
+        try:
+            conn.executescript(SCHEMA)
+            conn.commit()
+        finally:
+            conn.close()
 
 
 SCHEMA = """

@@ -17,7 +17,10 @@
       "Read(//usr/bin/**)",
       "Bash(uv pip install:*)",
       "Bash(uvicorn backend.main:app:*)",
-      "Bash(gunzip:*)"
+      "Bash(gunzip:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ]
   }
 }
