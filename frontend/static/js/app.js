@@ -81,6 +81,10 @@ function bibleApp() {
         // Mobile resources panel state
         resourcesPanelExpanded: false,
 
+        // Interlinear data
+        interlinearData: {},  // verse number -> words array
+        showInterlinear: false,
+
         // Initialize
         async init() {
             // Detect touch device
@@ -317,6 +321,13 @@ function bibleApp() {
                 // Load commentary
                 await this.loadCommentary();
 
+                // Load interlinear data if available (Genesis or Matthew)
+                if (this.currentBook === 'Genesis' || this.currentBook === 'Matthew') {
+                    await this.loadInterlinearData();
+                } else {
+                    this.interlinearData = {};
+                }
+
                 // Scroll to highlighted verse if any
                 if (this.highlightedVerses.length > 0) {
                     this.$nextTick(() => {
@@ -523,10 +534,52 @@ function bibleApp() {
             this.versePreview.show = false;
         },
 
+        // Load interlinear data for highlighted verses
+        async loadInterlinearData() {
+            this.interlinearData = {};
+
+            // Load interlinear for each verse in the chapter
+            const versesToLoad = this.highlightedVerses.length > 0
+                ? this.highlightedVerses
+                : this.verses.map(v => v.verse);
+
+            for (const verseNum of versesToLoad) {
+                try {
+                    const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+                    const response = await fetch(
+                        `/api/verse/${encodeURIComponent(ref)}/interlinear?translation=${this.translation}`
+                    );
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.has_interlinear && data.words.length > 0) {
+                            this.interlinearData[verseNum] = data;
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Failed to load interlinear for verse ${verseNum}:`, err);
+                }
+            }
+        },
+
+        // Check if verse has interlinear data
+        hasInterlinear(verseNum) {
+            return !!this.interlinearData[verseNum];
+        },
+
+        // Get interlinear words for a verse
+        getInterlinearWords(verseNum) {
+            return this.interlinearData[verseNum]?.words || [];
+        },
+
+        // Get language for interlinear display
+        getInterlinearLanguage(verseNum) {
+            return this.interlinearData[verseNum]?.language || 'unknown';
+        },
+
         // Format verse text with clickable words
         formatVerseText(text) {
-            // For now, just wrap each word in a span
-            // Later this will use interlinear data with Strong's numbers
+            // Just wrap each word in a span for click handling
             return text.split(/\s+/).map((word, i) => {
                 const cleanWord = word.replace(/[.,;:!?'"()]/g, '');
                 const punct = word.replace(cleanWord, '');
@@ -534,13 +587,12 @@ function bibleApp() {
             }).join(' ');
         },
 
-        // Handle word click
+        // Handle word click (for interlinear words)
         async handleWordClick(event) {
             const wordEl = event.target.closest('.word');
             if (!wordEl) return;
 
-            const word = wordEl.dataset.word;
-            if (!word) return;
+            const strongNum = wordEl.dataset.strong;
 
             // Remove previous selection
             document.querySelectorAll('.word.selected').forEach(el => {
@@ -548,18 +600,46 @@ function bibleApp() {
             });
             wordEl.classList.add('selected');
 
-            // In a full implementation, this would look up Strong's number
-            // For now, show a placeholder
-            this.selectedWord = {
-                text: word,
-                original: '---',
-                transliteration: '---',
-                strong_number: '---',
-                parsing: 'Word lookup not yet implemented',
-                definition: 'Interlinear data will be loaded in a future update.',
-                occurrences: [],
-                count: 0
-            };
+            // If we have a Strong's number, look it up
+            if (strongNum && strongNum !== 'null') {
+                await this.loadWordDetails(strongNum);
+            } else {
+                // For words without Strong's data
+                const word = wordEl.dataset.word || wordEl.textContent;
+                this.selectedWord = {
+                    text: word,
+                    original: '---',
+                    transliteration: '---',
+                    strong_number: null,
+                    parsing: 'No Strong\'s number available',
+                    definition: 'This word does not have interlinear data linked.',
+                    occurrences: [],
+                    count: 0
+                };
+            }
+        },
+
+        // Handle interlinear word click
+        async handleInterlinearWordClick(word) {
+            // Remove previous selection
+            document.querySelectorAll('.word.selected, .interlinear-word.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+
+            if (word.strong_number) {
+                await this.loadWordDetails(word.strong_number);
+            } else {
+                this.selectedWord = {
+                    text: word.original_text,
+                    original: word.lexeme || word.original_text,
+                    transliteration: word.transliteration || '---',
+                    strong_number: null,
+                    parsing: word.parsing || 'N/A',
+                    definition: word.definition || 'No definition available',
+                    occurrences: [],
+                    count: 0
+                };
+            }
         },
 
         // Load word details by Strong's number
@@ -569,7 +649,16 @@ function bibleApp() {
                 if (response.ok) {
                     const data = await response.json();
                     this.selectedWord = {
-                        ...data.word,
+                        text: data.word.original || strongNumber,
+                        original: data.word.original,
+                        transliteration: data.word.transliteration,
+                        pronunciation: data.word.pronunciation,
+                        strong_number: data.word.strong_number,
+                        parsing: data.word.language === 'hebrew' ? 'Hebrew' : 'Greek',
+                        definition: data.word.definition,
+                        extended_definition: data.word.extended_definition,
+                        derivation: data.word.derivation,
+                        language: data.word.language,
                         occurrences: data.occurrences,
                         count: data.count
                     };
