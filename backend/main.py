@@ -175,21 +175,36 @@ async def get_single_verse(
 @app.get("/api/search")
 async def search(
     q: str = Query(..., min_length=2, description="Search query"),
-    scope: str = Query(default="all", description="Search scope: bible, notes, commentary, all")
+    scope: str = Query(default="all", description="Search scope: bible, book:BookName, notes, commentary, all")
 ):
     """Full-text search across Bible text, notes, and commentaries."""
     conn = get_db_connection()
     try:
         results = []
 
+        # Check if searching within a specific book
+        book_filter = None
+        if scope.startswith("book:"):
+            book_filter = scope[5:]
+            scope = "bible"
+
         if scope in ("all", "bible"):
-            cursor = conn.execute("""
-                SELECT 'verse' as type, book, chapter, verse,
-                       snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
-                FROM verses_fts
-                WHERE verses_fts MATCH ?
-                LIMIT 50
-            """, (q,))
+            if book_filter:
+                cursor = conn.execute("""
+                    SELECT 'verse' as type, book, chapter, verse,
+                           snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
+                    FROM verses_fts
+                    WHERE verses_fts MATCH ? AND book = ?
+                    LIMIT 50
+                """, (q, book_filter))
+            else:
+                cursor = conn.execute("""
+                    SELECT 'verse' as type, book, chapter, verse,
+                           snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
+                    FROM verses_fts
+                    WHERE verses_fts MATCH ?
+                    LIMIT 50
+                """, (q,))
             results.extend([dict(r) for r in cursor.fetchall()])
 
         if scope in ("all", "commentary"):
@@ -339,3 +354,12 @@ def get_cross_references(conn, book: str, chapter: int, verse_start: int, verse_
     """, (book, chapter, verse_start, verse_end))
 
     return [dict(r) for r in cursor.fetchall()]
+
+
+# Catch-all route for clean URLs (e.g., /John/3/16)
+# Must be registered last to not override other routes
+@app.get("/{book}/{chapter}")
+@app.get("/{book}/{chapter}/{verse}")
+async def serve_app_with_reference(book: str, chapter: int, verse: int = None):
+    """Serve main app for clean URLs - JS handles the routing."""
+    return FileResponse(frontend_path / "index.html")

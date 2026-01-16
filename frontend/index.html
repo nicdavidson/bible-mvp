@@ -64,6 +64,10 @@
         <section class="panel panel-text">
             <div class="panel-header">
                 <h2 x-text="currentReference || 'Select a passage'"></h2>
+                <div class="reading-progress" x-show="highlightedVerses.length > 0 && verses.length > 0">
+                    <div class="progress-bar" :style="'width: ' + getReadingProgress() + '%'"></div>
+                    <span class="progress-text" x-text="highlightedVerses[0] + '/' + verses.length"></span>
+                </div>
                 <div class="nav-buttons" x-show="currentReference">
                     <button @click="previousChapter" class="btn-nav" title="Previous chapter">← Ch</button>
                     <button @click="previousVerse" class="btn-nav" title="Previous verse" :disabled="!canGoPrevVerse()">← V</button>
@@ -87,6 +91,14 @@
                                 class="verse-text"
                                 x-html="formatVerseText(verse.text)"
                             ></span>
+                            <button
+                                class="btn-copy"
+                                @click.stop="copyVerse(verse)"
+                                :title="copyFeedback === verse.verse ? 'Copied!' : 'Copy verse'"
+                            >
+                                <span x-show="copyFeedback !== verse.verse">📋</span>
+                                <span x-show="copyFeedback === verse.verse">✓</span>
+                            </button>
                         </div>
                     </template>
                 </div>
@@ -234,6 +246,7 @@
                     <select x-model="searchScope" class="select-scope">
                         <option value="all">All</option>
                         <option value="bible">Bible Text</option>
+                        <option :value="'book:' + currentBook" x-show="currentBook" x-text="'In ' + currentBook"></option>
                         <option value="commentary">Commentary</option>
                         <option value="notes">Notes</option>
                     </select>

@@ -60,6 +60,9 @@ function bibleApp() {
         },
         previewTimeout: null,
 
+        // Copy feedback
+        copyFeedback: null,
+
         // Initialize
         async init() {
             // Load dark mode preference
@@ -68,13 +71,42 @@ function bibleApp() {
             // Load notes from IndexedDB
             await this.loadNotes();
 
-            // Check URL for initial reference
-            const urlParams = new URLSearchParams(window.location.search);
-            const ref = urlParams.get('ref');
-            if (ref) {
-                this.referenceInput = ref;
+            // Check URL for initial reference - support both /Book/Chapter:Verse and ?ref= formats
+            const pathRef = this.parsePathReference();
+            if (pathRef) {
+                this.referenceInput = pathRef;
                 await this.loadPassage();
+            } else {
+                const urlParams = new URLSearchParams(window.location.search);
+                const ref = urlParams.get('ref');
+                if (ref) {
+                    this.referenceInput = ref;
+                    await this.loadPassage();
+                }
             }
+
+            // Handle browser back/forward
+            window.addEventListener('popstate', () => {
+                const pathRef = this.parsePathReference();
+                if (pathRef) {
+                    this.referenceInput = pathRef;
+                    this.loadPassage();
+                }
+            });
+        },
+
+        // Parse path-based reference from URL (e.g., /John/3/16 or /John/3)
+        parsePathReference() {
+            const path = window.location.pathname;
+            // Match /Book/Chapter or /Book/Chapter/Verse
+            const match = path.match(/^\/([^\/]+)\/(\d+)(?:\/(\d+))?$/);
+            if (match) {
+                const book = decodeURIComponent(match[1]).replace(/-/g, ' ');
+                const chapter = match[2];
+                const verse = match[3];
+                return verse ? `${book} ${chapter}:${verse}` : `${book} ${chapter}`;
+            }
+            return null;
         },
 
         // Autocomplete: filter books based on input
@@ -184,8 +216,8 @@ function bibleApp() {
                 // Parse reference for navigation
                 this.parseCurrentReference();
 
-                // Update URL
-                window.history.replaceState({}, '', `?ref=${encodeURIComponent(this.referenceInput)}`);
+                // Update URL with clean path format
+                this.updateURL();
 
                 // Load commentary
                 await this.loadCommentary();
@@ -322,7 +354,7 @@ function bibleApp() {
             this.referenceInput = this.currentReference;
 
             // Update URL
-            window.history.replaceState({}, '', `?ref=${encodeURIComponent(this.referenceInput)}`);
+            this.updateURL();
 
             // Reload cross-references and commentary for the selected verse
             await this.loadCrossRefs();
@@ -513,6 +545,41 @@ function bibleApp() {
         // Check if a verse should be highlighted
         isVerseHighlighted(verseNum) {
             return this.highlightedVerses.includes(verseNum);
+        },
+
+        // Update URL with clean path format (/Book/Chapter/Verse)
+        updateURL() {
+            if (!this.currentBook || !this.currentChapter) return;
+
+            const bookSlug = this.currentBook.replace(/\s+/g, '-');
+            const verse = this.highlightedVerses.length === 1 ? this.highlightedVerses[0] : null;
+            const path = verse
+                ? `/${bookSlug}/${this.currentChapter}/${verse}`
+                : `/${bookSlug}/${this.currentChapter}`;
+
+            window.history.pushState({}, '', path);
+        },
+
+        // Copy verse to clipboard
+        async copyVerse(verse) {
+            const text = `"${verse.text}" — ${this.currentBook} ${this.currentChapter}:${verse.verse} ${this.translation}`;
+
+            try {
+                await navigator.clipboard.writeText(text);
+                this.copyFeedback = verse.verse;
+                setTimeout(() => {
+                    this.copyFeedback = null;
+                }, 1500);
+            } catch (err) {
+                console.error('Failed to copy:', err);
+            }
+        },
+
+        // Get reading progress percentage
+        getReadingProgress() {
+            if (!this.verses.length || !this.highlightedVerses.length) return 0;
+            const currentVerse = this.highlightedVerses[0];
+            return Math.round((currentVerse / this.verses.length) * 100);
         }
     };
 }
