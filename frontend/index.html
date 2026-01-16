@@ -103,12 +103,20 @@
                     </div>
                 </div>
 
+                <!-- Interlinear toggle for Genesis/Matthew -->
+                <div x-show="!loading && !error && verses.length > 0 && (currentBook === 'Genesis' || currentBook === 'Matthew')" class="interlinear-toggle">
+                    <label class="toggle-label">
+                        <input type="checkbox" x-model="showInterlinear" class="toggle-checkbox">
+                        <span class="toggle-text">Show <span x-text="currentBook === 'Genesis' ? 'Hebrew' : 'Greek'"></span></span>
+                    </label>
+                </div>
+
                 <div x-show="!loading && !error && verses.length > 0" class="verses">
                     <template x-for="verse in verses" :key="verse.id">
                         <div
                             class="verse-box"
                             :id="'verse-' + verse.verse"
-                            :class="{ 'verse-highlighted': isVerseHighlighted(verse.verse) }"
+                            :class="{ 'verse-highlighted': isVerseHighlighted(verse.verse), 'has-interlinear': showInterlinear && hasInterlinear(verse.verse) }"
                             @click="handleVerseBoxClick($event, verse.verse)"
                         >
                             <sup class="verse-num" x-text="verse.verse"></sup>
@@ -116,6 +124,20 @@
                                 class="verse-text"
                                 x-html="formatVerseText(verse.text)"
                             ></span>
+                            <!-- Interlinear display -->
+                            <div x-show="showInterlinear && hasInterlinear(verse.verse)" class="interlinear-row" :class="getInterlinearLanguage(verse.verse)">
+                                <template x-for="word in getInterlinearWords(verse.verse)" :key="word.position">
+                                    <span
+                                        class="interlinear-word"
+                                        @click.stop="handleInterlinearWordClick(word)"
+                                        :class="{ 'has-strong': word.strong_number }"
+                                        :title="word.transliteration + (word.strong_number ? ' (' + word.strong_number + ')' : '')"
+                                    >
+                                        <span class="original-text" x-text="word.original_text"></span>
+                                        <span class="word-gloss" x-text="word.translation || '—'"></span>
+                                    </span>
+                                </template>
+                            </div>
                             <button
                                 class="btn-copy"
                                 @click.stop="copyVerse(verse)"
@@ -270,21 +292,32 @@
             </div>
             <div class="panel-body" x-show="selectedWord">
                 <div class="word-header">
-                    <span class="word-original" x-text="selectedWord?.original"></span>
-                    <span class="word-transliteration" x-text="selectedWord?.transliteration"></span>
+                    <span class="word-original" :class="selectedWord?.language" x-text="selectedWord?.original || selectedWord?.text"></span>
+                    <span class="word-transliteration" x-text="selectedWord?.transliteration || '—'"></span>
                 </div>
-                <div class="word-strongs">
-                    Strong's <span x-text="selectedWord?.strong_number"></span>
+                <div class="word-strongs" x-show="selectedWord?.strong_number">
+                    <span class="strong-badge" :class="selectedWord?.language" x-text="selectedWord?.strong_number"></span>
+                    <span class="word-lang-label" x-text="selectedWord?.language === 'hebrew' ? 'Hebrew' : selectedWord?.language === 'greek' ? 'Greek' : ''"></span>
                 </div>
-                <div class="word-parsing" x-text="selectedWord?.parsing"></div>
+                <div class="word-pronunciation" x-show="selectedWord?.pronunciation">
+                    <em x-text="selectedWord?.pronunciation"></em>
+                </div>
                 <div class="word-definition">
                     <strong>Definition:</strong>
-                    <span x-text="selectedWord?.definition"></span>
+                    <p x-text="selectedWord?.definition || 'No definition available'"></p>
                 </div>
-                <div class="word-occurrences" x-show="selectedWord?.occurrences">
+                <div class="word-extended" x-show="selectedWord?.extended_definition">
+                    <strong>KJV Usage:</strong>
+                    <p x-text="selectedWord?.extended_definition"></p>
+                </div>
+                <div class="word-derivation" x-show="selectedWord?.derivation">
+                    <strong>Derivation:</strong>
+                    <p x-text="selectedWord?.derivation"></p>
+                </div>
+                <div class="word-occurrences" x-show="selectedWord?.count > 0">
                     <h4>Appears <span x-text="selectedWord?.count"></span> times:</h4>
                     <ul class="occurrence-list">
-                        <template x-for="occ in (selectedWord?.occurrences || []).slice(0, 10)" :key="occ.book + occ.chapter + occ.verse">
+                        <template x-for="occ in (selectedWord?.occurrences || []).slice(0, 10)" :key="occ.book + occ.chapter + occ.verse + occ.position">
                             <li>
                                 <a
                                     href="#"

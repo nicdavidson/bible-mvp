@@ -16,15 +16,26 @@ from pathlib import Path
 DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
 
 # Public domain Strong's data sources
-STRONGS_GREEK_URL = "https://raw.githubusercontent.com/openscriptures/strongs/master/greek/strongs-greek-dictionary.json"
-STRONGS_HEBREW_URL = "https://raw.githubusercontent.com/openscriptures/strongs/master/hebrew/strongs-hebrew-dictionary.json"
+STRONGS_GREEK_URL = "https://raw.githubusercontent.com/openscriptures/strongs/master/greek/strongs-greek-dictionary.js"
+STRONGS_HEBREW_URL = "https://raw.githubusercontent.com/openscriptures/strongs/master/hebrew/strongs-hebrew-dictionary.js"
 
 
 def download_json(url):
-    """Download and parse JSON from URL."""
+    """Download and parse JSON from URL (handles .js files with comments)."""
     print(f"Downloading from {url}...")
     with urllib.request.urlopen(url) as response:
         data = response.read().decode('utf-8')
+        # Remove JavaScript comment header if present
+        # Find the start of the actual JSON object
+        json_start = data.find('{')
+        if json_start == -1:
+            raise ValueError("No JSON object found in file")
+        data = data[json_start:]
+        # Remove JavaScript module.exports suffix if present
+        # Find the last closing brace of the JSON object
+        json_end = data.rfind('}')
+        if json_end != -1:
+            data = data[:json_end + 1]
         return json.loads(data)
 
 

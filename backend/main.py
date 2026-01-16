@@ -230,7 +230,7 @@ async def get_word(strong_number: str):
         # Get word details
         cursor = conn.execute("""
             SELECT strong_number, original, transliteration,
-                   parsing, definition, language
+                   pronunciation, definition, extended_definition, derivation, language
             FROM lexicon
             WHERE strong_number = ?
         """, (strong_number,))
@@ -254,6 +254,49 @@ async def get_word(strong_number: str):
             "word": dict(word),
             "occurrences": [dict(o) for o in occurrences],
             "count": len(occurrences)
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/verse/{reference}/interlinear")
+async def get_verse_interlinear(
+    reference: str,
+    translation: str = Query(default="WEB", description="Bible translation")
+):
+    """Get interlinear (original language) data for a verse."""
+    conn = get_db_connection()
+    try:
+        parsed = parse_reference(reference)
+        if not parsed:
+            raise HTTPException(status_code=400, detail=f"Invalid reference: {reference}")
+
+        book, chapter, verse_start, verse_end, _ = parsed
+
+        # Get words with lexicon data for this verse
+        cursor = conn.execute("""
+            SELECT w.position, w.text as original_text, w.strong_number, w.parsing, w.translation,
+                   l.original as lexeme, l.transliteration, l.pronunciation, l.definition,
+                   l.language
+            FROM words w
+            JOIN verses v ON w.verse_id = v.id
+            LEFT JOIN lexicon l ON w.strong_number = l.strong_number
+            WHERE v.book = ? AND v.chapter = ? AND v.verse = ? AND v.translation_id = ?
+            ORDER BY w.position
+        """, (book, chapter, verse_start, translation))
+
+        words = [dict(w) for w in cursor.fetchall()]
+
+        # Determine language
+        language = None
+        if words:
+            language = words[0].get('language') or ('hebrew' if book == 'Genesis' else 'greek' if book == 'Matthew' else None)
+
+        return {
+            "reference": reference,
+            "language": language,
+            "words": words,
+            "has_interlinear": len(words) > 0
         }
     finally:
         conn.close()
