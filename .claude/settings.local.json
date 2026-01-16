@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(curl:*)",
+      "Bash(sh)",
+      "Bash(source ~/.local/bin/env)",
+      "Bash(~/.local/bin/uv venv:*)",
+      "Bash(source:*)",
+      "Bash(~/.local/bin/uv pip install:*)",
+      "Bash(python3:*)",
+      "Skill(superpowers:brainstorming)",
+      "Skill(superpowers:brainstorming:*)",
+      "Bash(xargs ls:*)",
+      "Bash(sqlite3:*)",
+      "Bash(pip3 install:*)",
+      "Read(//usr/bin/**)",
+      "Bash(uv pip install:*)",
+      "Bash(uvicorn backend.main:app:*)",
+      "Bash(gunzip:*)"
+    ]
+  }
+}

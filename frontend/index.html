@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Free, open-source Bible study platform with cross-resource linking">
+    <title>BibleMVP - Free Bible Study Tool</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="bibleApp()" x-init="init()" :class="{ 'dark': darkMode }">
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">BibleMVP</h1>
+        </div>
+        <div class="header-center">
+            <div class="reference-input">
+                <div class="autocomplete-wrapper">
+                    <input
+                        type="text"
+                        x-model="referenceInput"
+                        x-ref="referenceInput"
+                        @input="updateSuggestions"
+                        @keydown="handleInputKeydown"
+                        @blur="hideSuggestions"
+                        @focus="updateSuggestions"
+                        placeholder="Enter reference (e.g., John 3:16)"
+                        class="input-reference"
+                        autocomplete="off"
+                    >
+                    <ul class="autocomplete-dropdown" x-show="showSuggestions" x-transition>
+                        <template x-for="(book, index) in bookSuggestions" :key="book">
+                            <li
+                                @mousedown.prevent="selectSuggestion(book)"
+                                :class="{ 'selected': index === selectedSuggestionIndex }"
+                                class="autocomplete-item"
+                                x-text="book"
+                            ></li>
+                        </template>
+                    </ul>
+                </div>
+                <select x-model="translation" class="select-translation">
+                    <option value="WEB">WEB</option>
+                    <option value="KJV">KJV</option>
+                </select>
+                <button @click="loadPassage" class="btn-go">Go</button>
+            </div>
+        </div>
+        <div class="header-right">
+            <button @click="toggleDarkMode" class="btn-icon" title="Toggle dark mode">
+                <span x-show="!darkMode">🌙</span>
+                <span x-show="darkMode">☀️</span>
+            </button>
+            <button @click="showSearch = true" class="btn-icon" title="Search">
+                🔍
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Bible Text Panel -->
+        <section class="panel panel-text">
+            <div class="panel-header">
+                <h2 x-text="currentReference || 'Select a passage'"></h2>
+                <div class="nav-buttons" x-show="currentReference">
+                    <button @click="previousChapter" class="btn-nav" title="Previous chapter">← Ch</button>
+                    <button @click="previousVerse" class="btn-nav" title="Previous verse" :disabled="!canGoPrevVerse()">← V</button>
+                    <button @click="nextVerse" class="btn-nav" title="Next verse" :disabled="!canGoNextVerse()">V →</button>
+                    <button @click="nextChapter" class="btn-nav" title="Next chapter">Ch →</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div x-show="loading" class="loading">Loading...</div>
+                <div x-show="error" class="error" x-text="error"></div>
+                <div x-show="!loading && !error" class="verses">
+                    <template x-for="verse in verses" :key="verse.id">
+                        <div
+                            class="verse-box"
+                            :id="'verse-' + verse.verse"
+                            :class="{ 'verse-highlighted': isVerseHighlighted(verse.verse) }"
+                            @click="handleVerseBoxClick($event, verse.verse)"
+                        >
+                            <sup class="verse-num" x-text="verse.verse"></sup>
+                            <span
+                                class="verse-text"
+                                x-html="formatVerseText(verse.text)"
+                            ></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </section>
+
+        <!-- Resources Panel -->
+        <section class="panel panel-resources">
+            <div class="panel-tabs">
+                <button
+                    @click="activeTab = 'commentary'"
+                    :class="{ 'active': activeTab === 'commentary' }"
+                    class="tab-btn"
+                >Commentary</button>
+                <button
+                    @click="activeTab = 'notes'"
+                    :class="{ 'active': activeTab === 'notes' }"
+                    class="tab-btn"
+                >Notes</button>
+                <button
+                    @click="activeTab = 'crossrefs'"
+                    :class="{ 'active': activeTab === 'crossrefs' }"
+                    class="tab-btn"
+                >Cross-Refs</button>
+            </div>
+            <div class="panel-body">
+                <!-- Commentary Tab -->
+                <div x-show="activeTab === 'commentary'" class="tab-content">
+                    <template x-if="commentary.length === 0 && currentReference">
+                        <p class="empty-state">No commentary available for this passage.</p>
+                    </template>
+                    <template x-for="entry in commentary" :key="entry.source">
+                        <div class="commentary-entry">
+                            <h3 class="commentary-source" x-text="entry.source"></h3>
+                            <div class="commentary-content" x-html="entry.content"></div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Notes Tab -->
+                <div x-show="activeTab === 'notes'" class="tab-content">
+                    <div class="notes-editor">
+                        <textarea
+                            x-model="currentNote"
+                            placeholder="Add your notes for this passage..."
+                            class="note-textarea"
+                        ></textarea>
+                        <button @click="saveNote" class="btn-save" :disabled="!currentNote.trim()">
+                            Save Note
+                        </button>
+                    </div>
+                    <div class="saved-notes">
+                        <template x-for="note in notes" :key="note.id">
+                            <div class="note-card">
+                                <div class="note-meta">
+                                    <span x-text="note.reference"></span>
+                                    <span x-text="formatDate(note.created_at)"></span>
+                                </div>
+                                <div class="note-content" x-text="note.content"></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Cross-References Tab -->
+                <div x-show="activeTab === 'crossrefs'" class="tab-content">
+                    <template x-if="crossRefs.length === 0 && currentReference">
+                        <p class="empty-state">No cross-references found.</p>
+                    </template>
+                    <ul class="crossref-list">
+                        <template x-for="ref in crossRefs" :key="ref.target_book + ref.target_chapter + ref.target_verse">
+                            <li class="crossref-item"
+                                @mouseenter="previewVerse(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, $event)"
+                                @mouseleave="hidePreview()"
+                            >
+                                <a
+                                    href="#"
+                                    @click.prevent="loadReference(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse)"
+                                    x-text="ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse"
+                                ></a>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Word Details Panel (shows on word click) -->
+        <aside class="panel panel-word" x-show="selectedWord" x-transition>
+            <div class="panel-header">
+                <h2>Word Details</h2>
+                <button @click="selectedWord = null" class="btn-close">×</button>
+            </div>
+            <div class="panel-body" x-show="selectedWord">
+                <div class="word-header">
+                    <span class="word-original" x-text="selectedWord?.original"></span>
+                    <span class="word-transliteration" x-text="selectedWord?.transliteration"></span>
+                </div>
+                <div class="word-strongs">
+                    Strong's <span x-text="selectedWord?.strong_number"></span>
+                </div>
+                <div class="word-parsing" x-text="selectedWord?.parsing"></div>
+                <div class="word-definition">
+                    <strong>Definition:</strong>
+                    <span x-text="selectedWord?.definition"></span>
+                </div>
+                <div class="word-occurrences" x-show="selectedWord?.occurrences">
+                    <h4>Appears <span x-text="selectedWord?.count"></span> times:</h4>
+                    <ul class="occurrence-list">
+                        <template x-for="occ in (selectedWord?.occurrences || []).slice(0, 10)" :key="occ.book + occ.chapter + occ.verse">
+                            <li>
+                                <a
+                                    href="#"
+                                    @click.prevent="loadReference(occ.book + ' ' + occ.chapter + ':' + occ.verse)"
+                                    x-text="occ.book + ' ' + occ.chapter + ':' + occ.verse"
+                                ></a>
+                            </li>
+                        </template>
+                        <li x-show="selectedWord?.count > 10" class="more-occurrences">
+                            ...and <span x-text="selectedWord?.count - 10"></span> more
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Search Modal -->
+    <div class="modal-overlay" x-show="showSearch" x-transition @click.self="showSearch = false">
+        <div class="modal search-modal">
+            <div class="modal-header">
+                <h2>Search</h2>
+                <button @click="showSearch = false" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="search-input-group">
+                    <input
+                        type="text"
+                        x-model="searchQuery"
+                        @keydown.enter="performSearch"
+                        placeholder="Search Bible, notes, commentary..."
+                        class="input-search"
+                        x-ref="searchInput"
+                    >
+                    <select x-model="searchScope" class="select-scope">
+                        <option value="all">All</option>
+                        <option value="bible">Bible Text</option>
+                        <option value="commentary">Commentary</option>
+                        <option value="notes">Notes</option>
+                    </select>
+                    <button @click="performSearch" class="btn-search">Search</button>
+                </div>
+                <div class="search-results">
+                    <template x-for="result in searchResults" :key="result.type + result.book + result.chapter + result.verse">
+                        <div class="search-result" @click="goToSearchResult(result)">
+                            <div class="result-type" x-text="result.type"></div>
+                            <div class="result-ref" x-text="result.book + ' ' + result.chapter + ':' + result.verse"></div>
+                            <div class="result-snippet" x-html="result.snippet"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verse Preview Tooltip -->
+    <div
+        x-show="versePreview.show"
+        x-transition
+        class="verse-preview-tooltip"
+        :style="'top: ' + versePreview.y + 'px; left: ' + versePreview.x + 'px;'"
+    >
+        <div class="preview-ref" x-text="versePreview.reference"></div>
+        <div class="preview-text" x-text="versePreview.text"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
