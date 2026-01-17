@@ -1,0 +1,21 @@
+{
+  "name": "In the Word - Free Bible Study Tool",
+  "short_name": "In the Word",
+  "description": "Free, open-source Bible study platform with interlinear Greek/Hebrew, commentary, and cross-references",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["books", "education", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr"
+}

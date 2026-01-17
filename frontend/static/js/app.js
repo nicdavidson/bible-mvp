@@ -28,6 +28,24 @@ const NT_BOOKS = [
 // All Bible books for autocomplete
 const BIBLE_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
 
+// Chapter counts for each book
+const BOOK_CHAPTERS = {
+    "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
+    "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24,
+    "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36,
+    "Ezra": 10, "Nehemiah": 13, "Esther": 10, "Job": 42, "Psalms": 150, "Proverbs": 31,
+    "Ecclesiastes": 12, "Song of Solomon": 8, "Isaiah": 66, "Jeremiah": 52,
+    "Lamentations": 5, "Ezekiel": 48, "Daniel": 12, "Hosea": 14, "Joel": 3, "Amos": 9,
+    "Obadiah": 1, "Jonah": 4, "Micah": 7, "Nahum": 3, "Habakkuk": 3, "Zephaniah": 3,
+    "Haggai": 2, "Zechariah": 14, "Malachi": 4,
+    "Matthew": 28, "Mark": 16, "Luke": 24, "John": 21, "Acts": 28, "Romans": 16,
+    "1 Corinthians": 16, "2 Corinthians": 13, "Galatians": 6, "Ephesians": 6,
+    "Philippians": 4, "Colossians": 4, "1 Thessalonians": 5, "2 Thessalonians": 3,
+    "1 Timothy": 6, "2 Timothy": 4, "Titus": 3, "Philemon": 1, "Hebrews": 13,
+    "James": 5, "1 Peter": 5, "2 Peter": 3, "1 John": 5, "2 John": 1, "3 John": 1,
+    "Jude": 1, "Revelation": 22
+};
+
 function bibleApp() {
     return {
         // Book lists for selector
@@ -47,7 +65,9 @@ function bibleApp() {
         notes: [],
         currentNote: '',
         selectedWord: null,
+        showAllOccurrences: false,
         loading: false,
+        loadingCommentary: false,
         error: null,
         darkMode: false,
         activeTab: 'commentary',
@@ -61,6 +81,11 @@ function bibleApp() {
         bookSuggestions: [],
         showSuggestions: false,
         selectedSuggestionIndex: -1,
+
+        // Book picker state
+        showBookPicker: false,
+        pickerSelectedBook: null,
+        bookChapters: BOOK_CHAPTERS,
 
         // Verse preview tooltip
         versePreview: {
@@ -288,6 +313,34 @@ function bibleApp() {
             }, 150);
         },
 
+        // Book picker methods
+        toggleBookPicker() {
+            this.showBookPicker = !this.showBookPicker;
+            if (this.showBookPicker) {
+                this.pickerSelectedBook = null;
+            }
+        },
+
+        selectPickerBook(book) {
+            this.pickerSelectedBook = book;
+        },
+
+        selectPickerChapter(chapter) {
+            this.referenceInput = `${this.pickerSelectedBook} ${chapter}`;
+            this.showBookPicker = false;
+            this.pickerSelectedBook = null;
+            this.loadPassage();
+        },
+
+        getChapterCount(book) {
+            return this.bookChapters[book] || 1;
+        },
+
+        getChaptersArray(book) {
+            const count = this.getChapterCount(book);
+            return Array.from({ length: count }, (_, i) => i + 1);
+        },
+
         // Load a passage
         async loadPassage() {
             if (!this.referenceInput.trim()) return;
@@ -322,7 +375,7 @@ function bibleApp() {
                 await this.loadCommentary();
 
                 // Load interlinear data if available (OT books or Matthew)
-                if (OT_BOOKS.includes(this.currentBook) || this.currentBook === 'Matthew') {
+                if (OT_BOOKS.includes(this.currentBook) || NT_BOOKS.includes(this.currentBook)) {
                     await this.loadInterlinearData();
                 } else {
                     this.interlinearData = {};
@@ -354,6 +407,7 @@ function bibleApp() {
 
         // Load commentary for current passage
         async loadCommentary() {
+            this.loadingCommentary = true;
             try {
                 const response = await fetch(
                     `/api/passage/${encodeURIComponent(this.currentReference)}/commentary`
@@ -366,6 +420,8 @@ function bibleApp() {
             } catch (err) {
                 console.error('Failed to load commentary:', err);
                 this.commentary = [];
+            } finally {
+                this.loadingCommentary = false;
             }
         },
 
@@ -410,24 +466,64 @@ function bibleApp() {
             return lastHighlighted < maxVerse;
         },
 
-        // Navigate to previous verse
+        // Navigate to previous verse (within same chapter - no reload)
         previousVerse() {
             const currentVerse = this.getCurrentVerse();
             if (currentVerse > 1) {
-                this.referenceInput = `${this.currentBook} ${this.currentChapter}:${currentVerse - 1}`;
-                this.loadPassage();
+                this.navigateToVerse(currentVerse - 1);
             }
         },
 
-        // Navigate to next verse
+        // Navigate to next verse (within same chapter - no reload)
         nextVerse() {
             const currentVerse = this.highlightedVerses.length > 0
                 ? this.highlightedVerses[this.highlightedVerses.length - 1]
                 : 0;
             const maxVerse = this.verses.length > 0 ? Math.max(...this.verses.map(v => v.verse)) : 0;
             if (currentVerse < maxVerse) {
-                this.referenceInput = `${this.currentBook} ${this.currentChapter}:${currentVerse + 1}`;
-                this.loadPassage();
+                this.navigateToVerse(currentVerse + 1);
+            }
+        },
+
+        // Navigate to a verse within the current chapter without reloading
+        navigateToVerse(verseNum) {
+            // Update state
+            this.highlightedVerses = [verseNum];
+            this.currentReference = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+            this.referenceInput = this.currentReference;
+            this.selectedWord = null;
+
+            // Update URL
+            this.updateURL();
+
+            // Load cross-refs for the new verse
+            this.loadCrossRefs(verseNum);
+
+            // Load commentary for new verse
+            this.loadCommentary();
+
+            // Scroll to verse
+            this.$nextTick(() => {
+                const verseEl = document.getElementById(`verse-${verseNum}`);
+                if (verseEl) {
+                    verseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        },
+
+        // Load cross-references for a specific verse
+        async loadCrossRefs(verseNum) {
+            try {
+                const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+                const response = await fetch(
+                    `/api/passage/${encodeURIComponent(ref)}/crossrefs`
+                );
+                if (response.ok) {
+                    const data = await response.json();
+                    this.crossRefs = data.cross_references || [];
+                }
+            } catch (err) {
+                console.error('Failed to load cross-refs:', err);
             }
         },
 
@@ -449,6 +545,18 @@ function bibleApp() {
 
             // Otherwise select the verse
             await this.selectVerse(verseNum);
+        },
+
+        // Handle clicks on Bible reference links in commentary
+        handleCommentaryClick(event) {
+            const link = event.target.closest('.commentary-ref');
+            if (link) {
+                event.preventDefault();
+                const ref = link.dataset.ref;
+                if (ref) {
+                    this.loadReference(ref);
+                }
+            }
         },
 
         // Select a specific verse (click on verse box)
@@ -670,6 +778,7 @@ function bibleApp() {
 
         // Load word details by Strong's number
         async loadWordDetails(strongNumber) {
+            this.showAllOccurrences = false;
             try {
                 const response = await fetch(`/api/word/${strongNumber}`);
                 if (response.ok) {

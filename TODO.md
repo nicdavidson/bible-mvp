@@ -9,26 +9,38 @@
 - [x] Prev/next chapter and verse navigation
 - [x] Clickable verse boxes for commentary
 - [x] Cross-references (41,649 entries) with hover previews
-- [x] Commentary display (463 entries - Matthew Henry, 3 books)
+- [x] Commentary display (4,124 entries - Matthew Henry, all 66 books)
 - [x] Dark mode
 - [x] Notes (localStorage)
 - [x] Book-only reference defaults to chapter 1
+- [x] Hebrew interlinear for entire OT (304,400 words)
+- [x] Greek interlinear for entire NT (122,286 words)
+- [x] Word click shows Greek/Hebrew details with Strong's definitions
+- [x] Loading states & empty state messaging
+- [x] Mobile touch support for word study
+- [x] "Original Language" toggle in header (always visible)
+- [x] Expandable word occurrence list ("and xxx more" clickable)
+- [x] PWA manifest for installability
+- [x] Service worker for offline caching
+- [x] Book/chapter picker dropdown
+- [x] Mobile-optimized header with hamburger menu
+- [x] Resource tab indicators (shows when commentary/notes/cross-refs available)
 
 ## High Priority
 
 ### Data Import
-- [ ] Import remaining Matthew Henry commentary (63 more books)
-- [ ] Import Strong's lexicon for word studies
+- [x] Import remaining Matthew Henry commentary (all 66 books - DONE)
+- [x] Import Strong's lexicon for word studies (DONE)
 - [ ] Add second commentary source (John Gill or Adam Clarke)
 
 ### UI/UX
 - [ ] **Draggable/resizable panels** - VSCode-style layout where Word details, Notes, Commentary, Cross-refs can all be visible simultaneously and rearranged. Consider using Golden Layout or split.js library.
 
 ### Core Features (from spec)
-- [ ] Interlinear data import (OpenGNT, OpenHebrewBible)
-- [ ] Word click shows Greek/Hebrew details (currently placeholder)
-- [ ] Service worker + offline caching
-- [ ] PWA manifest + install prompt
+- [x] Interlinear data import (OpenGNT, OpenHebrewBible) - DONE for all 66 books
+- [x] Word click shows Greek/Hebrew details - DONE
+- [x] Service worker + offline caching - DONE
+- [x] PWA manifest + install prompt - DONE
 
 ## Medium Priority
 
@@ -43,7 +55,7 @@
 - [ ] Export notes
 
 ### Navigation
-- [ ] Book/chapter picker dropdown
+- [x] Book/chapter picker dropdown - DONE
 - [ ] Reading history
 - [ ] Bookmarks
 
@@ -61,7 +73,7 @@
 ## Technical Debt
 - [ ] Add tests
 - [ ] Error handling improvements
-- [ ] Loading states/skeletons
+- [x] Loading states/skeletons - DONE
 
 ## Word-by-Word Reorganization (Original-Language Anchoring)
 
@@ -138,4 +150,4 @@
 
 ---
 
-Last updated: 2026-01-16
+Last updated: 2026-01-17
