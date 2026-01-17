@@ -5,6 +5,7 @@ Uses SQLite with FTS5 for full-text search.
 import sqlite3
 from pathlib import Path
 import logging
+import re
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,6 +32,9 @@ def init_db():
             cursor = conn.execute("SELECT COUNT(*) FROM verses")
             count = cursor.fetchone()[0]
             logger.info(f"Verses in database: {count}")
+
+            # Run one-time migrations
+            _migrate_commentary_links(conn)
         except Exception as e:
             logger.error(f"Error checking database: {e}")
         finally:
@@ -44,6 +48,140 @@ def init_db():
             conn.commit()
         finally:
             conn.close()
+
+
+def _migrate_commentary_links(conn):
+    """Add clickable Bible reference links to commentary (one-time migration)."""
+    # Check if already migrated by looking for existing links
+    cursor = conn.execute(
+        "SELECT content FROM commentary_entries WHERE content LIKE '%commentary-ref%' LIMIT 1"
+    )
+    if cursor.fetchone():
+        logger.info("Commentary links already present, skipping migration")
+        return
+
+    # Check if there's any commentary to process
+    cursor = conn.execute("SELECT COUNT(*) FROM commentary_entries")
+    count = cursor.fetchone()[0]
+    if count == 0:
+        logger.info("No commentary entries to process")
+        return
+
+    logger.info(f"Migrating commentary links for {count} entries...")
+
+    # Book abbreviation mappings
+    BOOK_ABBREVS = {
+        # Old Testament
+        'Gen': 'Genesis', 'Ge': 'Genesis', 'Exod': 'Exodus', 'Exo': 'Exodus', 'Ex': 'Exodus',
+        'Lev': 'Leviticus', 'Le': 'Leviticus',
+        'Num': 'Numbers', 'Nu': 'Numbers', 'Deut': 'Deuteronomy', 'Deu': 'Deuteronomy', 'De': 'Deuteronomy',
+        'Josh': 'Joshua', 'Jos': 'Joshua', 'Judg': 'Judges', 'Jdg': 'Judges',
+        'Rth': 'Ruth', 'Ru': 'Ruth',
+        '1Sam': '1 Samuel', '1Sa': '1 Samuel', 'Sa1': '1 Samuel',
+        '2Sam': '2 Samuel', '2Sa': '2 Samuel', 'Sa2': '2 Samuel',
+        '1Kgs': '1 Kings', '1Ki': '1 Kings', 'Kg1': '1 Kings', '1Kg': '1 Kings',
+        '2Kgs': '2 Kings', '2Ki': '2 Kings', 'Kg2': '2 Kings', '2Kg': '2 Kings',
+        '1Chr': '1 Chronicles', '1Ch': '1 Chronicles', 'Ch1': '1 Chronicles',
+        '2Chr': '2 Chronicles', '2Ch': '2 Chronicles', 'Ch2': '2 Chronicles',
+        'Ezr': 'Ezra', 'Ne': 'Nehemiah',
+        'Esth': 'Esther', 'Est': 'Esther', 'Es': 'Esther',
+        'Psa': 'Psalms', 'Ps': 'Psalms',
+        'Prov': 'Proverbs', 'Pro': 'Proverbs', 'Pr': 'Proverbs',
+        'Eccl': 'Ecclesiastes', 'Ecc': 'Ecclesiastes', 'Ec': 'Ecclesiastes',
+        'Song': 'Song of Solomon', 'Sol': 'Song of Solomon', 'So': 'Song of Solomon', 'Ca': 'Song of Solomon',
+        'Isa': 'Isaiah', 'Is': 'Isaiah', 'Je': 'Jeremiah',
+        'Lam': 'Lamentations', 'La': 'Lamentations',
+        'Ezek': 'Ezekiel', 'Eze': 'Ezekiel', 'Da': 'Daniel',
+        'Ho': 'Hosea', 'Joe': 'Joel',
+        'Am': 'Amos', 'Obad': 'Obadiah', 'Oba': 'Obadiah', 'Ob': 'Obadiah',
+        'Jon': 'Jonah', 'Mi': 'Micah',
+        'Na': 'Nahum',
+        'Zeph': 'Zephaniah', 'Zep': 'Zephaniah',
+        'Zech': 'Zechariah', 'Zec': 'Zechariah', 'Zac': 'Zechariah',
+        # Full names
+        'Genesis': 'Genesis', 'Exodus': 'Exodus', 'Leviticus': 'Leviticus', 'Numbers': 'Numbers',
+        'Deuteronomy': 'Deuteronomy', 'Joshua': 'Joshua', 'Judges': 'Judges', 'Ruth': 'Ruth',
+        'Ezra': 'Ezra', 'Nehemiah': 'Nehemiah', 'Esther': 'Esther', 'Job': 'Job',
+        'Psalms': 'Psalms', 'Proverbs': 'Proverbs', 'Ecclesiastes': 'Ecclesiastes',
+        'Isaiah': 'Isaiah', 'Jeremiah': 'Jeremiah', 'Lamentations': 'Lamentations',
+        'Ezekiel': 'Ezekiel', 'Daniel': 'Daniel', 'Hosea': 'Hosea', 'Joel': 'Joel',
+        'Amos': 'Amos', 'Obadiah': 'Obadiah', 'Jonah': 'Jonah', 'Micah': 'Micah',
+        'Nahum': 'Nahum', 'Habakkuk': 'Habakkuk', 'Hab': 'Habakkuk',
+        'Zephaniah': 'Zephaniah', 'Haggai': 'Haggai', 'Hag': 'Haggai',
+        'Zechariah': 'Zechariah', 'Malachi': 'Malachi', 'Mal': 'Malachi',
+        # New Testament
+        'Mat': 'Matthew', 'Matt': 'Matthew', 'Mt': 'Matthew',
+        'Mar': 'Mark', 'Mk': 'Mark', 'Lk': 'Luke', 'Lu': 'Luke',
+        'Joh': 'John', 'Jn': 'John', 'Act': 'Acts', 'Ac': 'Acts',
+        'Rom': 'Romans', 'Ro': 'Romans',
+        '1Cor': '1 Corinthians', '1Co': '1 Corinthians', 'Co1': '1 Corinthians',
+        '2Cor': '2 Corinthians', '2Co': '2 Corinthians', 'Co2': '2 Corinthians',
+        'Gal': 'Galatians', 'Ga': 'Galatians',
+        'Eph': 'Ephesians', 'Phil': 'Philippians', 'Php': 'Philippians',
+        'Col': 'Colossians',
+        '1Thes': '1 Thessalonians', '1Th': '1 Thessalonians', 'Th1': '1 Thessalonians',
+        '2Thes': '2 Thessalonians', '2Th': '2 Thessalonians', 'Th2': '2 Thessalonians',
+        '1Tim': '1 Timothy', '1Ti': '1 Timothy', 'Ti1': '1 Timothy',
+        '2Tim': '2 Timothy', '2Ti': '2 Timothy', 'Ti2': '2 Timothy',
+        'Tit': 'Titus', 'Phm': 'Philemon', 'Philem': 'Philemon',
+        'Jam': 'James', 'Jas': 'James',
+        '1Pet': '1 Peter', '1Pe': '1 Peter', 'Pe1': '1 Peter',
+        '2Pet': '2 Peter', '2Pe': '2 Peter', 'Pe2': '2 Peter',
+        '1Joh': '1 John', '1Jn': '1 John', 'Jo1': '1 John',
+        '2Joh': '2 John', '2Jn': '2 John', 'Jo2': '2 John',
+        '3Joh': '3 John', '3Jn': '3 John', 'Jo3': '3 John',
+        'Jud': 'Jude',
+        'Rev': 'Revelation', 'Re': 'Revelation',
+        'Matthew': 'Matthew', 'Mark': 'Mark', 'Luke': 'Luke', 'John': 'John', 'Acts': 'Acts',
+        'Romans': 'Romans', 'Galatians': 'Galatians', 'Ephesians': 'Ephesians',
+        'Philippians': 'Philippians', 'Colossians': 'Colossians',
+        'Titus': 'Titus', 'Hebrews': 'Hebrews', 'Heb': 'Hebrews',
+        'James': 'James', 'Jude': 'Jude', 'Revelation': 'Revelation',
+        'Peter': '1 Peter', 'Luk': 'Luke',
+    }
+
+    abbrev_pattern = '|'.join(re.escape(k) for k in sorted(BOOK_ABBREVS.keys(), key=len, reverse=True))
+    REF_PATTERN = re.compile(rf'\b({abbrev_pattern})\s+(\d+):(\d+)(?:-(\d+))?\b', re.IGNORECASE)
+
+    def normalize_book(abbrev):
+        if abbrev in BOOK_ABBREVS:
+            return BOOK_ABBREVS[abbrev]
+        for key, val in BOOK_ABBREVS.items():
+            if key.lower() == abbrev.lower():
+                return val
+        return None
+
+    def add_links(content):
+        def replace_ref(match):
+            abbrev, chapter, verse_start, verse_end = match.groups()
+            book = normalize_book(abbrev)
+            if not book:
+                return match.group(0)
+            if verse_end:
+                ref = f"{book} {chapter}:{verse_start}-{verse_end}"
+                display = f"{abbrev} {chapter}:{verse_start}-{verse_end}"
+            else:
+                ref = f"{book} {chapter}:{verse_start}"
+                display = f"{abbrev} {chapter}:{verse_start}"
+            return f'<a href="#" class="commentary-ref" data-ref="{ref}">{display}</a>'
+        return REF_PATTERN.sub(replace_ref, content)
+
+    # Process all entries
+    cursor = conn.execute("SELECT id, content FROM commentary_entries")
+    entries = cursor.fetchall()
+    updated = 0
+
+    for entry in entries:
+        entry_id, content = entry['id'], entry['content']
+        if not content:
+            continue
+        new_content = add_links(content)
+        if new_content != content:
+            conn.execute("UPDATE commentary_entries SET content = ? WHERE id = ?", (new_content, entry_id))
+            updated += 1
+
+    conn.commit()
+    logger.info(f"Commentary links migration complete: updated {updated} entries")
 
 
 SCHEMA = """
