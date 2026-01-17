@@ -450,10 +450,13 @@
                     <button @click="performSearch" class="btn-search">Search</button>
                 </div>
                 <div class="search-results">
-                    <template x-for="result in searchResults" :key="result.type + result.book + result.chapter + result.verse">
+                    <template x-for="result in searchResults" :key="result.type + result.book + result.chapter + (result.verse || '')">
                         <div class="search-result" @click="goToSearchResult(result)">
-                            <div class="result-type" x-text="result.type"></div>
-                            <div class="result-ref" x-text="result.book + ' ' + result.chapter + ':' + result.verse"></div>
+                            <div class="result-type" x-text="result.type === 'verse' ? 'Bible' : result.type"></div>
+                            <div class="result-ref">
+                                <span x-text="result.book + ' ' + result.chapter + (result.verse ? ':' + result.verse : '')"></span>
+                                <span x-show="result.source" class="result-source" x-text="'(' + result.source + ')'"></span>
+                            </div>
                             <div class="result-snippet" x-html="result.snippet"></div>
                         </div>
                     </template>
