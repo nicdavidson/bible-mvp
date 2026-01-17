@@ -4,7 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Free, open-source Bible study platform with cross-resource linking">
-    <title>BibleMVP - Free Bible Study Tool</title>
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="In the Word">
+    <title>In the Word - Free Bible Study Tool</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
+    <link rel="apple-touch-icon" href="/static/icons/icon.svg">
     <link rel="stylesheet" href="/static/css/style.css">
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
@@ -12,10 +19,13 @@
     <!-- Header -->
     <header class="header">
         <div class="header-left">
-            <h1 class="logo">BibleMVP</h1>
+            <h1 class="logo"><span class="logo-icon">📖</span><span class="logo-text">In the Word</span></h1>
         </div>
         <div class="header-center">
             <div class="reference-input">
+                <button @click="toggleBookPicker" class="btn-picker" title="Browse books">
+                    <span class="picker-icon">☰</span>
+                </button>
                 <div class="autocomplete-wrapper">
                     <input
                         type="text"
@@ -40,23 +50,68 @@
                         </template>
                     </ul>
                 </div>
-                <select x-model="translation" class="select-translation">
-                    <option value="WEB">WEB</option>
-                    <option value="KJV">KJV</option>
+                <select x-model="translation" class="select-translation" title="Bible Translation">
+                    <option value="WEB">WEB - World English</option>
+                    <option value="KJV">KJV - King James</option>
                 </select>
                 <button @click="loadPassage" class="btn-go">Go</button>
             </div>
+
+            <!-- Book Picker Dropdown -->
+            <div class="book-picker-dropdown" x-show="showBookPicker" x-transition @click.outside="showBookPicker = false">
+                <div class="picker-content">
+                    <!-- Translation selector (mobile only - shown via CSS) -->
+                    <div class="picker-translation-mobile">
+                        <label>Translation:</label>
+                        <select x-model="translation" class="picker-translation-select">
+                            <option value="WEB">WEB - World English Bible</option>
+                            <option value="KJV">KJV - King James Version</option>
+                        </select>
+                    </div>
+                    <!-- Book selection -->
+                    <div class="picker-books" x-show="!pickerSelectedBook">
+                        <div class="picker-section">
+                            <h4>Old Testament</h4>
+                            <div class="picker-book-grid">
+                                <template x-for="book in otBooks" :key="book">
+                                    <button @click="selectPickerBook(book)" class="picker-book-btn" x-text="book"></button>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="picker-section">
+                            <h4>New Testament</h4>
+                            <div class="picker-book-grid">
+                                <template x-for="book in ntBooks" :key="book">
+                                    <button @click="selectPickerBook(book)" class="picker-book-btn" x-text="book"></button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Chapter selection -->
+                    <div class="picker-chapters" x-show="pickerSelectedBook">
+                        <div class="picker-header">
+                            <button @click="pickerSelectedBook = null" class="picker-back-btn">← Back</button>
+                            <span class="picker-book-title" x-text="pickerSelectedBook"></span>
+                        </div>
+                        <div class="picker-chapter-grid">
+                            <template x-for="ch in getChaptersArray(pickerSelectedBook)" :key="ch">
+                                <button @click="selectPickerChapter(ch)" class="picker-chapter-btn" x-text="ch"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="header-right">
-            <button @click="toggleDarkMode" class="btn-icon" title="Toggle dark mode (D)">
-                <span x-show="!darkMode">🌙</span>
-                <span x-show="darkMode">☀️</span>
+            <button @click="showSearch = true" class="btn-icon" title="Search (/)">
+                🔍
             </button>
             <button @click="showHelp = true" class="btn-icon" title="Help (?)">
                 ?
             </button>
-            <button @click="showSearch = true" class="btn-icon" title="Search (/)">
-                🔍
+            <button @click="toggleDarkMode" class="btn-icon" title="Toggle dark mode (D)">
+                <span x-show="!darkMode">🌙</span>
+                <span x-show="darkMode">☀️</span>
             </button>
         </div>
     </header>
@@ -67,9 +122,15 @@
         <section class="panel panel-text">
             <div class="panel-header">
                 <h2 x-text="currentReference || 'Select a passage'"></h2>
-                <div class="reading-progress" x-show="highlightedVerses.length > 0 && verses.length > 0">
-                    <div class="progress-bar" :style="'width: ' + getReadingProgress() + '%'"></div>
-                    <span class="progress-text" x-text="highlightedVerses[0] + '/' + verses.length"></span>
+                <div class="header-controls" x-show="currentReference">
+                    <label class="interlinear-toggle-header" x-show="otBooks.includes(currentBook) || ntBooks.includes(currentBook)" title="Show Hebrew/Greek text">
+                        <input type="checkbox" x-model="showInterlinear">
+                        <span class="toggle-label-text">Original Language</span>
+                    </label>
+                    <div class="reading-progress" x-show="highlightedVerses.length > 0 && verses.length > 0">
+                        <div class="progress-bar" :style="'width: ' + getReadingProgress() + '%'"></div>
+                        <span class="progress-text" x-text="highlightedVerses[0] + '/' + verses.length"></span>
+                    </div>
                 </div>
                 <div class="nav-buttons" x-show="currentReference">
                     <button @click="previousChapter" class="btn-nav" title="Previous chapter">← Ch</button>
@@ -79,7 +140,10 @@
                 </div>
             </div>
             <div class="panel-body">
-                <div x-show="loading" class="loading">Loading...</div>
+                <div x-show="loading" class="loading">
+                    <div class="loading-spinner"></div>
+                    <span class="loading-text">Loading passage...</span>
+                </div>
                 <div x-show="error" class="error" x-text="error"></div>
 
                 <!-- Book selector when no passage loaded -->
@@ -101,14 +165,6 @@
                             </template>
                         </div>
                     </div>
-                </div>
-
-                <!-- Interlinear toggle for OT books and Matthew -->
-                <div x-show="!loading && !error && verses.length > 0 && (otBooks.includes(currentBook) || currentBook === 'Matthew')" class="interlinear-toggle">
-                    <label class="toggle-label">
-                        <input type="checkbox" x-model="showInterlinear" class="toggle-checkbox">
-                        <span class="toggle-text">Show original language</span>
-                    </label>
                 </div>
 
                 <div x-show="!loading && !error && verses.length > 0" class="verses">
@@ -171,34 +227,46 @@
                 >×</button>
                 <button
                     @click="activeTab = 'commentary'; resourcesPanelExpanded = true"
-                    :class="{ 'active': activeTab === 'commentary' }"
+                    :class="{ 'active': activeTab === 'commentary', 'has-content': commentary.length > 0 }"
                     class="tab-btn"
-                >Commentary</button>
+                >Commentary<span x-show="commentary.length > 0" class="tab-indicator">●</span></button>
                 <button
                     @click="activeTab = 'notes'; resourcesPanelExpanded = true"
-                    :class="{ 'active': activeTab === 'notes' }"
+                    :class="{ 'active': activeTab === 'notes', 'has-content': getRelevantNotes().length > 0 }"
                     class="tab-btn"
-                >Notes</button>
+                >Notes<span x-show="getRelevantNotes().length > 0" class="tab-indicator" x-text="'(' + getRelevantNotes().length + ')'"></span></button>
                 <button
                     @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true"
-                    :class="{ 'active': activeTab === 'crossrefs' }"
+                    :class="{ 'active': activeTab === 'crossrefs', 'has-content': crossRefs.length > 0 }"
                     class="tab-btn"
-                    x-text="'Cross-Refs' + (crossRefs.length ? ' (' + crossRefs.length + ')' : '')"
-                >Cross-Refs</button>
+                >Cross-Refs<span x-show="crossRefs.length > 0" class="tab-indicator" x-text="'(' + crossRefs.length + ')'"></span></button>
             </div>
             <div class="panel-body">
                 <!-- Commentary Tab -->
                 <div x-show="activeTab === 'commentary'" class="tab-content">
-                    <template x-if="!currentReference">
-                        <p class="empty-state">Select a passage to see commentary.</p>
+                    <template x-if="loadingCommentary">
+                        <div class="panel-loading">
+                            <div class="loading-spinner"></div>
+                        </div>
                     </template>
-                    <template x-if="commentary.length === 0 && currentReference">
-                        <p class="empty-state">No commentary available for this passage.</p>
+                    <template x-if="!loadingCommentary && !currentReference">
+                        <div class="empty-state">
+                            <span class="empty-state-icon">📖</span>
+                            <span class="empty-state-title">Select a passage</span>
+                            <span class="empty-state-hint">Commentary will appear here</span>
+                        </div>
+                    </template>
+                    <template x-if="!loadingCommentary && commentary.length === 0 && currentReference">
+                        <div class="empty-state">
+                            <span class="empty-state-icon">📝</span>
+                            <span class="empty-state-title">No commentary available</span>
+                            <span class="empty-state-hint">Try another passage or check back later</span>
+                        </div>
                     </template>
                     <template x-for="entry in commentary" :key="entry.source">
                         <div class="commentary-entry">
                             <h3 class="commentary-source" x-text="entry.source"></h3>
-                            <div class="commentary-content" x-html="entry.content"></div>
+                            <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
                         </div>
                     </template>
                 </div>
@@ -206,7 +274,11 @@
                 <!-- Notes Tab -->
                 <div x-show="activeTab === 'notes'" class="tab-content">
                     <template x-if="!currentBook">
-                        <p class="empty-state">Select a passage to add notes.</p>
+                        <div class="empty-state">
+                            <span class="empty-state-icon">✏️</span>
+                            <span class="empty-state-title">Select a passage</span>
+                            <span class="empty-state-hint">Add your study notes here</span>
+                        </div>
                     </template>
                     <template x-if="currentBook">
                         <div class="notes-editor">
@@ -254,7 +326,9 @@
                             </div>
                         </template>
                         <template x-if="getRelevantNotes().length === 0 && currentBook">
-                            <p class="empty-state">No notes for this verse yet.</p>
+                            <div class="empty-state" style="padding: 1rem;">
+                                <span class="empty-state-hint">No notes for this passage yet</span>
+                            </div>
                         </template>
                     </div>
                 </div>
@@ -262,10 +336,18 @@
                 <!-- Cross-References Tab -->
                 <div x-show="activeTab === 'crossrefs'" class="tab-content">
                     <template x-if="!currentReference">
-                        <p class="empty-state">Select a verse to see cross-references.</p>
+                        <div class="empty-state">
+                            <span class="empty-state-icon">🔗</span>
+                            <span class="empty-state-title">Select a verse</span>
+                            <span class="empty-state-hint">Related passages will appear here</span>
+                        </div>
                     </template>
                     <template x-if="crossRefs.length === 0 && currentReference">
-                        <p class="empty-state">No cross-references found for this verse.</p>
+                        <div class="empty-state">
+                            <span class="empty-state-icon">🔗</span>
+                            <span class="empty-state-title">No cross-references</span>
+                            <span class="empty-state-hint">This verse has no linked references</span>
+                        </div>
                     </template>
                     <ul class="crossref-list">
                         <template x-for="ref in crossRefs" :key="ref.target_book + ref.target_chapter + ref.target_verse">
@@ -318,7 +400,7 @@
                 <div class="word-occurrences" x-show="selectedWord?.count > 0">
                     <h4>Appears <span x-text="selectedWord?.count"></span> times:</h4>
                     <ul class="occurrence-list">
-                        <template x-for="occ in (selectedWord?.occurrences || []).slice(0, 10)" :key="occ.book + occ.chapter + occ.verse + occ.position">
+                        <template x-for="occ in (showAllOccurrences ? (selectedWord?.occurrences || []) : (selectedWord?.occurrences || []).slice(0, 10))" :key="occ.book + occ.chapter + occ.verse + occ.position">
                             <li>
                                 <a
                                     href="#"
@@ -327,8 +409,13 @@
                                 ></a>
                             </li>
                         </template>
-                        <li x-show="selectedWord?.count > 10" class="more-occurrences">
-                            ...and <span x-text="selectedWord?.count - 10"></span> more
+                        <li x-show="selectedWord?.count > 10 && !showAllOccurrences" class="more-occurrences">
+                            <a href="#" @click.prevent="showAllOccurrences = true" class="show-more-link">
+                                ...and <span x-text="selectedWord?.count - 10"></span> more
+                            </a>
+                        </li>
+                        <li x-show="selectedWord?.count > 10 && showAllOccurrences" class="more-occurrences">
+                            <a href="#" @click.prevent="showAllOccurrences = false" class="show-more-link">Show less</a>
                         </li>
                     </ul>
                 </div>
@@ -452,5 +539,13 @@
     </div>
 
     <script src="/static/js/app.js"></script>
+    <script>
+        // Register service worker for offline support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(reg => console.log('Service worker registered'))
+                .catch(err => console.log('Service worker registration failed:', err));
+        }
+    </script>
 </body>
 </html>

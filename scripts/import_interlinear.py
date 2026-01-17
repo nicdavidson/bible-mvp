@@ -160,10 +160,28 @@ def parse_hebrew_xml(xml_path, osis_abbrev):
     return words_data
 
 
-def parse_greek_matthew(csv_path):
-    """Parse Matthew Greek data from OpenGNT."""
+# NT book number to name mapping (OpenGNT uses numbers 40-66)
+NT_BOOK_NUM_MAP = {
+    40: 'Matthew', 41: 'Mark', 42: 'Luke', 43: 'John', 44: 'Acts',
+    45: 'Romans', 46: '1 Corinthians', 47: '2 Corinthians', 48: 'Galatians',
+    49: 'Ephesians', 50: 'Philippians', 51: 'Colossians', 52: '1 Thessalonians',
+    53: '2 Thessalonians', 54: '1 Timothy', 55: '2 Timothy', 56: 'Titus',
+    57: 'Philemon', 58: 'Hebrews', 59: 'James', 60: '1 Peter', 61: '2 Peter',
+    62: '1 John', 63: '2 John', 64: '3 John', 65: 'Jude', 66: 'Revelation'
+}
+
+
+def parse_greek_nt(csv_path, book_filter=None):
+    """Parse Greek NT data from OpenGNT for all books or specific ones.
+
+    Args:
+        csv_path: Path to OpenGNT CSV file
+        book_filter: Optional list of book numbers to import (e.g., [40, 43] for Matthew and John)
+                     If None, imports all NT books.
+    """
     print(f"  Parsing {csv_path}...")
     words_data = []
+    books_found = set()
 
     with open(csv_path, 'r', encoding='utf-8') as f:
         reader = csv.reader(f, delimiter='\t')
@@ -187,11 +205,18 @@ def parse_greek_matthew(csv_path):
             chapter = int(ref_match.group(2))
             verse = int(ref_match.group(3))
 
-            # Only process Matthew (book 40)
-            if book_num != 40:
+            # Filter books if specified
+            if book_filter and book_num not in book_filter:
                 continue
 
-            verse_key = (chapter, verse)
+            # Skip if not a valid NT book
+            if book_num not in NT_BOOK_NUM_MAP:
+                continue
+
+            book_name = NT_BOOK_NUM_MAP[book_num]
+            books_found.add(book_name)
+
+            verse_key = (book_num, chapter, verse)
             if verse_key != current_verse_key:
                 current_verse_key = verse_key
                 position = 0
@@ -221,7 +246,7 @@ def parse_greek_matthew(csv_path):
                 translation = trans_match.group(2)  # IT - Interlinear Translation
 
             words_data.append({
-                'book': 'Matthew',
+                'book': book_name,
                 'chapter': chapter,
                 'verse': verse,
                 'position': position,
@@ -231,6 +256,7 @@ def parse_greek_matthew(csv_path):
                 'translation': translation
             })
 
+    print(f"    Found words for books: {', '.join(sorted(books_found))}")
     return words_data
 
 
@@ -307,14 +333,14 @@ def main():
         if total_skipped:
             print(f"  Skipped (verse not found): {total_skipped}")
 
-        # Import Greek Matthew
-        print("\n2. Importing Greek Matthew...")
-        matthew_csv = DATA_DIR / "OpenGNT_version3_3.csv"
-        if not matthew_csv.exists():
-            print(f"   ERROR: {matthew_csv} not found!")
+        # Import Greek NT (all books)
+        print("\n2. Importing Greek New Testament (all books)...")
+        nt_csv = DATA_DIR / "OpenGNT_version3_3.csv"
+        if not nt_csv.exists():
+            print(f"   ERROR: {nt_csv} not found!")
             print("   Download from: https://github.com/eliranwong/OpenGNT/raw/master/OpenGNT_BASE_TEXT.zip")
         else:
-            greek_words = parse_greek_matthew(matthew_csv)
+            greek_words = parse_greek_nt(nt_csv)
             imported, skipped = import_words(conn, greek_words)
             print(f"   Imported {imported} Greek words, skipped {skipped}")
 
