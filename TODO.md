@@ -25,6 +25,7 @@
 - [x] Book/chapter picker dropdown
 - [x] Mobile-optimized header with hamburger menu
 - [x] Resource tab indicators (shows when commentary/notes/cross-refs available)
+- [x] Clickable Bible references in commentary (56,228 links auto-parsed)
 
 ## High Priority
 
@@ -139,8 +140,8 @@
 ## Custom & Commentary Hyperlinks
 
 - [ ] User custom links: Create/save verse/note chains (new `user_links` table)
-- [ ] Auto-parse commentary for Bible refs during import → make clickable
-- [ ] Frontend handlers: Click ref → load verse/panel
+- [x] Auto-parse commentary for Bible refs during import → make clickable (DONE - 56,228 links)
+- [x] Frontend handlers: Click ref → load verse/panel (DONE)
 
 ## Swipe Mode
 
