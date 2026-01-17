@@ -175,18 +175,79 @@ async def get_single_verse(
 @app.get("/api/search")
 async def search(
     q: str = Query(..., min_length=2, description="Search query"),
-    scope: str = Query(default="all", description="Search scope: bible, book:BookName, notes, commentary, all")
+    scope: str = Query(default="all", description="Search scope: bible, ot, nt, book:BookName, commentary, all")
 ):
     """Full-text search across Bible text, notes, and commentaries."""
+    import re
+
+    # OT/NT book lists for filtering
+    OT_BOOKS = [
+        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+        "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+        "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
+        "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+        "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+        "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+        "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
+        "Haggai", "Zechariah", "Malachi"
+    ]
+    NT_BOOKS = [
+        "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+        "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+        "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+        "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
+        "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+        "Jude", "Revelation"
+    ]
+
     conn = get_db_connection()
     try:
         results = []
 
+        # Check if this is a Strong's number search (G### or H###)
+        strongs_match = re.match(r'^([GH])(\d+)$', q.strip(), re.IGNORECASE)
+        if strongs_match:
+            prefix = strongs_match.group(1).upper()
+            number = strongs_match.group(2)
+            strongs_num = f"{prefix}{number}"
+
+            # Search for verses with this Strong's number
+            cursor = conn.execute("""
+                SELECT DISTINCT 'verse' as type, v.book, v.chapter, v.verse,
+                       v.text as snippet
+                FROM words w
+                JOIN verses v ON w.verse_id = v.id
+                WHERE w.strong_number = ?
+                ORDER BY v.book_order, v.chapter, v.verse
+                LIMIT 50
+            """, (strongs_num,))
+            results.extend([dict(r) for r in cursor.fetchall()])
+            return {"query": q, "scope": scope, "results": results}
+
         # Check if searching within a specific book
         book_filter = None
+        testament_filter = None
         if scope.startswith("book:"):
             book_filter = scope[5:]
             scope = "bible"
+        elif scope == "ot":
+            testament_filter = OT_BOOKS
+            scope = "bible"
+        elif scope == "nt":
+            testament_filter = NT_BOOKS
+            scope = "bible"
+
+        # Build FTS query - handle phrase search with quotes
+        fts_query = q
+        if '"' in q:
+            # FTS5 handles quoted phrases natively
+            pass
+        else:
+            # Add wildcard for partial matching on last word
+            words = q.split()
+            if words:
+                words[-1] = words[-1] + '*'
+                fts_query = ' '.join(words)
 
         if scope in ("all", "bible"):
             if book_filter:
@@ -195,16 +256,28 @@ async def search(
                            snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
                     FROM verses_fts
                     WHERE verses_fts MATCH ? AND book = ?
+                    ORDER BY rank
                     LIMIT 50
-                """, (q, book_filter))
+                """, (fts_query, book_filter))
+            elif testament_filter:
+                placeholders = ','.join('?' * len(testament_filter))
+                cursor = conn.execute(f"""
+                    SELECT 'verse' as type, book, chapter, verse,
+                           snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
+                    FROM verses_fts
+                    WHERE verses_fts MATCH ? AND book IN ({placeholders})
+                    ORDER BY rank
+                    LIMIT 50
+                """, (fts_query, *testament_filter))
             else:
                 cursor = conn.execute("""
                     SELECT 'verse' as type, book, chapter, verse,
                            snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
                     FROM verses_fts
                     WHERE verses_fts MATCH ?
+                    ORDER BY rank
                     LIMIT 50
-                """, (q,))
+                """, (fts_query,))
             results.extend([dict(r) for r in cursor.fetchall()])
 
         if scope in ("all", "commentary"):
@@ -213,8 +286,9 @@ async def search(
                        snippet(commentary_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
                 FROM commentary_fts
                 WHERE commentary_fts MATCH ?
+                ORDER BY rank
                 LIMIT 50
-            """, (q,))
+            """, (fts_query,))
             results.extend([dict(r) for r in cursor.fetchall()])
 
         return {"query": q, "scope": scope, "results": results}
