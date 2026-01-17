@@ -76,6 +76,10 @@ function bibleApp() {
         searchQuery: '',
         searchScope: 'all',
         searchResults: [],
+        searchLoading: false,
+        searchPerformed: false,
+        searchDebounceTimer: null,
+        selectedResultIndex: -1,
 
         // Autocomplete state
         bookSuggestions: [],
@@ -190,8 +194,7 @@ function bibleApp() {
                         break;
                     case '/':
                         e.preventDefault();
-                        this.showSearch = true;
-                        this.$nextTick(() => this.$refs.searchInput?.focus());
+                        this.openSearch();
                         break;
                     case 'Escape':
                         this.showSearch = false;
@@ -809,22 +812,117 @@ function bibleApp() {
             localStorage.setItem('darkMode', this.darkMode);
         },
 
-        // Search
+        // Search - debounced live search
+        handleSearchInput() {
+            // Clear previous timer
+            if (this.searchDebounceTimer) {
+                clearTimeout(this.searchDebounceTimer);
+            }
+
+            // Reset selection when typing
+            this.selectedResultIndex = -1;
+
+            // Debounce search (300ms)
+            this.searchDebounceTimer = setTimeout(() => {
+                this.performSearch();
+            }, 300);
+        },
+
         async performSearch() {
-            if (!this.searchQuery.trim()) return;
+            const query = this.searchQuery.trim();
+
+            // Need at least 2 characters
+            if (query.length < 2) {
+                this.searchResults = [];
+                this.searchPerformed = false;
+                return;
+            }
+
+            this.searchLoading = true;
+            this.searchPerformed = true;
+            this.selectedResultIndex = -1;
 
             try {
                 const response = await fetch(
-                    `/api/search?q=${encodeURIComponent(this.searchQuery)}&scope=${this.searchScope}`
+                    `/api/search?q=${encodeURIComponent(query)}&scope=${this.searchScope}`
                 );
 
                 if (response.ok) {
                     const data = await response.json();
-                    this.searchResults = data.results;
+                    this.searchResults = data.results || [];
                 }
             } catch (err) {
                 console.error('Search failed:', err);
+                this.searchResults = [];
+            } finally {
+                this.searchLoading = false;
             }
+        },
+
+        // Handle keyboard navigation in search results
+        handleSearchKeydown(event) {
+            const resultCount = this.searchResults.length;
+
+            switch (event.key) {
+                case 'ArrowDown':
+                    event.preventDefault();
+                    if (resultCount > 0) {
+                        this.selectedResultIndex = Math.min(
+                            this.selectedResultIndex + 1,
+                            resultCount - 1
+                        );
+                        this.scrollToSelectedResult();
+                    }
+                    break;
+                case 'ArrowUp':
+                    event.preventDefault();
+                    if (resultCount > 0) {
+                        this.selectedResultIndex = Math.max(
+                            this.selectedResultIndex - 1,
+                            0
+                        );
+                        this.scrollToSelectedResult();
+                    }
+                    break;
+                case 'Enter':
+                    if (this.selectedResultIndex >= 0 && this.selectedResultIndex < resultCount) {
+                        event.preventDefault();
+                        this.goToSearchResult(this.searchResults[this.selectedResultIndex]);
+                    } else if (resultCount > 0) {
+                        // If no selection, go to first result
+                        event.preventDefault();
+                        this.goToSearchResult(this.searchResults[0]);
+                    }
+                    break;
+                case 'Escape':
+                    this.showSearch = false;
+                    break;
+            }
+        },
+
+        scrollToSelectedResult() {
+            this.$nextTick(() => {
+                const selected = document.querySelector('.search-result.selected');
+                if (selected) {
+                    selected.scrollIntoView({ block: 'nearest' });
+                }
+            });
+        },
+
+        // Get grouped search results
+        getGroupedResults() {
+            const groups = {
+                verse: [],
+                commentary: []
+            };
+            for (const result of this.searchResults) {
+                if (result.type === 'verse') {
+                    groups.verse.push(result);
+                } else if (result.type === 'commentary') {
+                    groups.commentary.push(result);
+                }
+            }
+            return groups;
         },
 
         // Go to search result
@@ -835,7 +933,19 @@ function bibleApp() {
                     : `${result.book} ${result.chapter}`;
                 this.loadReference(ref);
                 this.showSearch = false;
+                this.searchQuery = '';
+                this.searchResults = [];
+                this.searchPerformed = false;
             }
+        },
+
+        // Reset search state when opening
+        openSearch() {
+            this.showSearch = true;
+            this.searchResults = [];
+            this.searchPerformed = false;
+            this.selectedResultIndex = -1;
+            this.$nextTick(() => this.$refs.searchInput?.focus());
         },
 
         // Notes (IndexedDB)

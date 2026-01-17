@@ -103,7 +103,7 @@
             </div>
         </div>
         <div class="header-right">
-            <button @click="showSearch = true" class="btn-icon" title="Search (/)">
+            <button @click="openSearch()" class="btn-icon" title="Search (/)">
                 🔍
             </button>
             <button @click="showHelp = true" class="btn-icon" title="Help (?)">
@@ -435,31 +435,96 @@
                     <input
                         type="text"
                         x-model="searchQuery"
-                        @keydown.enter="performSearch"
-                        placeholder="Search Bible, notes, commentary..."
+                        @input="handleSearchInput"
+                        @keydown="handleSearchKeydown"
+                        placeholder="Search Bible, commentary... (min 2 chars)"
                         class="input-search"
                         x-ref="searchInput"
+                        autocomplete="off"
                     >
-                    <select x-model="searchScope" class="select-scope">
+                    <select x-model="searchScope" @change="performSearch" class="select-scope">
                         <option value="all">All</option>
                         <option value="bible">Bible Text</option>
+                        <option value="ot">Old Testament</option>
+                        <option value="nt">New Testament</option>
                         <option :value="'book:' + currentBook" x-show="currentBook" x-text="'In ' + currentBook"></option>
                         <option value="commentary">Commentary</option>
-                        <option value="notes">Notes</option>
                     </select>
-                    <button @click="performSearch" class="btn-search">Search</button>
                 </div>
-                <div class="search-results">
-                    <template x-for="(result, index) in searchResults" :key="index">
-                        <div class="search-result" @click="goToSearchResult(result)">
-                            <div class="result-type" x-text="result.type === 'verse' ? 'Bible' : result.type"></div>
-                            <div class="result-ref">
-                                <span x-text="result.book + ' ' + result.chapter + (result.verse ? ':' + result.verse : '')"></span>
-                                <span x-show="result.source" class="result-source" x-text="'(' + result.source + ')'"></span>
+
+                <!-- Loading indicator -->
+                <div x-show="searchLoading" class="search-loading">
+                    <div class="loading-spinner"></div>
+                    <span>Searching...</span>
+                </div>
+
+                <!-- No results message -->
+                <div x-show="searchPerformed && !searchLoading && searchResults.length === 0" class="search-no-results">
+                    <span class="empty-state-icon">🔍</span>
+                    <span>No results found for "<span x-text="searchQuery"></span>"</span>
+                    <span class="search-tip">Try different keywords or check spelling</span>
+                </div>
+
+                <!-- Results grouped by type -->
+                <div class="search-results" x-show="searchResults.length > 0">
+                    <!-- Bible Results -->
+                    <template x-if="getGroupedResults().verse.length > 0">
+                        <div class="results-group">
+                            <div class="results-group-header">
+                                <span class="group-icon">📖</span>
+                                Bible Text
+                                <span class="group-count" x-text="'(' + getGroupedResults().verse.length + ')'"></span>
                             </div>
-                            <div class="result-snippet" x-html="result.snippet"></div>
+                            <template x-for="(result, i) in getGroupedResults().verse" :key="'v' + i">
+                                <div
+                                    class="search-result"
+                                    :class="{ 'selected': selectedResultIndex === searchResults.indexOf(result) }"
+                                    @click="goToSearchResult(result)"
+                                    @mouseenter="selectedResultIndex = searchResults.indexOf(result)"
+                                >
+                                    <div class="result-ref">
+                                        <span x-text="result.book + ' ' + result.chapter + ':' + result.verse"></span>
+                                    </div>
+                                    <div class="result-snippet" x-html="result.snippet"></div>
+                                </div>
+                            </template>
                         </div>
                     </template>
+
+                    <!-- Commentary Results -->
+                    <template x-if="getGroupedResults().commentary.length > 0">
+                        <div class="results-group">
+                            <div class="results-group-header">
+                                <span class="group-icon">📝</span>
+                                Commentary
+                                <span class="group-count" x-text="'(' + getGroupedResults().commentary.length + ')'"></span>
+                            </div>
+                            <template x-for="(result, i) in getGroupedResults().commentary" :key="'c' + i">
+                                <div
+                                    class="search-result"
+                                    :class="{ 'selected': selectedResultIndex === searchResults.indexOf(result) }"
+                                    @click="goToSearchResult(result)"
+                                    @mouseenter="selectedResultIndex = searchResults.indexOf(result)"
+                                >
+                                    <div class="result-ref">
+                                        <span x-text="result.book + ' ' + result.chapter"></span>
+                                        <span class="result-source" x-text="'(' + result.source + ')'"></span>
+                                    </div>
+                                    <div class="result-snippet" x-html="result.snippet"></div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Search tips -->
+                <div x-show="!searchPerformed && searchQuery.length < 2" class="search-tips">
+                    <p><strong>Search tips:</strong></p>
+                    <ul>
+                        <li>Use quotes for exact phrases: <code>"in the beginning"</code></li>
+                        <li>Search Strong's numbers: <code>G26</code> or <code>H430</code></li>
+                        <li>Use arrow keys to navigate results</li>
+                    </ul>
                 </div>
             </div>
         </div>
