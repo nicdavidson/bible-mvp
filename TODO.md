@@ -109,6 +109,33 @@
 - Sources: MorphGNT (GitHub), Open Scriptures Hebrew Bible, public-domain Strong's.
 - This ties directly into interlinear import (already high-priority) and commentary (verse-level is fine, link to words optionally).
 
+## Study Spaces & Templates
+
+- [ ] Design template system: JSON configs for panels, resources (translations, commentary, originals, cross-refs), and layouts
+- [ ] Backend: New `user_templates` table in SQLite (id, name, config_json)
+- [ ] Frontend: Template selector dropdown; load/save current view as template
+- [ ] Prototype 2-3 defaults: "Daily Reading" (NIV + commentary), "Deep Study" (add originals + extra refs)
+
+## Highlighting & Tagging
+
+- [ ] Implement text selection highlighting with color picker
+- [ ] Add tagging: Assign tags to highlights, default colors per tag
+- [ ] Quick mode: Color implies tag; detailed mode: Popup for tag input
+- [ ] New/expand SQLite table: `highlights` (verse_ref, selection, color, tag)
+- [ ] Filtering: Search/show highlights by tag/color
+
+## Custom & Commentary Hyperlinks
+
+- [ ] User custom links: Create/save verse/note chains (new `user_links` table)
+- [ ] Auto-parse commentary for Bible refs during import → make clickable
+- [ ] Frontend handlers: Click ref → load verse/panel
+
+## Swipe Mode
+
+- [ ] Full-screen verse view with swipe navigation (Alpine.js touch events)
+- [ ] Toggles: Originals, cross-refs, commentary overlays
+- [ ] Integrate as template "screen" type (e.g., optional in "Daily Reading")
+
 ---
 
 Last updated: 2026-01-16
