@@ -9,7 +9,7 @@
 - [x] Prev/next chapter and verse navigation
 - [x] Clickable verse boxes for commentary
 - [x] Cross-references (41,649 entries) with hover previews
-- [x] Commentary display (4,124 entries - Matthew Henry, all 66 books)
+- [x] Commentary display (4,124 entries - Matthew Henry, 65/66 books - Song of Solomon missing from API)
 - [x] Dark mode
 - [x] Notes (localStorage)
 - [x] Book-only reference defaults to chapter 1
@@ -26,13 +26,17 @@
 - [x] Mobile-optimized header with hamburger menu
 - [x] Resource tab indicators (shows when commentary/notes/cross-refs available)
 - [x] Clickable Bible references in commentary (56,228 links auto-parsed)
+- [x] Enhanced search (live debounced search, keyboard navigation, grouped results)
+- [x] Strong's number search with word info card (e.g., G26 shows ἀγάπη with definition)
+- [x] Search scope filters (OT/NT/current book/commentary)
 
 ## High Priority
 
 ### Data Import
-- [x] Import remaining Matthew Henry commentary (all 66 books - DONE)
+- [x] Import Matthew Henry commentary (65/66 books - Song of Solomon missing from source API)
 - [x] Import Strong's lexicon for word studies (DONE)
 - [ ] Add second commentary source (John Gill or Adam Clarke)
+- [ ] Find alternative source for Song of Solomon commentary
 
 ### UI/UX
 - [ ] **Draggable/resizable panels** - VSCode-style layout where Word details, Notes, Commentary, Cross-refs can all be visible simultaneously and rearranged. Consider using Golden Layout or split.js library.
@@ -46,8 +50,13 @@
 ## Medium Priority
 
 ### Search Improvements
-- [ ] Better search result snippets
-- [ ] Search within current book/chapter
+- [x] Live search as you type (debounced) - DONE
+- [x] Keyboard navigation for results - DONE
+- [x] Group results by type (Bible/Commentary) - DONE
+- [x] Search scope filters (OT/NT/book/commentary) - DONE
+- [x] Strong's number search (G###/H###) - DONE
+- [x] Phrase search with quotes - DONE
+- [ ] Search suggestions for book names
 
 ### Notes System
 - [ ] Migrate from localStorage to IndexedDB

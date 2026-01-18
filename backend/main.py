@@ -211,18 +211,47 @@ async def search(
             number = strongs_match.group(2)
             strongs_num = f"{prefix}{number}"
 
-            # Search for verses with this Strong's number
+            # Get the lexicon entry for this Strong's number
+            lex_cursor = conn.execute("""
+                SELECT original, transliteration, definition
+                FROM lexicon
+                WHERE strong_number = ?
+            """, (strongs_num,))
+            lex_row = lex_cursor.fetchone()
+            word_info = None
+            if lex_row:
+                word_info = {
+                    "strong_number": strongs_num,
+                    "original": lex_row["original"],
+                    "transliteration": lex_row["transliteration"],
+                    "definition": lex_row["definition"]
+                }
+
+            # Search for verses with this Strong's number, including the original word
             cursor = conn.execute("""
-                SELECT DISTINCT 'verse' as type, v.book, v.chapter, v.verse,
-                       v.text as snippet
+                SELECT 'verse' as type, v.book, v.chapter, v.verse,
+                       v.text as snippet, w.text as original_word,
+                       w.translation as gloss
                 FROM words w
                 JOIN verses v ON w.verse_id = v.id
                 WHERE w.strong_number = ?
                 ORDER BY v.book_order, v.chapter, v.verse
                 LIMIT 50
             """, (strongs_num,))
-            results.extend([dict(r) for r in cursor.fetchall()])
-            return {"query": q, "scope": scope, "results": results}
+
+            for row in cursor.fetchall():
+                result = dict(row)
+                # Highlight the translated word in the snippet if we have a gloss
+                if result.get("gloss"):
+                    gloss = result["gloss"]
+                    snippet = result["snippet"]
+                    # Try to highlight the gloss word in the verse text
+                    import re as regex
+                    pattern = regex.compile(r'\b(' + regex.escape(gloss) + r')\b', regex.IGNORECASE)
+                    result["snippet"] = pattern.sub(r'<mark>\1</mark>', snippet, count=1)
+                results.append(result)
+
+            return {"query": q, "scope": scope, "results": results, "word_info": word_info}
 
         # Check if searching within a specific book
         book_filter = None
@@ -296,12 +325,78 @@ async def search(
         conn.close()
 
 
+@app.get("/api/word-alignment")
+async def get_word_alignment(
+    book: str,
+    chapter: int,
+    verse: int,
+    word_position: int,
+    translation: str = Query(default="KJV", description="Bible translation")
+):
+    """
+    Look up the Hebrew/Greek original word for an English word by position.
+
+    This enables deterministic word lookup when clicking English words.
+    Returns the original word data including Strong's number and definition.
+    """
+    conn = get_db_connection()
+    try:
+        # Look up the alignment
+        cursor = conn.execute("""
+            SELECT ea.english_word, ea.original_word_position, ea.confidence,
+                   wa.hebrew_text as original_text, wa.transliteration, wa.english_gloss,
+                   wa.grammar as parsing,
+                   CASE WHEN wa.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(wa.strong_number, 2) AS INTEGER) AS TEXT)
+                        WHEN wa.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(wa.strong_number, 2) AS INTEGER) AS TEXT)
+                        ELSE wa.strong_number END as strong_number
+            FROM english_word_alignments ea
+            JOIN word_alignments wa ON (
+                wa.book = ea.book AND wa.chapter = ea.chapter
+                AND wa.verse = ea.verse AND wa.word_position = ea.original_word_position
+            )
+            WHERE ea.translation_id = ?
+              AND ea.book = ? AND ea.chapter = ? AND ea.verse = ?
+              AND ea.english_word_position = ?
+        """, (translation, book, chapter, verse, word_position))
+
+        row = cursor.fetchone()
+        if not row:
+            return {"found": False, "message": "No alignment found for this word"}
+
+        result = dict(row)
+        strong_number = result.get('strong_number')
+
+        # Get lexicon definition if we have a Strong's number
+        if strong_number:
+            cursor = conn.execute("""
+                SELECT original, transliteration, pronunciation, definition,
+                       extended_definition, derivation, language
+                FROM lexicon
+                WHERE strong_number = ?
+            """, (strong_number,))
+
+            lex_row = cursor.fetchone()
+            if lex_row:
+                lex_data = dict(lex_row)
+                # Use lexicon transliteration if alignment doesn't have one
+                if not result.get('transliteration'):
+                    result['transliteration'] = lex_data.get('transliteration')
+                result['pronunciation'] = lex_data.get('pronunciation')
+                result['definition'] = lex_data.get('definition')
+                result['extended_definition'] = lex_data.get('extended_definition')
+                result['language'] = lex_data.get('language')
+
+        return {"found": True, "alignment": result}
+    finally:
+        conn.close()
+
+
 @app.get("/api/word/{strong_number}")
 async def get_word(strong_number: str):
     """Get lexicon entry and all occurrences for a Strong's number."""
     conn = get_db_connection()
     try:
-        # Get word details
+        # Get word details from lexicon
         cursor = conn.execute("""
             SELECT strong_number, original, transliteration,
                    pronunciation, definition, extended_definition, derivation, language
@@ -312,6 +407,24 @@ async def get_word(strong_number: str):
         word = cursor.fetchone()
         if not word:
             raise HTTPException(status_code=404, detail=f"Word not found: {strong_number}")
+
+        word_dict = dict(word)
+
+        # If lexicon doesn't have transliteration, try to get from alignment data
+        if not word_dict.get('transliteration'):
+            # Normalize Strong's number format - alignment uses H0430, lexicon uses H430
+            prefix = strong_number[0]  # H or G
+            num = strong_number[1:]
+            padded_strong = f"{prefix}{num.zfill(4)}"  # H430 -> H0430
+
+            cursor = conn.execute("""
+                SELECT transliteration FROM word_alignments
+                WHERE strong_number = ? AND transliteration IS NOT NULL AND transliteration != ''
+                LIMIT 1
+            """, (padded_strong,))
+            align_row = cursor.fetchone()
+            if align_row and align_row['transliteration']:
+                word_dict['transliteration'] = align_row['transliteration']
 
         # Get all occurrences
         cursor = conn.execute("""
@@ -325,7 +438,7 @@ async def get_word(strong_number: str):
         occurrences = cursor.fetchall()
 
         return {
-            "word": dict(word),
+            "word": word_dict,
             "occurrences": [dict(o) for o in occurrences],
             "count": len(occurrences)
         }
@@ -338,7 +451,13 @@ async def get_passage_interlinear(
     reference: str,
     translation: str = Query(default="WEB", description="Bible translation")
 ):
-    """Get interlinear (original language) data for an entire chapter."""
+    """Get interlinear (original language) data for an entire chapter.
+
+    The interlinear data comes from word_alignments which contains the original
+    Hebrew/Greek text with English glosses. This is translation-independent since
+    the original language text is the same regardless of which English translation
+    is being viewed.
+    """
     conn = get_db_connection()
     try:
         parsed = parse_reference(reference)
@@ -347,17 +466,31 @@ async def get_passage_interlinear(
 
         book, chapter, _, _, _ = parsed
 
-        # Get all words for the chapter with lexicon data
+        # Query alignment data directly - this works for any translation since
+        # the Hebrew/Greek text is the same. Normalize Strong's numbers for lexicon lookup.
+        # Include word_id for deterministic English word alignment.
         cursor = conn.execute("""
-            SELECT v.verse, w.position, w.text as original_text, w.strong_number, w.parsing, w.translation,
-                   l.original as lexeme, l.transliteration, l.pronunciation, l.definition,
+            SELECT a.verse, a.word_position as position, a.hebrew_text as original_text,
+                   a.book || '.' || a.chapter || '.' || a.verse || '.' || a.word_position as word_id,
+                   CASE WHEN a.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
+                        WHEN a.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
+                        ELSE a.strong_number END as strong_number,
+                   a.grammar as parsing,
+                   a.english_gloss as translation,
+                   l.original as lexeme,
+                   COALESCE(NULLIF(a.transliteration, ''), l.transliteration) as transliteration,
+                   l.pronunciation,
+                   l.definition,
+                   l.extended_definition,
                    l.language
-            FROM words w
-            JOIN verses v ON w.verse_id = v.id
-            LEFT JOIN lexicon l ON w.strong_number = l.strong_number
-            WHERE v.book = ? AND v.chapter = ? AND v.translation_id = ?
-            ORDER BY v.verse, w.position
-        """, (book, chapter, translation))
+            FROM word_alignments a
+            LEFT JOIN lexicon l ON l.strong_number = CASE
+                WHEN a.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
+                WHEN a.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
+                ELSE a.strong_number END
+            WHERE a.book = ? AND a.chapter = ?
+            ORDER BY a.verse, a.word_position
+        """, (book, chapter))
 
         rows = cursor.fetchall()
 

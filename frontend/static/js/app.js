@@ -76,6 +76,7 @@ function bibleApp() {
         searchQuery: '',
         searchScope: 'all',
         searchResults: [],
+        searchWordInfo: null,  // Strong's word info for Strong's searches
         searchLoading: false,
         searchPerformed: false,
         searchDebounceTimer: null,
@@ -716,52 +717,157 @@ function bibleApp() {
 
         // Format verse text with clickable words
         formatVerseText(text) {
-            // Just wrap each word in a span for click handling
-            return text.split(/\s+/).map((word, i) => {
+            // Wrap each word in a span with position for alignment lookup
+            let wordPosition = 0;
+            return text.split(/\s+/).map((word) => {
                 const cleanWord = word.replace(/[.,;:!?'"()]/g, '');
                 const punct = word.replace(cleanWord, '');
-                return `<span class="word" data-word="${cleanWord}">${cleanWord}</span>${punct}`;
+                if (cleanWord) wordPosition++;
+                return `<span class="word" data-word="${cleanWord}" data-position="${wordPosition}">${cleanWord}</span>${punct}`;
             }).join(' ');
         },
 
-        // Handle word click (for interlinear words)
+        // Handle word click (for English words in verse text)
         async handleWordClick(event) {
             const wordEl = event.target.closest('.word');
             if (!wordEl) return;
 
-            const strongNum = wordEl.dataset.strong;
-
-            // Remove previous selection
-            document.querySelectorAll('.word.selected').forEach(el => {
-                el.classList.remove('selected');
-            });
-            wordEl.classList.add('selected');
-
-            // If we have a Strong's number, look it up
-            if (strongNum && strongNum !== 'null') {
-                await this.loadWordDetails(strongNum);
-            } else {
-                // For words without Strong's data
-                const word = wordEl.dataset.word || wordEl.textContent;
-                this.selectedWord = {
-                    text: word,
-                    original: '---',
-                    transliteration: '---',
-                    strong_number: null,
-                    parsing: 'No Strong\'s number available',
-                    definition: 'This word does not have interlinear data linked.',
-                    occurrences: [],
-                    count: 0
-                };
-            }
-        },
-
-        // Handle interlinear word click
-        async handleInterlinearWordClick(word) {
             // Remove previous selection
             document.querySelectorAll('.word.selected, .interlinear-word.selected').forEach(el => {
                 el.classList.remove('selected');
             });
+            wordEl.classList.add('selected');
+
+            const word = wordEl.dataset.word || wordEl.textContent;
+            const wordPosition = parseInt(wordEl.dataset.position, 10);
+
+            // Get verse number from parent verse-box
+            const verseBox = wordEl.closest('.verse-box');
+            const verseId = verseBox?.id || '';
+            const verseNum = parseInt(verseId.replace('verse-', ''), 10);
+
+            // Try database lookup for word alignment
+            if (this.currentBook && this.currentChapter && verseNum && wordPosition) {
+                try {
+                    const params = new URLSearchParams({
+                        book: this.currentBook,
+                        chapter: this.currentChapter,
+                        verse: verseNum,
+                        word_position: wordPosition,
+                        translation: this.translation
+                    });
+                    const response = await fetch(`/api/word-alignment?${params}`);
+                    const data = await response.json();
+
+                    if (data.found && data.alignment) {
+                        const align = data.alignment;
+                        this.selectedWord = {
+                            text: word,
+                            original: align.original_text,
+                            transliteration: align.transliteration,
+                            strong_number: align.strong_number,
+                            parsing: align.parsing,
+                            definition: align.definition || align.english_gloss,
+                            extended_definition: align.extended_definition,
+                            language: align.language,
+                            occurrences: [],
+                            count: 0
+                        };
+
+                        // Also highlight the corresponding interlinear word if visible
+                        if (this.showInterlinear) {
+                            const origPos = align.original_word_position;
+                            const interlinearWords = verseBox?.querySelectorAll('.interlinear-word');
+                            interlinearWords?.forEach((el, idx) => {
+                                if (idx + 1 === origPos) {
+                                    el.classList.add('selected');
+                                }
+                            });
+                        }
+                        return;
+                    }
+                } catch (err) {
+                    console.error('Word alignment lookup failed:', err);
+                }
+            }
+
+            // Fallback: show helpful message if no alignment found
+            const isOT = OT_BOOKS.includes(this.currentBook);
+            const language = isOT ? 'Hebrew' : 'Greek';
+
+            this.selectedWord = {
+                text: word,
+                original: null,
+                transliteration: null,
+                strong_number: null,
+                parsing: null,
+                definition: this.showInterlinear
+                    ? `Click on the ${language} word below to see Strong's definitions and word study details.`
+                    : `Enable "Original Language" in the header to see ${language} words with Strong's numbers.`,
+                occurrences: [],
+                count: 0
+            };
+        },
+
+        // Handle interlinear word click
+        async handleInterlinearWordClick(word, event) {
+            // Remove previous selection
+            document.querySelectorAll('.word.selected, .interlinear-word.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+
+            // Highlight this interlinear word
+            const interlinearEl = event?.target?.closest('.interlinear-word');
+            if (interlinearEl) {
+                interlinearEl.classList.add('selected');
+            }
+
+            // Try to highlight the corresponding English word
+            const verseBox = event?.target?.closest('.verse-box');
+            if (verseBox) {
+                const translation = (word.translation || '').toLowerCase().replace(/[.,;:!?'"()\[\]]/g, '');
+                const englishWords = verseBox.querySelectorAll('.verse-text .word');
+
+                // Skip common words that appear multiple times
+                const skipWords = ['and', 'the', 'a', 'an', 'of', 'to', 'in', 'for', 'is', 'was', 'be', 'it', 'that', 'his', 'her', 'with', 'he', 'she', 'they', 'them', 'him', 'this', 'but', 'not', 'or', 'as', 'at', 'by', 'from', 'on', 'are', 'were', 'have', 'has', 'had', 'will', 'shall', 'who', 'which', 'their', 'you', 'your', 'my', 'me', 'i', 'we', 'us', 'our'];
+
+                // Extract key words from translation (e.g., "in beginning" -> ["beginning"])
+                const translationWords = translation.split(/\s+/).filter(w => w.length > 2 && !skipWords.includes(w));
+
+                if (translationWords.length > 0) {
+                    // Find best matching English word
+                    let bestMatch = null;
+                    let bestScore = 0;
+
+                    englishWords.forEach(el => {
+                        const englishWord = (el.dataset.word || el.textContent).toLowerCase()
+                            .replace(/'s$/, '').replace(/s$/, '');
+                        const englishBase = englishWord.replace(/ing$|ed$|ly$/, '');
+
+                        // Skip common words
+                        if (skipWords.includes(englishWord)) return;
+
+                        let score = 0;
+                        // Exact match with a translation word
+                        if (translationWords.some(tw => tw === englishWord || tw === englishBase)) {
+                            score = 100;
+                        }
+                        // Plural/singular match
+                        else if (translationWords.some(tw => tw + 's' === englishWord || tw === englishWord + 's')) {
+                            score = 90;
+                        }
+
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMatch = el;
+                        }
+                    });
+
+                    if (bestMatch && bestScore >= 90) {
+                        bestMatch.classList.add('selected');
+                    }
+                }
+            }
 
             if (word.strong_number) {
                 await this.loadWordDetails(word.strong_number);
@@ -850,6 +956,7 @@ function bibleApp() {
                 if (response.ok) {
                     const data = await response.json();
                     this.searchResults = data.results || [];
+                    this.searchWordInfo = data.word_info || null;
                 }
             } catch (err) {
                 console.error('Search failed:', err);
@@ -943,6 +1050,7 @@ function bibleApp() {
         openSearch() {
             this.showSearch = true;
             this.searchResults = [];
+            this.searchWordInfo = null;
             this.searchPerformed = false;
             this.selectedResultIndex = -1;
             this.$nextTick(() => this.$refs.searchInput?.focus());

@@ -185,12 +185,12 @@
                                 <template x-for="word in getInterlinearWords(verse.verse)" :key="word.position">
                                     <span
                                         class="interlinear-word"
-                                        @click.stop="handleInterlinearWordClick(word)"
+                                        @click.stop="handleInterlinearWordClick(word, $event)"
                                         :class="{ 'has-strong': word.strong_number }"
-                                        :title="word.transliteration + (word.strong_number ? ' (' + word.strong_number + ')' : '')"
+                                        :data-word-id="word.word_id"
+                                        :title="(word.transliteration || '') + (word.strong_number ? ' [' + word.strong_number + ']' : '')"
                                     >
                                         <span class="original-text" x-text="word.original_text"></span>
-                                        <span class="word-transliteration" x-text="word.transliteration || ''"></span>
                                         <span class="word-gloss" x-text="getWordGloss(word)"></span>
                                     </span>
                                 </template>
@@ -374,21 +374,35 @@
                 <button @click="selectedWord = null" class="btn-close">×</button>
             </div>
             <div class="panel-body" x-show="selectedWord">
-                <div class="word-header">
-                    <span class="word-original" :class="selectedWord?.language" x-text="selectedWord?.original || selectedWord?.text"></span>
-                    <span class="word-transliteration" x-text="selectedWord?.transliteration || '—'"></span>
-                </div>
-                <div class="word-strongs" x-show="selectedWord?.strong_number">
-                    <span class="strong-badge" :class="selectedWord?.language" x-text="selectedWord?.strong_number"></span>
-                    <span class="word-lang-label" x-text="selectedWord?.language === 'hebrew' ? 'Hebrew' : selectedWord?.language === 'greek' ? 'Greek' : ''"></span>
-                </div>
-                <div class="word-pronunciation" x-show="selectedWord?.pronunciation">
-                    <em x-text="selectedWord?.pronunciation"></em>
-                </div>
-                <div class="word-definition">
-                    <strong>Definition:</strong>
-                    <p x-text="selectedWord?.definition || 'No definition available'"></p>
-                </div>
+                <!-- Show full word details when we have original language data -->
+                <template x-if="selectedWord?.original || selectedWord?.strong_number">
+                    <div>
+                        <div class="word-header">
+                            <span class="word-original" :class="selectedWord?.language" x-text="selectedWord?.original || selectedWord?.text"></span>
+                            <span class="word-transliteration" x-text="selectedWord?.transliteration || '—'"></span>
+                        </div>
+                        <div class="word-strongs" x-show="selectedWord?.strong_number">
+                            <span class="strong-badge" :class="selectedWord?.language" x-text="selectedWord?.strong_number"></span>
+                            <span class="word-lang-label" x-text="selectedWord?.language === 'hebrew' ? 'Hebrew' : selectedWord?.language === 'greek' ? 'Greek' : ''"></span>
+                        </div>
+                        <div class="word-pronunciation" x-show="selectedWord?.pronunciation">
+                            <em x-text="selectedWord?.pronunciation"></em>
+                        </div>
+                        <div class="word-definition">
+                            <strong>Definition:</strong>
+                            <p x-text="selectedWord?.definition || 'No definition available'"></p>
+                        </div>
+                    </div>
+                </template>
+                <!-- Show helpful message when clicking English words -->
+                <template x-if="!selectedWord?.original && !selectedWord?.strong_number">
+                    <div class="word-hint">
+                        <div class="word-hint-title">
+                            "<span x-text="selectedWord?.text"></span>"
+                        </div>
+                        <p x-text="selectedWord?.definition"></p>
+                    </div>
+                </template>
                 <div class="word-extended" x-show="selectedWord?.extended_definition">
                     <strong>KJV Usage:</strong>
                     <p x-text="selectedWord?.extended_definition"></p>
@@ -465,6 +479,16 @@
                     <span class="search-tip">Try different keywords or check spelling</span>
                 </div>
 
+                <!-- Strong's word info card -->
+                <div x-show="searchWordInfo" class="strongs-word-card">
+                    <div class="strongs-header">
+                        <span class="strongs-number" x-text="searchWordInfo?.strong_number"></span>
+                        <span class="strongs-original" x-text="searchWordInfo?.original"></span>
+                        <span class="strongs-transliteration" x-text="'(' + (searchWordInfo?.transliteration || '') + ')'"></span>
+                    </div>
+                    <div class="strongs-definition" x-text="searchWordInfo?.definition"></div>
+                </div>
+
                 <!-- Results grouped by type -->
                 <div class="search-results" x-show="searchResults.length > 0">
                     <!-- Bible Results -->
@@ -472,7 +496,7 @@
                         <div class="results-group">
                             <div class="results-group-header">
                                 <span class="group-icon">📖</span>
-                                Bible Text
+                                <span x-text="searchWordInfo ? 'Verses with this word' : 'Bible Text'"></span>
                                 <span class="group-count" x-text="'(' + getGroupedResults().verse.length + ')'"></span>
                             </div>
                             <template x-for="(result, i) in getGroupedResults().verse" :key="'v' + i">
@@ -484,6 +508,7 @@
                                 >
                                     <div class="result-ref">
                                         <span x-text="result.book + ' ' + result.chapter + ':' + result.verse"></span>
+                                        <span x-show="result.original_word" class="result-original-word" x-text="result.original_word"></span>
                                     </div>
                                     <div class="result-snippet" x-html="result.snippet"></div>
                                 </div>
