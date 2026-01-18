@@ -61,3 +61,10 @@ data/*.xml
 data/*.csv
 data/*.zip
 data/__MACOSX/
+
+# Database files
+*.db
+*.sqlite
+
+# Grok config
+.grok/
