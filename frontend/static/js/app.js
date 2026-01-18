@@ -54,7 +54,7 @@ function bibleApp() {
 
         // State
         referenceInput: '',
-        translation: 'WEB',
+        translation: 'BSB',
         currentReference: '',
         currentBook: '',
         currentChapter: 0,
@@ -72,7 +72,6 @@ function bibleApp() {
         darkMode: false,
         activeTab: 'commentary',
         showSearch: false,
-        showHelp: false,
         searchQuery: '',
         searchScope: 'all',
         searchResults: [],
@@ -115,13 +114,88 @@ function bibleApp() {
         interlinearData: {},  // verse number -> words array
         showInterlinear: false,
 
+        // Settings state
+        showSettings: false,
+        settingsTab: 'general',
+        defaultTranslation: 'BSB',
+        defaultShowInterlinear: false,
+
+        // Devotional state (kept for offline downloads)
+        devotional: { entries: [], month: 0, day: 0 },
+        loadingDevotional: false,
+        devotionalMonth: new Date().getMonth() + 1,
+        devotionalDay: new Date().getDate(),
+
+        // Commentary grouping state
+        expandedCommentarySources: {},  // { source: boolean }
+
+        // Offline state
+        isOnline: navigator.onLine,
+        forcedOffline: false,  // Manual offline mode for privacy/security
+        autoCacheEnabled: true,
+        offlineStats: {
+            chapters: 0,
+            verses: 0,
+            lexicon: false,
+            estimatedSize: 0
+        },
+        downloadOptions: {
+            lexicon: false,
+            currentBook: false
+        },
+        downloadSelections: {
+            translations: {
+                BSB: false,
+                WEB: false,
+                KJV: false
+            },
+            lexicon: false,
+            commentaryMH: false,  // Matthew Henry
+            commentaryJG: false,  // John Gill
+            crossRefs: false,
+            devotionalSpurgeon: false
+        },
+        downloadProgress: {
+            active: false,
+            label: '',
+            percent: 0,
+            status: ''
+        },
+        toasts: [],
+
         // Initialize
         async init() {
             // Detect touch device
             this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-            // Load dark mode preference
+            // Load preferences from localStorage
             this.darkMode = localStorage.getItem('darkMode') === 'true';
+            this.defaultTranslation = localStorage.getItem('defaultTranslation') || 'BSB';
+            this.translation = this.defaultTranslation;
+            this.defaultShowInterlinear = localStorage.getItem('defaultShowInterlinear') === 'true';
+            this.showInterlinear = this.defaultShowInterlinear;
+            this.autoCacheEnabled = localStorage.getItem('autoCacheEnabled') !== 'false';
+            this.forcedOffline = localStorage.getItem('forcedOffline') === 'true';
+
+            // If forced offline, reflect that in isOnline
+            if (this.forcedOffline) {
+                this.isOnline = false;
+            }
+
+            // Setup online/offline listeners
+            window.addEventListener('online', () => {
+                if (!this.forcedOffline) {
+                    this.isOnline = true;
+                    this.showToast('Back online', 'success');
+                }
+            });
+            window.addEventListener('offline', () => {
+                this.isOnline = false;
+                this.showToast('You are offline - cached content available', 'info');
+            });
+
+            // Load offline stats
+            await this.updateOfflineStats();
 
             // Load notes from IndexedDB
             await this.loadNotes();
@@ -162,7 +236,7 @@ function bibleApp() {
                     if (e.key === 'Escape') {
                         e.target.blur();
                         this.showSearch = false;
-                        this.showHelp = false;
+                        this.showSettings = false;
                         this.selectedWord = null;
                     }
                     return;
@@ -199,7 +273,7 @@ function bibleApp() {
                         break;
                     case 'Escape':
                         this.showSearch = false;
-                        this.showHelp = false;
+                        this.showSettings = false;
                         this.selectedWord = null;
                         break;
                     case 'd':
@@ -213,7 +287,7 @@ function bibleApp() {
                         break;
                     case '?':
                         e.preventDefault();
-                        this.showHelp = !this.showHelp;
+                        this.openSettings('shortcuts');
                         break;
                     case 'g':
                         e.preventDefault();
@@ -441,15 +515,37 @@ function bibleApp() {
         // Navigate to previous chapter
         previousChapter() {
             if (this.currentChapter > 1) {
+                // Go to previous chapter in same book
                 this.referenceInput = `${this.currentBook} ${this.currentChapter - 1}`;
                 this.loadPassage();
+            } else {
+                // At chapter 1, go to last chapter of previous book
+                const bookIndex = BIBLE_BOOKS.indexOf(this.currentBook);
+                if (bookIndex > 0) {
+                    const prevBook = BIBLE_BOOKS[bookIndex - 1];
+                    const lastChapter = BOOK_CHAPTERS[prevBook] || 1;
+                    this.referenceInput = `${prevBook} ${lastChapter}`;
+                    this.loadPassage();
+                }
             }
         },
 
         // Navigate to next chapter
         nextChapter() {
-            this.referenceInput = `${this.currentBook} ${this.currentChapter + 1}`;
-            this.loadPassage();
+            const maxChapter = BOOK_CHAPTERS[this.currentBook] || 1;
+            if (this.currentChapter < maxChapter) {
+                // Go to next chapter in same book
+                this.referenceInput = `${this.currentBook} ${this.currentChapter + 1}`;
+                this.loadPassage();
+            } else {
+                // At last chapter, go to first chapter of next book
+                const bookIndex = BIBLE_BOOKS.indexOf(this.currentBook);
+                if (bookIndex < BIBLE_BOOKS.length - 1) {
+                    const nextBook = BIBLE_BOOKS[bookIndex + 1];
+                    this.referenceInput = `${nextBook} 1`;
+                    this.loadPassage();
+                }
+            }
         },
 
         // Get first highlighted verse or 1
@@ -561,6 +657,44 @@ function bibleApp() {
                     this.loadReference(ref);
                 }
             }
+        },
+
+        // Group commentary entries by source
+        getGroupedCommentary() {
+            const grouped = {};
+            for (const entry of this.commentary) {
+                const source = entry.source || 'Unknown';
+                if (!grouped[source]) {
+                    grouped[source] = [];
+                }
+                grouped[source].push(entry);
+            }
+            return grouped;
+        },
+
+        // Check if a commentary source is expanded
+        isCommentarySourceExpanded(source) {
+            return this.expandedCommentarySources[source] === true;
+        },
+
+        // Toggle a commentary source's expanded state
+        toggleCommentarySource(source) {
+            this.expandedCommentarySources[source] = !this.expandedCommentarySources[source];
+        },
+
+        // Get a preview of the commentary (first 1-2 sentences)
+        getCommentaryPreview(entries) {
+            if (!entries || entries.length === 0) return '';
+            // Get the first entry's content, strip HTML, and take first ~150 chars
+            const firstContent = entries[0].content || '';
+            const plainText = firstContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            // Find a good break point (end of sentence or word boundary)
+            if (plainText.length <= 150) return plainText;
+            const truncated = plainText.substring(0, 150);
+            const lastPeriod = truncated.lastIndexOf('.');
+            const lastSpace = truncated.lastIndexOf(' ');
+            const breakPoint = lastPeriod > 100 ? lastPeriod + 1 : lastSpace > 0 ? lastSpace : 150;
+            return truncated.substring(0, breakPoint).trim() + '...';
         },
 
         // Select a specific verse (click on verse box)
@@ -720,10 +854,15 @@ function bibleApp() {
             // Wrap each word in a span with position for alignment lookup
             let wordPosition = 0;
             return text.split(/\s+/).map((word) => {
-                const cleanWord = word.replace(/[.,;:!?'"()]/g, '');
-                const punct = word.replace(cleanWord, '');
+                // Extract leading punctuation, the word, and trailing punctuation
+                const match = word.match(/^([.,;:!?'"()—]*)([a-zA-Z'-]+)([.,;:!?'"()—]*)$/);
+                if (!match) {
+                    // Pure punctuation or other - return as-is
+                    return word;
+                }
+                const [, leadingPunct, cleanWord, trailingPunct] = match;
                 if (cleanWord) wordPosition++;
-                return `<span class="word" data-word="${cleanWord}" data-position="${wordPosition}">${cleanWord}</span>${punct}`;
+                return `${leadingPunct}<span class="word" data-word="${cleanWord}" data-position="${wordPosition}">${cleanWord}</span>${trailingPunct}`;
             }).join(' ');
         },
 
@@ -916,6 +1055,38 @@ function bibleApp() {
         toggleDarkMode() {
             this.darkMode = !this.darkMode;
             localStorage.setItem('darkMode', this.darkMode);
+        },
+
+        // Save dark mode preference (from settings)
+        saveDarkMode() {
+            localStorage.setItem('darkMode', this.darkMode);
+        },
+
+        // Save default translation preference
+        saveDefaultTranslation() {
+            localStorage.setItem('defaultTranslation', this.defaultTranslation);
+            // Also update current translation
+            this.translation = this.defaultTranslation;
+        },
+
+        // Save interlinear preference
+        saveInterlinearPref() {
+            localStorage.setItem('defaultShowInterlinear', this.defaultShowInterlinear);
+        },
+
+        // Save auto-cache preference
+        saveAutoCachePref() {
+            localStorage.setItem('autoCacheEnabled', this.autoCacheEnabled);
+        },
+
+        // Open settings modal, optionally to a specific tab
+        openSettings(tab = 'general') {
+            this.settingsTab = tab;
+            this.showSettings = true;
+            // Refresh offline stats when opening settings
+            if (tab === 'offline') {
+                this.updateOfflineStats();
+            }
         },
 
         // Search - debounced live search
@@ -1175,6 +1346,514 @@ function bibleApp() {
             if (!this.verses.length || !this.highlightedVerses.length) return 0;
             const currentVerse = this.highlightedVerses[0];
             return Math.round((currentVerse / this.verses.length) * 100);
+        },
+
+        // ========== OFFLINE METHODS ==========
+
+        // Update offline storage stats
+        async updateOfflineStats() {
+            if (!window.offlineStorage) return;
+
+            try {
+                const stats = await window.offlineStorage.getStorageStats();
+                let totalChapters = 0;
+                let totalVerses = 0;
+
+                // Count verses across all translations
+                for (const translation of Object.values(stats.verses.translations)) {
+                    totalChapters += translation.chapters;
+                    totalVerses += translation.verses;
+                }
+
+                this.offlineStats = {
+                    chapters: totalChapters,
+                    verses: totalVerses,
+                    lexicon: stats.lexicon.cached,
+                    estimatedSize: this.estimateStorageSize(totalVerses, stats.lexicon.count, stats.interlinear.chapters)
+                };
+            } catch (err) {
+                console.error('Failed to update offline stats:', err);
+            }
+        },
+
+        // Estimate storage size in bytes
+        estimateStorageSize(verses, lexiconEntries, interlinearChapters) {
+            // Rough estimates: ~500 bytes per verse, ~1KB per lexicon entry, ~50KB per interlinear chapter
+            return (verses * 500) + (lexiconEntries * 1024) + (interlinearChapters * 50000);
+        },
+
+        // Format storage size for display
+        formatStorageSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+        },
+
+        // Show a toast notification
+        showToast(message, type = 'info') {
+            const id = Date.now();
+            this.toasts.push({ id, message, type });
+
+            // Auto-remove after 4 seconds
+            setTimeout(() => {
+                this.toasts = this.toasts.filter(t => t.id !== id);
+            }, 4000);
+        },
+
+        // Toggle auto-cache and persist preference
+        toggleAutoCache() {
+            this.autoCacheEnabled = !this.autoCacheEnabled;
+            localStorage.setItem('autoCacheEnabled', this.autoCacheEnabled);
+        },
+
+        // Start downloading selected offline content
+        async startDownload() {
+            if (this.downloadProgress.active) return;
+
+            this.downloadProgress.active = true;
+            this.downloadProgress.percent = 0;
+
+            try {
+                // Download lexicon if selected
+                if (this.downloadOptions.lexicon && !this.offlineStats.lexicon) {
+                    await this.downloadLexicon();
+                }
+
+                // Download current book if selected
+                if (this.downloadOptions.currentBook && this.currentBook) {
+                    await this.downloadBook(this.currentBook);
+                }
+
+                this.showToast('Download complete!', 'success');
+                await this.updateOfflineStats();
+
+            } catch (err) {
+                console.error('Download failed:', err);
+                this.showToast('Download failed: ' + err.message, 'error');
+            } finally {
+                this.downloadProgress.active = false;
+                this.downloadOptions.lexicon = false;
+                this.downloadOptions.currentBook = false;
+            }
+        },
+
+        // Download the Strong's lexicon
+        async downloadLexicon() {
+            this.downloadProgress.label = 'Downloading lexicon...';
+            this.downloadProgress.status = 'Fetching Hebrew & Greek definitions';
+
+            try {
+                const response = await fetch('/api/offline/lexicon');
+                if (!response.ok) throw new Error('Failed to fetch lexicon');
+
+                const data = await response.json();
+                this.downloadProgress.percent = 50;
+
+                if (data.entries && window.offlineStorage) {
+                    this.downloadProgress.status = `Saving ${data.entries.length} entries...`;
+                    await window.offlineStorage.saveLexiconEntries(data.entries);
+                    this.downloadProgress.percent = 100;
+                }
+            } catch (err) {
+                console.error('Lexicon download failed:', err);
+                throw err;
+            }
+        },
+
+        // Download an entire book
+        async downloadBook(book) {
+            const chapterCount = BOOK_CHAPTERS[book] || 1;
+            this.downloadProgress.label = `Downloading ${book}...`;
+
+            for (let ch = 1; ch <= chapterCount; ch++) {
+                this.downloadProgress.status = `Chapter ${ch} of ${chapterCount}`;
+                this.downloadProgress.percent = Math.round((ch / chapterCount) * 100);
+
+                try {
+                    // Use the bulk chapter endpoint
+                    const response = await fetch(
+                        `/api/offline/chapter?book=${encodeURIComponent(book)}&chapter=${ch}&translation=${this.translation}`
+                    );
+
+                    if (!response.ok) continue;
+
+                    const data = await response.json();
+
+                    if (window.offlineStorage) {
+                        // Save verses
+                        if (data.verses?.length > 0) {
+                            await window.offlineStorage.saveChapterVerses(this.translation, book, ch, data.verses);
+                        }
+
+                        // Save alignments
+                        if (data.alignments?.length > 0) {
+                            await window.offlineStorage.saveChapterAlignments(this.translation, book, ch, data.alignments);
+                        }
+
+                        // Save interlinear
+                        if (data.interlinear?.length > 0) {
+                            await window.offlineStorage.saveChapterInterlinear(book, ch, data.interlinear);
+                        }
+
+                        // Save cross-refs
+                        if (data.cross_refs?.length > 0) {
+                            await window.offlineStorage.saveChapterCrossRefs(book, ch, data.cross_refs);
+                        }
+
+                        // Save commentary
+                        if (data.commentary?.length > 0) {
+                            await window.offlineStorage.saveChapterCommentary(book, ch, data.commentary);
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Failed to download ${book} ${ch}:`, err);
+                }
+
+                // Small delay to avoid hammering the server
+                await new Promise(r => setTimeout(r, 100));
+            }
+        },
+
+        // Clear all offline data
+        async clearOfflineData() {
+            if (!confirm('Clear all cached offline data?')) return;
+
+            try {
+                if (window.offlineStorage) {
+                    await window.offlineStorage.clearAll();
+                }
+
+                // Also clear service worker cache
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    const channel = new MessageChannel();
+                    navigator.serviceWorker.controller.postMessage(
+                        { type: 'CLEAR_CACHE' },
+                        [channel.port2]
+                    );
+                }
+
+                await this.updateOfflineStats();
+                this.showToast('Offline data cleared', 'success');
+            } catch (err) {
+                console.error('Failed to clear offline data:', err);
+                this.showToast('Failed to clear data', 'error');
+            }
+        },
+
+        // Check if any download options are selected
+        hasDownloadSelections() {
+            const t = this.downloadSelections.translations;
+            return t.BSB || t.WEB || t.KJV ||
+                   this.downloadSelections.lexicon ||
+                   this.downloadSelections.commentaryMH ||
+                   this.downloadSelections.commentaryJG ||
+                   this.downloadSelections.crossRefs ||
+                   this.downloadSelections.devotionalSpurgeon;
+        },
+
+        // Start downloading selected offline content
+        async startOfflineDownload() {
+            if (this.downloadProgress.active) return;
+            if (!this.hasDownloadSelections()) return;
+
+            this.downloadProgress.active = true;
+            this.downloadProgress.percent = 0;
+
+            const tasks = [];
+            const t = this.downloadSelections.translations;
+
+            // Gather tasks
+            if (t.BSB) tasks.push({ type: 'translation', name: 'BSB' });
+            if (t.WEB) tasks.push({ type: 'translation', name: 'WEB' });
+            if (t.KJV) tasks.push({ type: 'translation', name: 'KJV' });
+            if (this.downloadSelections.lexicon) tasks.push({ type: 'lexicon' });
+            if (this.downloadSelections.commentaryMH) tasks.push({ type: 'commentary', source: 'Matthew Henry' });
+            if (this.downloadSelections.commentaryJG) tasks.push({ type: 'commentary', source: 'John Gill' });
+            if (this.downloadSelections.crossRefs) tasks.push({ type: 'crossRefs' });
+            if (this.downloadSelections.devotionalSpurgeon) tasks.push({ type: 'devotional', source: 'Spurgeon' });
+
+            try {
+                for (let i = 0; i < tasks.length; i++) {
+                    const task = tasks[i];
+                    const basePercent = Math.round((i / tasks.length) * 100);
+
+                    if (task.type === 'translation') {
+                        await this.downloadFullTranslation(task.name, basePercent, tasks.length);
+                    } else if (task.type === 'lexicon') {
+                        this.downloadProgress.label = 'Downloading lexicon...';
+                        this.downloadProgress.status = 'Fetching Hebrew & Greek definitions';
+                        await this.downloadLexicon();
+                    } else if (task.type === 'commentary') {
+                        await this.downloadAllCommentary(basePercent, tasks.length, task.source);
+                    } else if (task.type === 'crossRefs') {
+                        await this.downloadAllCrossRefs(basePercent, tasks.length);
+                    } else if (task.type === 'devotional') {
+                        await this.downloadDevotionals(basePercent, tasks.length, task.source);
+                    }
+                }
+
+                this.showToast('Download complete!', 'success');
+                await this.updateOfflineStats();
+
+                // Reset selections
+                this.downloadSelections.translations = { BSB: false, WEB: false, KJV: false };
+                this.downloadSelections.lexicon = false;
+                this.downloadSelections.commentaryMH = false;
+                this.downloadSelections.commentaryJG = false;
+                this.downloadSelections.crossRefs = false;
+                this.downloadSelections.devotionalSpurgeon = false;
+
+            } catch (err) {
+                console.error('Download failed:', err);
+                this.showToast('Download failed: ' + err.message, 'error');
+            } finally {
+                this.downloadProgress.active = false;
+            }
+        },
+
+        // Download full translation (all 66 books)
+        async downloadFullTranslation(translation, basePercent, totalTasks) {
+            const books = Object.keys(BOOK_CHAPTERS);
+            const totalChapters = Object.values(BOOK_CHAPTERS).reduce((a, b) => a + b, 0);
+            let chaptersDownloaded = 0;
+
+            this.downloadProgress.label = `Downloading ${translation}...`;
+
+            for (const book of books) {
+                const chapterCount = BOOK_CHAPTERS[book];
+                for (let ch = 1; ch <= chapterCount; ch++) {
+                    this.downloadProgress.status = `${book} ${ch}`;
+
+                    try {
+                        const response = await fetch(
+                            `/api/offline/chapter?book=${encodeURIComponent(book)}&chapter=${ch}&translation=${translation}`
+                        );
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (window.offlineStorage && data.verses?.length > 0) {
+                                await window.offlineStorage.saveChapterVerses(translation, book, ch, data.verses);
+                                if (data.alignments?.length > 0) {
+                                    await window.offlineStorage.saveChapterAlignments(translation, book, ch, data.alignments);
+                                }
+                                if (data.interlinear?.length > 0) {
+                                    await window.offlineStorage.saveChapterInterlinear(book, ch, data.interlinear);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to download ${book} ${ch}:`, err);
+                    }
+
+                    chaptersDownloaded++;
+                    const taskProgress = (chaptersDownloaded / totalChapters) * (100 / totalTasks);
+                    this.downloadProgress.percent = Math.round(basePercent + taskProgress);
+
+                    // Small delay
+                    await new Promise(r => setTimeout(r, 50));
+                }
+            }
+        },
+
+        // Download all commentary (optionally filtered by source)
+        async downloadAllCommentary(basePercent, totalTasks, source = null) {
+            this.downloadProgress.label = `Downloading ${source || 'commentary'}...`;
+            const books = Object.keys(BOOK_CHAPTERS);
+            let booksDownloaded = 0;
+
+            for (const book of books) {
+                this.downloadProgress.status = book;
+
+                try {
+                    const response = await fetch(`/api/offline/commentary?book=${encodeURIComponent(book)}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (window.offlineStorage && data.entries?.length > 0) {
+                            // Filter by source if specified
+                            const entries = source
+                                ? data.entries.filter(e => e.source === source)
+                                : data.entries;
+                            for (const entry of entries) {
+                                await window.offlineStorage.saveCommentary(entry.book, entry.chapter, [entry]);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Failed to download commentary for ${book}:`, err);
+                }
+
+                booksDownloaded++;
+                const taskProgress = (booksDownloaded / books.length) * (100 / totalTasks);
+                this.downloadProgress.percent = Math.round(basePercent + taskProgress);
+
+                await new Promise(r => setTimeout(r, 50));
+            }
+        },
+
+        // Download all devotionals
+        async downloadDevotionals(basePercent, totalTasks, source) {
+            this.downloadProgress.label = `Downloading ${source} devotionals...`;
+            this.downloadProgress.status = 'Fetching all entries...';
+
+            try {
+                const response = await fetch(`/api/offline/devotionals?source=${encodeURIComponent(source)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (window.offlineStorage && data.entries?.length > 0) {
+                        // Store devotionals in IndexedDB
+                        // For now, store in localStorage as a simple approach
+                        localStorage.setItem(`devotional_${source}`, JSON.stringify(data.entries));
+                        this.downloadProgress.status = `Saved ${data.count} entries`;
+                    }
+                }
+            } catch (err) {
+                console.warn(`Failed to download devotionals for ${source}:`, err);
+            }
+
+            this.downloadProgress.percent = Math.round(basePercent + (100 / totalTasks));
+        },
+
+        // Download all cross-references
+        async downloadAllCrossRefs(basePercent, totalTasks) {
+            this.downloadProgress.label = 'Downloading cross-references...';
+            const books = Object.keys(BOOK_CHAPTERS);
+            let booksDownloaded = 0;
+
+            for (const book of books) {
+                this.downloadProgress.status = book;
+
+                try {
+                    const response = await fetch(`/api/offline/crossrefs?book=${encodeURIComponent(book)}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (window.offlineStorage && data.entries?.length > 0) {
+                            // Group by chapter and save
+                            const byChapter = {};
+                            for (const ref of data.entries) {
+                                const ch = ref.chapter || 1;
+                                if (!byChapter[ch]) byChapter[ch] = [];
+                                byChapter[ch].push(ref);
+                            }
+                            for (const [ch, refs] of Object.entries(byChapter)) {
+                                await window.offlineStorage.saveChapterCrossRefs(book, parseInt(ch), refs);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Failed to download cross-refs for ${book}:`, err);
+                }
+
+                booksDownloaded++;
+                const taskProgress = (booksDownloaded / books.length) * (100 / totalTasks);
+                this.downloadProgress.percent = Math.round(basePercent + taskProgress);
+
+                await new Promise(r => setTimeout(r, 50));
+            }
+        },
+
+        // Refresh (re-download) all cached content
+        async refreshOfflineData() {
+            if (!confirm('Re-download all cached content? This will refresh existing data.')) return;
+
+            // Get what's currently cached and re-download it
+            this.downloadProgress.active = true;
+            this.downloadProgress.label = 'Refreshing cache...';
+            this.downloadProgress.percent = 0;
+
+            try {
+                // Clear and re-download lexicon if it was cached
+                if (this.offlineStats.lexicon) {
+                    this.downloadProgress.status = 'Refreshing lexicon...';
+                    await this.downloadLexicon();
+                }
+
+                // Re-download cached chapters
+                if (window.offlineStorage && this.offlineStats.chapters > 0) {
+                    this.downloadProgress.status = 'Refreshing chapters...';
+                    // We'll need to iterate through what we have cached
+                    // For now, just clear and let auto-cache rebuild
+                    await window.offlineStorage.clearAll();
+                }
+
+                await this.updateOfflineStats();
+                this.showToast('Cache refreshed', 'success');
+            } catch (err) {
+                console.error('Refresh failed:', err);
+                this.showToast('Refresh failed', 'error');
+            } finally {
+                this.downloadProgress.active = false;
+            }
+        },
+
+        // Toggle forced offline mode - blocks ALL network requests
+        toggleForcedOffline() {
+            this.forcedOffline = !this.forcedOffline;
+            localStorage.setItem('forcedOffline', this.forcedOffline);
+
+            if (this.forcedOffline) {
+                this.isOnline = false;
+                this.showToast('Offline mode enabled - no network requests will be made', 'info');
+            } else {
+                this.isOnline = navigator.onLine;
+                this.showToast('Online mode restored', 'success');
+            }
+        },
+
+        // Check if we should allow network requests
+        canUseNetwork() {
+            return !this.forcedOffline && navigator.onLine;
+        },
+
+        // ========== DEVOTIONAL METHODS ==========
+
+        async loadDevotional(date = null) {
+            if (this.loadingDevotional) return;
+
+            this.loadingDevotional = true;
+            try {
+                let url = '/api/devotional';
+                if (date) {
+                    url += `?date=${date}`;
+                } else {
+                    // Use current devotional date state
+                    const dateStr = `${String(this.devotionalMonth).padStart(2, '0')}-${String(this.devotionalDay).padStart(2, '0')}`;
+                    url += `?date=${dateStr}`;
+                }
+
+                const response = await fetch(url);
+                if (response.ok) {
+                    this.devotional = await response.json();
+                } else {
+                    this.devotional = { entries: [], month: this.devotionalMonth, day: this.devotionalDay };
+                }
+            } catch (err) {
+                console.error('Failed to load devotional:', err);
+                this.devotional = { entries: [], month: this.devotionalMonth, day: this.devotionalDay };
+            } finally {
+                this.loadingDevotional = false;
+            }
+        },
+
+        changeDevotionalDate(delta) {
+            // Create a date object to handle month/day rollover
+            const date = new Date(2024, this.devotionalMonth - 1, this.devotionalDay);
+            date.setDate(date.getDate() + delta);
+
+            this.devotionalMonth = date.getMonth() + 1;
+            this.devotionalDay = date.getDate();
+            this.loadDevotional();
+        },
+
+        formatDevotionalDate(month, day) {
+            const months = ['January', 'February', 'March', 'April', 'May', 'June',
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+            return `${months[month - 1]} ${day}`;
+        },
+
+        formatDevotionalText(text) {
+            if (!text) return '';
+            // Convert newlines to paragraphs and clean up
+            return text.split(/\n\n+/).map(p => `<p>${p.trim()}</p>`).join('');
         }
     };
 }

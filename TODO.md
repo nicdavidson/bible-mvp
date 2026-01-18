@@ -2,8 +2,12 @@
 
 ## Current Status
 
+**Deployment:** Fly.io with persistent volume for SQLite database (too large for GitHub)
+
 **Working:**
-- [x] Bible text (61,303 verses - WEB + KJV)
+- [x] Bible text (93,505 verses - BSB + WEB + KJV)
+- [x] **BSB as default translation** with full word-level Hebrew/Greek alignment (724,050 alignments)
+- [x] Click any BSB word → see original Hebrew/Greek with Strong's definition (deterministic, not fuzzy)
 - [x] Search autocomplete for book names
 - [x] Chapter context with verse highlighting
 - [x] Prev/next chapter and verse navigation
@@ -13,15 +17,17 @@
 - [x] Dark mode
 - [x] Notes (localStorage)
 - [x] Book-only reference defaults to chapter 1
-- [x] Hebrew interlinear for entire OT (304,400 words)
-- [x] Greek interlinear for entire NT (122,286 words)
+- [x] Hebrew interlinear for entire OT (304,400 words from STEPBible)
+- [x] Greek interlinear for entire NT (122,286 words from STEPBible)
 - [x] Word click shows Greek/Hebrew details with Strong's definitions
 - [x] Loading states & empty state messaging
 - [x] Mobile touch support for word study
 - [x] "Original Language" toggle in header (always visible)
 - [x] Expandable word occurrence list ("and xxx more" clickable)
 - [x] PWA manifest for installability
-- [x] Service worker for offline caching
+- [x] Service worker for offline caching (requires localhost or HTTPS)
+- [x] Auto-cache browsed chapters with visual toast feedback
+- [x] Offline settings panel with cache stats display
 - [x] Book/chapter picker dropdown
 - [x] Mobile-optimized header with hamburger menu
 - [x] Resource tab indicators (shows when commentary/notes/cross-refs available)
@@ -35,17 +41,21 @@
 ### Data Import
 - [x] Import Matthew Henry commentary (65/66 books - Song of Solomon missing from source API)
 - [x] Import Strong's lexicon for word studies (DONE)
-- [ ] Add second commentary source (John Gill or Adam Clarke)
+- [x] Add John Gill commentary (28,300 verses from HelloAO API)
+- [x] Add Spurgeon Morning & Evening devotionals (730 entries from CCEL)
 - [ ] Find alternative source for Song of Solomon commentary
 
 ### UI/UX
 - [ ] **Draggable/resizable panels** - VSCode-style layout where Word details, Notes, Commentary, Cross-refs can all be visible simultaneously and rearranged. Consider using Golden Layout or split.js library.
+- [ ] **Devotionals as standalone section** - Move devotionals (Spurgeon Morning & Evening) out of the resources tabs into their own dedicated section/page. Consider: daily reading view, calendar navigation, integration with reading plans.
 
 ### Core Features (from spec)
 - [x] Interlinear data import (OpenGNT, OpenHebrewBible) - DONE for all 66 books
 - [x] Word click shows Greek/Hebrew details - DONE
 - [x] Service worker + offline caching - DONE
 - [x] PWA manifest + install prompt - DONE
+- [x] Smart offline caching with IndexedDB - DONE (auto-caches browsed chapters)
+- [x] Offline data manager UI - DONE (download books/lexicon for offline use)
 
 ## Medium Priority
 
@@ -59,7 +69,8 @@
 - [ ] Search suggestions for book names
 
 ### Notes System
-- [ ] Migrate from localStorage to IndexedDB
+- [x] IndexedDB storage layer (for offline data) - DONE
+- [ ] Migrate notes from localStorage to IndexedDB
 - [ ] Note tags/categories
 - [ ] Highlight colors
 - [ ] Export notes
@@ -72,11 +83,11 @@
 ## Lower Priority
 
 ### Content
-- [ ] Spurgeon Morning/Evening devotionals
+- [x] Spurgeon Morning/Evening devotionals - DONE (via "Today" tab)
 - [ ] Additional translations (ASV already in dropdown but may need import)
 
 ### Polish
-- [ ] Keyboard shortcuts
+- [x] Keyboard shortcuts (arrows for nav, / for search, G for go-to, D for dark mode, ? for help)
 - [ ] Print-friendly styles
 - [ ] Share verse functionality
 
@@ -85,51 +96,34 @@
 - [ ] Error handling improvements
 - [x] Loading states/skeletons - DONE
 
-## Word-by-Word Reorganization (Original-Language Anchoring)
+## Word-by-Word Alignment (MOSTLY COMPLETE)
 
-**Goal:** Shift core data model to treat words as rich objects anchored to original Greek/Hebrew (lemmas + Strong's/morphology) instead of English-only positions. This enables accurate multi-translation support, word studies, pronoun/entity resolution, and deep features without breaking on translation variances.
+**Status:** Core functionality implemented for BSB translation using Clear-Bible alignment data.
 
-### High Priority (Foundation for Word-Level Features)
-- [ ] Research & select primary data sources for originals:
-  - NT Greek: MorphGNT or OpenGNT (SBLGNT/NA28 with Strong's + morphology)
-  - OT Hebrew: Open Scriptures Hebrew Bible (OSHB) or Westminster Leningrad Codex tagged (Strong's + morphology)
-  - Strong's lexicon (Greek & Hebrew definitions) – public domain XML/JSON imports
-- [ ] Design & create new SQLite tables for word-level data:
-  - `original_words` (id, book, chapter, verse, word_seq, language, text, lemma, strongs, morphology, gloss)
-  - `strongs_lexicon` (strongs_id TEXT PRIMARY KEY, language, lemma, definition, pronunciation)
-  - `word_alignments` (original_word_id, translation TEXT, verse_ref TEXT, word_index INT, text) – for mapping English words to originals
-  - Add indexes: ON original_words(verse_ref), (lemma), (strongs)
-- [ ] Write Python import script for NT Greek interlinear (start with Gospel of John for prototyping):
-  - Parse MorphGNT/OpenGNT data → populate `original_words` & `strongs_lexicon`
-  - Limit to 1-2 books initially to test performance
-- [ ] Prototype word click handler:
-  - On frontend: Click English word → query alignments → fetch original details + Strong's definition
-  - Display in side panel (leverage draggable panels when ready)
+### Completed
+- [x] Research & select primary data sources:
+  - BSB word alignments from [Clear-Bible/Alignments](https://github.com/Clear-Bible/Alignments) (CC-BY 4.0)
+  - Hebrew source: WLCM (Westminster Leningrad Codex Morphology)
+  - Greek source: SBLGNT
+  - Strong's lexicon integrated
+- [x] Database tables for word-level data:
+  - `word_alignments` - Hebrew/Greek words with Strong's, morphology, glosses (426,686 words)
+  - `english_word_alignments` - Translation-specific word→original mappings
+  - `lexicon` - Strong's definitions
+- [x] Import scripts:
+  - `scripts/import_bsb.py` - Imports BSB text and Clear-Bible alignment data
+  - `scripts/import_interlinear.py` - Imports STEPBible Hebrew/Greek data
+- [x] Word click handler:
+  - Click any BSB word → `/api/word-alignment` → returns Hebrew/Greek + Strong's definition
+  - Deterministic lookup (no fuzzy matching)
+- [x] Full coverage: 724,050 BSB word alignments (OT Hebrew + NT Greek)
 
-### Medium Priority (Integration & Expansion)
-- [ ] Add OT Hebrew word-level import (modular, user-downloadable pack)
-- [ ] Implement basic word study view:
-  - Search by lemma/Strong's → list all occurrences across books with context snippets
-  - Show translation variants (e.g., "love" → agapē in different English renderings)
-- [ ] Prototype pronoun/entity resolution (start simple):
-  - Add optional `antecedent_id` field to `original_words` for pronouns
-  - Manual tagging for key ambiguous cases (e.g., "he" in John 1 referring to John the Baptist)
-  - Future: Integrate lightweight rule-based or LLM-assisted chains
-- [ ] Performance & storage audit:
-  - Benchmark chapter load with word data (target <200ms)
-  - Estimate full NT Greek + Strong's size (~30-60 MB?) → plan modular downloads
-  - Test on low-end devices (SQLite + FTS5 should handle it well)
-
-### Lower Priority / Future
-- [ ] Full multi-translation alignments (KJV/WEB/NIV/ESV → originals)
-- [ ] Advanced word features: Morphology breakdown, usage stats, lexicon popups
-- [ ] User-contributed word notes/tags linked to original_word_id
-
-**Notes on this epic:**
-- Anchor to originals (lemma + strongs + verse context) as primary key for stability across translations.
-- Keep verse-level text as-is for quick reading; word-level is optional/on-demand.
-- Sources: MorphGNT (GitHub), Open Scriptures Hebrew Bible, public-domain Strong's.
-- This ties directly into interlinear import (already high-priority) and commentary (verse-level is fine, link to words optionally).
+### Remaining / Future
+- [ ] Add word-level alignments for KJV (data available from kaiserlik/kjv repo)
+- [ ] WEB alignments (no good public source found - using STEPBible gloss fallback)
+- [ ] Advanced word features: Morphology breakdown, usage stats
+- [ ] Pronoun/entity resolution
+- [ ] User-contributed word notes linked to original words
 
 ## Study Spaces & Templates
 
@@ -160,4 +154,4 @@
 
 ---
 
-Last updated: 2026-01-17
+Last updated: 2026-01-18

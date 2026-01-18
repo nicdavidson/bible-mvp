@@ -16,6 +16,12 @@
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body x-data="bibleApp()" x-init="init()" :class="{ 'dark': darkMode }">
+    <!-- Toast notification for caching feedback -->
+    <div id="cache-toast" class="cache-toast" style="display: none;">
+        <span class="toast-icon">&#10003;</span>
+        <span class="toast-message"></span>
+    </div>
+
     <!-- Header -->
     <header class="header">
         <div class="header-left">
@@ -51,6 +57,7 @@
                     </ul>
                 </div>
                 <select x-model="translation" class="select-translation" title="Bible Translation">
+                    <option value="BSB">BSB - Berean Standard</option>
                     <option value="WEB">WEB - World English</option>
                     <option value="KJV">KJV - King James</option>
                 </select>
@@ -64,6 +71,7 @@
                     <div class="picker-translation-mobile">
                         <label>Translation:</label>
                         <select x-model="translation" class="picker-translation-select">
+                            <option value="BSB">BSB - Berean Standard Bible</option>
                             <option value="WEB">WEB - World English Bible</option>
                             <option value="KJV">KJV - King James Version</option>
                         </select>
@@ -103,15 +111,15 @@
             </div>
         </div>
         <div class="header-right">
+            <div class="offline-indicator" :class="isOnline ? 'online' : 'offline'" @click="openSettings('offline')" :title="isOnline ? 'Online' : 'Offline - using cached data'">
+                <span class="status-dot"></span>
+                <span class="offline-label" x-text="isOnline ? '' : 'Offline'"></span>
+            </div>
             <button @click="openSearch()" class="btn-icon" title="Search (/)">
                 🔍
             </button>
-            <button @click="showHelp = true" class="btn-icon" title="Help (?)">
-                ?
-            </button>
-            <button @click="toggleDarkMode" class="btn-icon" title="Toggle dark mode (D)">
-                <span x-show="!darkMode">🌙</span>
-                <span x-show="darkMode">☀️</span>
+            <button @click="openSettings()" class="btn-icon" title="Settings">
+                ⚙️
             </button>
         </div>
     </header>
@@ -168,7 +176,7 @@
                 </div>
 
                 <div x-show="!loading && !error && verses.length > 0" class="verses">
-                    <template x-for="verse in verses" :key="verse.id">
+                    <template x-for="(verse, verseIdx) in verses" :key="'v-' + verseIdx">
                         <div
                             class="verse-box"
                             :id="'verse-' + verse.verse"
@@ -182,7 +190,7 @@
                             ></span>
                             <!-- Interlinear display -->
                             <div x-show="showInterlinear && hasInterlinear(verse.verse)" class="interlinear-row" :class="getInterlinearLanguage(verse.verse)">
-                                <template x-for="word in getInterlinearWords(verse.verse)" :key="word.position">
+                                <template x-for="(word, wordIdx) in getInterlinearWords(verse.verse)" :key="'iw-' + verse.verse + '-' + wordIdx">
                                     <span
                                         class="interlinear-word"
                                         @click.stop="handleInterlinearWordClick(word, $event)"
@@ -263,10 +271,26 @@
                             <span class="empty-state-hint">Try another passage or check back later</span>
                         </div>
                     </template>
-                    <template x-for="entry in commentary" :key="entry.source">
-                        <div class="commentary-entry">
-                            <h3 class="commentary-source" x-text="entry.source"></h3>
-                            <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
+                    <!-- Grouped by source with collapsible sections -->
+                    <template x-for="(group, source) in getGroupedCommentary()" :key="'comm-group-' + source">
+                        <div class="commentary-group">
+                            <button
+                                class="commentary-group-header"
+                                @click="toggleCommentarySource(source)"
+                                :class="{ 'expanded': isCommentarySourceExpanded(source) }"
+                            >
+                                <span class="commentary-source-name" x-text="source"></span>
+                                <span class="commentary-entry-count" x-text="'(' + group.length + (group.length === 1 ? ' entry' : ' entries') + ')'"></span>
+                                <span class="commentary-toggle-icon" x-text="isCommentarySourceExpanded(source) ? '▼' : '▶'"></span>
+                            </button>
+                            <div class="commentary-preview" x-show="!isCommentarySourceExpanded(source)" x-text="getCommentaryPreview(group)"></div>
+                            <div class="commentary-entries" x-show="isCommentarySourceExpanded(source)" x-transition>
+                                <template x-for="(entry, idx) in group" :key="'comm-' + source + '-' + idx">
+                                    <div class="commentary-entry">
+                                        <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </template>
                 </div>
@@ -350,7 +374,7 @@
                         </div>
                     </template>
                     <ul class="crossref-list">
-                        <template x-for="ref in crossRefs" :key="ref.target_book + ref.target_chapter + ref.target_verse">
+                        <template x-for="(ref, idx) in crossRefs" :key="'xref-' + idx">
                             <li class="crossref-item"
                                 @mouseenter="previewVerse(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, $event)"
                                 @mouseleave="hidePreview()"
@@ -364,6 +388,7 @@
                         </template>
                     </ul>
                 </div>
+
             </div>
         </section>
 
@@ -414,7 +439,7 @@
                 <div class="word-occurrences" x-show="selectedWord?.count > 0">
                     <h4>Appears <span x-text="selectedWord?.count"></span> times:</h4>
                     <ul class="occurrence-list">
-                        <template x-for="occ in (showAllOccurrences ? (selectedWord?.occurrences || []) : (selectedWord?.occurrences || []).slice(0, 10))" :key="occ.book + occ.chapter + occ.verse + occ.position">
+                        <template x-for="(occ, occIdx) in (showAllOccurrences ? (selectedWord?.occurrences || []) : (selectedWord?.occurrences || []).slice(0, 10))" :key="'occ-' + occIdx">
                             <li>
                                 <a
                                     href="#"
@@ -555,71 +580,6 @@
         </div>
     </div>
 
-    <!-- Help Modal -->
-    <div class="modal-overlay" x-show="showHelp" x-transition @click.self="showHelp = false">
-        <div class="modal help-modal">
-            <div class="modal-header">
-                <h2>Quick Guide</h2>
-                <button @click="showHelp = false" class="btn-close">×</button>
-            </div>
-            <div class="modal-body">
-                <section class="help-section">
-                    <h3>Getting Started</h3>
-                    <p>Type a reference like <strong>John 3:16</strong> or <strong>Rom 8</strong> in the search bar and press Go. Click any verse to highlight it and see cross-references.</p>
-                </section>
-
-                <section class="help-section">
-                    <h3>Keyboard Shortcuts</h3>
-                    <div class="shortcuts-grid">
-                        <div class="shortcut">
-                            <kbd>←</kbd> <kbd>→</kbd>
-                            <span>Previous/Next chapter</span>
-                        </div>
-                        <div class="shortcut">
-                            <kbd>↑</kbd> <kbd>↓</kbd>
-                            <span>Previous/Next verse</span>
-                        </div>
-                        <div class="shortcut">
-                            <kbd>/</kbd>
-                            <span>Open search</span>
-                        </div>
-                        <div class="shortcut">
-                            <kbd>G</kbd>
-                            <span>Go to reference</span>
-                        </div>
-                        <div class="shortcut">
-                            <kbd>D</kbd>
-                            <span>Toggle dark mode</span>
-                        </div>
-                        <div class="shortcut">
-                            <kbd>C</kbd>
-                            <span>Copy current verse</span>
-                        </div>
-                        <div class="shortcut">
-                            <kbd>?</kbd>
-                            <span>Show this help</span>
-                        </div>
-                        <div class="shortcut">
-                            <kbd>Esc</kbd>
-                            <span>Close panels/modals</span>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="help-section">
-                    <h3>Features</h3>
-                    <ul class="help-features">
-                        <li><strong>Commentary</strong> - Matthew Henry's commentary on the right panel</li>
-                        <li><strong>Cross-refs</strong> - Related verses that reference the same themes</li>
-                        <li><strong>Notes</strong> - Save your own study notes (stored locally)</li>
-                        <li><strong>Copy</strong> - Click the clipboard icon on any verse</li>
-                        <li><strong>Share</strong> - URLs update as you navigate for easy sharing</li>
-                    </ul>
-                </section>
-            </div>
-        </div>
-    </div>
-
     <!-- Verse Preview Tooltip -->
     <div
         x-show="versePreview.show"
@@ -631,14 +591,429 @@
         <div class="preview-text" x-text="versePreview.text"></div>
     </div>
 
+    <!-- Settings Modal -->
+    <div class="modal-overlay" x-show="showSettings" x-transition @click.self="showSettings = false">
+        <div class="modal settings-modal">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button @click="showSettings = false" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- Settings Navigation -->
+                <div class="settings-nav">
+                    <button @click="settingsTab = 'general'" :class="{ active: settingsTab === 'general' }" class="settings-nav-btn">
+                        General
+                    </button>
+                    <button @click="settingsTab = 'offline'" :class="{ active: settingsTab === 'offline' }" class="settings-nav-btn">
+                        Offline
+                        <span class="offline-badge" :class="isOnline ? 'online' : 'offline'"></span>
+                    </button>
+                    <button @click="settingsTab = 'shortcuts'" :class="{ active: settingsTab === 'shortcuts' }" class="settings-nav-btn">
+                        Shortcuts
+                    </button>
+                </div>
+
+                <!-- General Settings Tab -->
+                <div class="settings-content" x-show="settingsTab === 'general'">
+                    <div class="settings-section">
+                        <h4>Appearance</h4>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <div class="setting-label">Dark Mode</div>
+                                <div class="setting-description">Use dark theme for comfortable reading</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" x-model="darkMode" @change="saveDarkMode()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h4>Bible Translation</h4>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <div class="setting-label">Default Translation</div>
+                                <div class="setting-description">Used when opening the app</div>
+                            </div>
+                            <select x-model="defaultTranslation" @change="saveDefaultTranslation()" class="setting-select">
+                                <option value="BSB">BSB - Berean Standard</option>
+                                <option value="WEB">WEB - World English</option>
+                                <option value="KJV">KJV - King James</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h4>Reading</h4>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <div class="setting-label">Show Interlinear by Default</div>
+                                <div class="setting-description">Display Hebrew/Greek text automatically</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" x-model="defaultShowInterlinear" @change="saveInterlinearPref()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Offline Settings Tab -->
+                <div class="settings-content" x-show="settingsTab === 'offline'">
+                    <!-- Offline Availability Section -->
+                    <div class="offline-availability-header">Offline Availability</div>
+                    <div class="offline-status-bar">
+                        <span class="status-indicator" :class="isOnline ? 'online' : 'offline'"></span>
+                        <span class="status-text" x-text="forcedOffline ? 'Forced Offline' : (isOnline ? 'Online' : 'Offline')"></span>
+                        <button @click="toggleForcedOffline()" class="btn-offline-toggle" :class="{ active: forcedOffline }">
+                            <span x-text="forcedOffline ? 'Go Online' : 'Go Offline'"></span>
+                        </button>
+                    </div>
+
+                    <!-- Cache Stats Box - More Prominent -->
+                    <div class="cache-stats-box">
+                        <div class="cache-stats-header">Cached Data</div>
+                        <div class="cache-stats-numbers">
+                            <div class="cache-stat">
+                                <span class="cache-stat-value" x-text="offlineStats.chapters"></span>
+                                <span class="cache-stat-label">Chapters</span>
+                            </div>
+                            <div class="cache-stat">
+                                <span class="cache-stat-value" x-text="offlineStats.verses.toLocaleString()"></span>
+                                <span class="cache-stat-label">Verses</span>
+                            </div>
+                            <div class="cache-stat">
+                                <span class="cache-stat-value" x-text="formatStorageSize(offlineStats.estimatedSize)"></span>
+                                <span class="cache-stat-label">Storage</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Auto-Cache Toggle -->
+                    <div class="auto-cache-section">
+                        <div class="setting-row compact">
+                            <div class="setting-info">
+                                <div class="setting-label">Auto-cache browsed chapters</div>
+                                <div class="setting-description">Automatically save chapters you read for offline use</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" x-model="autoCacheEnabled" @change="saveAutoCachePref()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Bulk Download Section Header -->
+                    <div class="download-section-title">Download for Offline</div>
+
+                    <!-- Translations -->
+                    <div class="download-section">
+                        <div class="download-section-header">Translations</div>
+                        <label class="download-option">
+                            <input type="checkbox" x-model="downloadSelections.translations.BSB">
+                            <span>BSB - Berean Standard Bible</span>
+                        </label>
+                        <label class="download-option">
+                            <input type="checkbox" x-model="downloadSelections.translations.WEB">
+                            <span>WEB - World English Bible</span>
+                        </label>
+                        <label class="download-option">
+                            <input type="checkbox" x-model="downloadSelections.translations.KJV">
+                            <span>KJV - King James Version</span>
+                        </label>
+                    </div>
+
+                    <!-- Commentaries -->
+                    <div class="download-section">
+                        <div class="download-section-header">Commentaries</div>
+                        <label class="download-option">
+                            <input type="checkbox" x-model="downloadSelections.commentaryMH">
+                            <span>Matthew Henry Commentary</span>
+                        </label>
+                        <label class="download-option">
+                            <input type="checkbox" x-model="downloadSelections.commentaryJG">
+                            <span>John Gill Commentary</span>
+                        </label>
+                    </div>
+
+                    <!-- Devotionals -->
+                    <div class="download-section">
+                        <div class="download-section-header">Devotionals</div>
+                        <label class="download-option">
+                            <input type="checkbox" x-model="downloadSelections.devotionalSpurgeon">
+                            <span>Spurgeon Morning & Evening</span>
+                        </label>
+                    </div>
+
+                    <!-- Resources -->
+                    <div class="download-section">
+                        <div class="download-section-header">Resources</div>
+                        <label class="download-option">
+                            <input type="checkbox" x-model="downloadSelections.lexicon">
+                            <span>Strong's Lexicon</span>
+                        </label>
+                        <label class="download-option">
+                            <input type="checkbox" x-model="downloadSelections.crossRefs">
+                            <span>Cross-References</span>
+                        </label>
+                    </div>
+
+                    <!-- Download Progress -->
+                    <div class="download-progress" x-show="downloadProgress.active">
+                        <div class="progress-header">
+                            <span x-text="downloadProgress.label"></span>
+                            <span x-text="downloadProgress.percent + '%'"></span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" :style="'width: ' + downloadProgress.percent + '%'"></div>
+                        </div>
+                        <div class="progress-status" x-text="downloadProgress.status"></div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="download-actions">
+                        <button @click="startOfflineDownload()" class="btn-primary" :disabled="downloadProgress.active || !hasDownloadSelections()">
+                            Download Selected
+                        </button>
+                        <button @click="refreshOfflineData()" class="btn-secondary" :disabled="downloadProgress.active">
+                            Refresh
+                        </button>
+                        <button @click="clearOfflineData()" class="btn-danger" :disabled="downloadProgress.active">
+                            Clear All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Shortcuts Tab -->
+                <div class="settings-content" x-show="settingsTab === 'shortcuts'">
+                    <div class="settings-section">
+                        <h4>Navigation</h4>
+                        <div class="shortcuts-list">
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>←</kbd> <kbd>→</kbd></span>
+                                <span class="shortcut-desc">Previous / Next chapter</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>↑</kbd> <kbd>↓</kbd></span>
+                                <span class="shortcut-desc">Previous / Next verse</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>G</kbd></span>
+                                <span class="shortcut-desc">Go to reference input</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h4>Actions</h4>
+                        <div class="shortcuts-list">
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>/</kbd></span>
+                                <span class="shortcut-desc">Open search</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>C</kbd></span>
+                                <span class="shortcut-desc">Copy current verse</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>D</kbd></span>
+                                <span class="shortcut-desc">Toggle dark mode</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Esc</kbd></span>
+                                <span class="shortcut-desc">Close panels / modals</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h4>Tips</h4>
+                        <ul class="tips-list">
+                            <li>Click any verse to see commentary and cross-references</li>
+                            <li>Click any word (in BSB) to see Hebrew/Greek details</li>
+                            <li>Enable "Original Language" to see interlinear text</li>
+                            <li>URLs update as you navigate - share or bookmark any verse</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div class="toast" :class="toast.type" x-transition>
+                <span x-text="toast.message"></span>
+            </div>
+        </template>
+    </div>
+
+    <script src="/static/js/offline-storage.js"></script>
     <script src="/static/js/app.js"></script>
     <script>
-        // Register service worker for offline support
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/static/sw.js')
-                .then(reg => console.log('Service worker registered'))
-                .catch(err => console.log('Service worker registration failed:', err));
+        // Show cache toast notification
+        function showCacheToast(message) {
+            const toast = document.getElementById('cache-toast');
+            if (!toast) return;
+
+            const msgEl = toast.querySelector('.toast-message');
+            if (msgEl) msgEl.textContent = message;
+
+            // Reset animation by cloning
+            const newToast = toast.cloneNode(true);
+            newToast.style.display = 'flex';
+            toast.parentNode.replaceChild(newToast, toast);
+
+            // Hide after animation completes
+            setTimeout(() => {
+                newToast.style.display = 'none';
+            }, 2250);
         }
+
+        // Forced offline mode - intercept all fetch requests
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
+
+            // Log API requests to help debug caching
+            if (url?.includes('/api/')) {
+                console.log('[Main] Fetch API:', url);
+            }
+
+            // Check if forced offline mode is enabled
+            if (localStorage.getItem('forcedOffline') === 'true') {
+                // Block the request and return an error that triggers offline fallback
+                throw new TypeError('Network request blocked - forced offline mode');
+            }
+            return originalFetch.apply(this, args);
+        };
+
+        // Register service worker for offline support
+        // Note: Service workers only work on localhost or HTTPS
+        const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        const isSecure = location.protocol === 'https:';
+
+        if ('serviceWorker' in navigator && (isLocalhost || isSecure)) {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(reg => {
+                    console.log('[Main] Service worker registered:', reg.scope);
+                    console.log('[Main] SW state:', reg.installing ? 'installing' : reg.waiting ? 'waiting' : reg.active ? 'active' : 'unknown');
+
+                    // Listen for updates
+                    reg.addEventListener('updatefound', () => {
+                        console.log('[Main] Service worker update found');
+                        const newWorker = reg.installing;
+                        newWorker?.addEventListener('statechange', () => {
+                            console.log('[Main] New SW state:', newWorker.state);
+                        });
+                    });
+                })
+                .catch(err => console.log('[Main] Service worker registration failed:', err));
+
+            // Wait for service worker to be ready
+            navigator.serviceWorker.ready.then(reg => {
+                console.log('[Main] Service worker ready, controller:', !!navigator.serviceWorker.controller);
+            });
+        } else if (!isLocalhost && !isSecure) {
+            console.warn('[Main] Service worker disabled: requires localhost or HTTPS. Current:', location.hostname);
+        }
+
+        // Handle messages from service worker to cache data in IndexedDB
+        navigator.serviceWorker?.addEventListener('message', async (event) => {
+            const { type, cacheType, data, pathname } = event.data || {};
+
+            console.log('[Main] SW Message received:', type, cacheType, pathname);
+
+            if (type !== 'CACHE_DATA' || !window.offlineStorage) {
+                console.log('[SW Message] Skipping - type:', type, 'storage:', !!window.offlineStorage);
+                return;
+            }
+
+            // Check if auto-caching is enabled
+            if (localStorage.getItem('autoCacheEnabled') === 'false') {
+                console.log('[SW Message] Auto-cache disabled');
+                return;
+            }
+
+            try {
+                // Parse reference from pathname to determine book/chapter
+                const refMatch = pathname.match(/\/api\/passage\/([^/?]+)/);
+                if (!refMatch) return;
+
+                const ref = decodeURIComponent(refMatch[1]);
+                const parsedRef = ref.match(/^(.+?)\s+(\d+)/);
+                if (!parsedRef) return;
+
+                const book = parsedRef[1];
+                const chapter = parseInt(parsedRef[2]);
+
+                let cached = false;
+                switch (cacheType) {
+                    case 'passage':
+                        // Cache verses
+                        if (data.verses && data.verses.length > 0) {
+                            const translation = new URLSearchParams(pathname.split('?')[1]).get('translation') || 'BSB';
+                            await window.offlineStorage.saveChapterVerses(translation, book, chapter, data.verses);
+                            showCacheToast(`Cached ${book} ${chapter}`);
+                            cached = true;
+                        }
+                        break;
+
+                    case 'interlinear':
+                        // Cache interlinear data
+                        if (data.verses) {
+                            const allWords = [];
+                            for (const [verseNum, words] of Object.entries(data.verses)) {
+                                for (const word of words) {
+                                    allWords.push({ ...word, verse: parseInt(verseNum) });
+                                }
+                            }
+                            if (allWords.length > 0) {
+                                await window.offlineStorage.saveChapterInterlinear(book, chapter, allWords);
+                                cached = true;
+                            }
+                        }
+                        break;
+
+                    case 'commentary':
+                        // Cache commentary
+                        if (data.entries && data.entries.length > 0) {
+                            await window.offlineStorage.saveChapterCommentary(book, chapter, data.entries);
+                            cached = true;
+                        }
+                        break;
+
+                    case 'crossrefs':
+                        // Cache cross-references
+                        if (data.cross_references && data.cross_references.length > 0) {
+                            await window.offlineStorage.saveChapterCrossRefs(book, chapter, data.cross_references);
+                            cached = true;
+                        }
+                        break;
+
+                    case 'lexicon':
+                        // Cache lexicon entry
+                        if (data.word) {
+                            await window.offlineStorage.saveLexiconEntries([data.word]);
+                            cached = true;
+                        }
+                        break;
+                }
+
+                // Refresh offline stats in the Alpine app
+                if (cached) {
+                    console.log('[Main] Cached data:', cacheType, book, chapter);
+                    const alpineApp = document.querySelector('[x-data]')?.__x?.$data;
+                    if (alpineApp && typeof alpineApp.updateOfflineStats === 'function') {
+                        alpineApp.updateOfflineStats();
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to cache data in IndexedDB:', err);
+            }
+        });
     </script>
 </body>
 </html>

@@ -1,0 +1,11 @@
+app = "bible-mvp"   
+[build]
+  dockerfile = "Dockerfile"
+[http_service]
+  internal_port = 8000
+  force_https = true
+[env]
+  DATABASE_PATH = "/data/bible.db"
+[mounts]
+  source = "bible_data"
+  destination = "/data"

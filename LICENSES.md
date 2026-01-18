@@ -12,6 +12,7 @@ The BibleMVP source code is licensed under the **MIT License**.
 
 | Translation | Status | Source | Notes |
 |-------------|--------|--------|-------|
+| BSB (Berean Standard Bible) | CC BY 4.0 | [berean.bible](https://berean.bible) | Modern translation, default |
 | WEB (World English Bible) | Public Domain | [open-bibles](https://github.com/seven1m/open-bibles) | Explicitly released to public domain |
 | KJV (King James Version) | Public Domain | Various | 1611, public domain worldwide |
 | ASV (American Standard Version) | Public Domain | Various | 1901, public domain |
@@ -52,12 +53,14 @@ The BibleMVP source code is licensed under the **MIT License**.
 
 ---
 
-## Interlinear Data
+## Interlinear & Alignment Data
 
 | Resource | Status | Source | Notes |
 |----------|--------|--------|-------|
-| OpenGNT | CC BY-SA 4.0 | [OpenGNT](https://github.com/eliranwong/OpenGNT) | Verify before use |
-| OpenHebrewBible | CC BY 4.0 | [OpenHebrewBible](https://github.com/eliranwong/OpenHebrewBible) | Verify before use |
+| Clear-Bible Alignments | CC BY 4.0 | [Clear-Bible/Alignments](https://github.com/Clear-Bible/Alignments) | BSB word-level Hebrew/Greek alignments |
+| STEPBible Data | CC BY 4.0 | [STEPBible/STEPBible-Data](https://github.com/STEPBible/STEPBible-Data) | Hebrew/Greek interlinear with Strong's |
+| OpenGNT | CC BY-SA 4.0 | [OpenGNT](https://github.com/eliranwong/OpenGNT) | Greek NT data |
+| OpenHebrewBible | CC BY 4.0 | [OpenHebrewBible](https://github.com/eliranwong/OpenHebrewBible) | Hebrew OT data |
 
 ---
 
