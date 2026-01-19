@@ -41,6 +41,8 @@
 - [x] **Supabase sync for reading plan progress** (user_reading_plans + reading_plan_progress tables)
 - [x] **Note tags with colors** (Supabase sync)
 - [x] **Plan completion indicator** with celebration banner
+- [x] **Book genre color-coding** in book picker (Law, History, Wisdom, Prophets, etc.) with configurable colors
+- [x] **Red Letter display** for words of God (OT) and Jesus (NT) - 6,896 verses with divine speech (toggleable)
 
 ## High Priority
 
