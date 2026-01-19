@@ -283,7 +283,11 @@ function bibleApp() {
         settingsTab: 'general',
         defaultTranslation: 'BSB',
         defaultShowInterlinear: false,
+        showRedLetter: true,  // Red letter display for God/Jesus speech
         genreColors: { ...DEFAULT_GENRE_COLORS },  // User-customizable genre colors
+
+        // Speaker verses for red letter display
+        speakerVerses: [],  // Verse numbers with divine speech
 
         // Auth state
         authUser: null,
@@ -394,6 +398,7 @@ function bibleApp() {
             this.showInterlinear = this.defaultShowInterlinear;
             this.autoCacheEnabled = localStorage.getItem('autoCacheEnabled') !== 'false';
             this.forcedOffline = localStorage.getItem('forcedOffline') === 'true';
+            this.showRedLetter = localStorage.getItem('showRedLetter') !== 'false';  // Default true
 
             // Load genre colors from localStorage
             const savedGenreColors = localStorage.getItem('genreColors');
@@ -763,6 +768,7 @@ function bibleApp() {
                 this.verses = data.verses;
                 this.crossRefs = data.cross_references || [];
                 this.highlightedVerses = data.highlighted_verses || [];
+                this.speakerVerses = data.speaker_verses || [];
 
                 // Parse reference for navigation
                 this.parseCurrentReference();
@@ -1556,6 +1562,16 @@ function bibleApp() {
         // Save interlinear preference
         saveInterlinearPref() {
             localStorage.setItem('defaultShowInterlinear', this.defaultShowInterlinear);
+        },
+
+        // Save red letter preference
+        saveRedLetterPref() {
+            localStorage.setItem('showRedLetter', this.showRedLetter);
+        },
+
+        // Check if verse has divine speech (for red letter display)
+        isRedLetterVerse(verseNum) {
+            return this.showRedLetter && this.speakerVerses.includes(verseNum);
         },
 
         // Save auto-cache preference

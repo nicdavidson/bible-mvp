@@ -236,6 +236,7 @@
                             <sup class="verse-num" x-text="verse.verse"></sup>
                             <span
                                 class="verse-text"
+                                :class="{ 'red-letter': isRedLetterVerse(verse.verse) }"
                                 x-html="formatVerseText(verse.text)"
                             ></span>
                             <!-- Interlinear display -->
@@ -973,6 +974,16 @@
                             </div>
                             <label class="toggle-switch">
                                 <input type="checkbox" x-model="defaultShowInterlinear" @change="saveInterlinearPref()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <div class="setting-label">Red Letter</div>
+                                <div class="setting-description">Highlight words of God (OT) and Jesus (NT) in red</div>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" x-model="showRedLetter" @change="saveRedLetterPref()">
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>

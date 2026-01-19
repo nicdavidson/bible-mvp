@@ -82,12 +82,16 @@ async def get_passage(
         # Get cross-references for the requested verses
         cross_refs = get_cross_references(conn, book, chapter, verse_start, verse_end)
 
+        # Get verses with divine speech for red-letter display
+        speaker_verses = get_speaker_verses(conn, book, chapter)
+
         return {
             "reference": f"{book} {chapter}" if not has_verse else reference,
             "translation": translation,
             "verses": [dict(v) for v in verses],
             "cross_references": cross_refs,
-            "highlighted_verses": highlighted_verses
+            "highlighted_verses": highlighted_verses,
+            "speaker_verses": speaker_verses
         }
     finally:
         conn.close()
@@ -740,6 +744,21 @@ def get_cross_references(conn, book: str, chapter: int, verse_start: int, verse_
     """, (book, chapter, verse_start, verse_end))
 
     return [dict(r) for r in cursor.fetchall()]
+
+
+def get_speaker_verses(conn, book: str, chapter: int) -> list:
+    """Get verses with divine speech (God in OT, Jesus in NT) for red-letter display."""
+    try:
+        cursor = conn.execute("""
+            SELECT verse, speaker
+            FROM speaker_verses
+            WHERE book = ? AND chapter = ? AND is_divine = 1
+            ORDER BY verse
+        """, (book, chapter))
+        return [row[0] for row in cursor.fetchall()]
+    except sqlite3.OperationalError:
+        # Table doesn't exist yet
+        return []
 
 
 # ========== OFFLINE DATA EXPORT ENDPOINTS ==========
