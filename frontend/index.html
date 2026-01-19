@@ -24,15 +24,83 @@
         <span class="toast-message"></span>
     </div>
 
+    <!-- Side Menu Overlay -->
+    <div class="side-menu-overlay" x-show="showSideMenu" x-transition.opacity @click="showSideMenu = false"></div>
+
+    <!-- Side Menu -->
+    <nav class="side-menu" :class="{ 'open': showSideMenu }">
+        <div class="side-menu-header">
+            <span class="side-menu-title">In the Word</span>
+            <button @click="showSideMenu = false" class="side-menu-close">&times;</button>
+        </div>
+
+        <div class="side-menu-content">
+            <div class="side-menu-section">
+                <button @click="navigateTo('reader')" class="side-menu-item" :class="{ 'active': currentView === 'reader' }">
+                    <span class="side-menu-icon">📖</span>
+                    <span>Get in the Word</span>
+                </button>
+                <button @click="openTodaysReading()" class="side-menu-item" x-show="currentPlan">
+                    <span class="side-menu-icon">📅</span>
+                    <span>Today's Reading</span>
+                </button>
+                <button @click="navigateTo('plans')" class="side-menu-item">
+                    <span class="side-menu-icon">📚</span>
+                    <span>Reading Plans</span>
+                </button>
+            </div>
+
+            <div class="side-menu-divider"></div>
+
+            <div class="side-menu-section">
+                <button @click="openShareJesus()" class="side-menu-item">
+                    <span class="side-menu-icon">✝️</span>
+                    <span>Share Jesus</span>
+                </button>
+            </div>
+
+            <div class="side-menu-divider"></div>
+
+            <div class="side-menu-section">
+                <button @click="openSettingsFromMenu()" class="side-menu-item">
+                    <span class="side-menu-icon">⚙️</span>
+                    <span>Settings</span>
+                </button>
+                <button @click="openGuide()" class="side-menu-item">
+                    <span class="side-menu-icon">📘</span>
+                    <span>Guide</span>
+                </button>
+                <button @click="openAbout()" class="side-menu-item">
+                    <span class="side-menu-icon">ℹ️</span>
+                    <span>About</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="side-menu-footer">
+            <template x-if="authUser">
+                <div class="side-menu-user">
+                    <span class="side-menu-user-email" x-text="authUser.email"></span>
+                    <button @click="handleSignOut(); showSideMenu = false;" class="side-menu-signout">Sign Out</button>
+                </div>
+            </template>
+            <template x-if="!authUser">
+                <button @click="openSettingsFromMenu('account')" class="side-menu-signin">Sign In</button>
+            </template>
+        </div>
+    </nav>
+
     <!-- Header -->
     <header class="header">
         <div class="header-left">
-            <h1 class="logo"><span class="logo-icon">📖</span><span class="logo-text">In the Word</span></h1>
+            <button @click="showSideMenu = true" class="btn-hamburger" title="Menu">
+                <span class="hamburger-icon">☰</span>
+            </button>
         </div>
         <div class="header-center">
             <div class="reference-input">
                 <button @click="toggleBookPicker" class="btn-picker" title="Browse books">
-                    <span class="picker-icon">☰</span>
+                    <span class="picker-icon">📖</span>
                 </button>
                 <div class="autocomplete-wrapper">
                     <input
@@ -113,18 +181,12 @@
             </div>
         </div>
         <div class="header-right">
-            <div class="offline-indicator" :class="isOnline ? 'online' : 'offline'" @click="openSettings('offline')" :title="isOnline ? 'Online' : 'Offline - using cached data'">
+            <div class="offline-indicator" :class="isOnline ? 'online' : 'offline'" @click="openSettingsFromMenu('offline')" :title="isOnline ? 'Online' : 'Offline - using cached data'">
                 <span class="status-dot"></span>
                 <span class="offline-label" x-text="isOnline ? '' : 'Offline'"></span>
             </div>
-            <button @click="openReadingPlan()" class="btn-icon" title="Reading Plans">
-                📅
-            </button>
             <button @click="openSearch()" class="btn-icon" title="Search (/)">
                 🔍
-            </button>
-            <button @click="openSettings()" class="btn-icon" title="Settings">
-                ⚙️
             </button>
         </div>
     </header>
@@ -162,7 +224,7 @@
 
             <!-- Plan reading header bar (shown when in combined plan reading mode) - sticky below header -->
             <div x-show="combinedPlanReading && currentPlan" class="plan-reading-bar">
-                <button @click="showReadingPlan = true; combinedPlanReading = false" class="btn-exit-plan">← Back to Plan</button>
+                <button @click="exitPlanReading()" class="btn-exit-plan" title="Exit to normal Bible view">✕ Exit</button>
                 <div class="plan-reading-info">
                     <div class="plan-title-row">
                         <span class="plan-name" x-text="currentPlan?.name"></span>
@@ -181,6 +243,14 @@
                 </button>
             </div>
 
+            <!-- Single verse full passage bar (shown when viewing full passage from single verse mode) -->
+            <div x-show="singleVerseFullPassage" class="single-verse-passage-bar">
+                <button @click="returnToSingleVerseMode()" class="btn-exit-plan" title="Back to verse view">← Back to Verses</button>
+                <div class="single-verse-passage-info">
+                    <span x-text="getCurrentSingleVerse()?.ref"></span>
+                </div>
+            </div>
+
             <div class="panel-body">
                 <div x-show="loading" class="loading">
                     <div class="loading-spinner"></div>
@@ -195,7 +265,7 @@
                         <h3>Old Testament</h3>
                         <div class="book-grid">
                             <template x-for="book in otBooks" :key="book">
-                                <button @click="loadReference(book + ' 1')" class="book-btn" x-text="book"></button>
+                                <button @click="loadReference(book + ' 1')" class="book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
                             </template>
                         </div>
                     </div>
@@ -203,7 +273,7 @@
                         <h3>New Testament</h3>
                         <div class="book-grid">
                             <template x-for="book in ntBooks" :key="book">
-                                <button @click="loadReference(book + ' 1')" class="book-btn" x-text="book"></button>
+                                <button @click="loadReference(book + ' 1')" class="book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
                             </template>
                         </div>
                     </div>
@@ -825,12 +895,6 @@
                         Offline
                         <span class="offline-badge" :class="isOnline ? 'online' : 'offline'"></span>
                     </button>
-                    <button @click="settingsTab = 'shortcuts'" :class="{ active: settingsTab === 'shortcuts' }" class="settings-nav-btn">
-                        Shortcuts
-                    </button>
-                    <button x-show="authUser" @click="settingsTab = 'feedback'" :class="{ active: settingsTab === 'feedback' }" class="settings-nav-btn">
-                        Feedback
-                    </button>
                 </div>
 
                 <!-- Account Settings Tab -->
@@ -1223,150 +1287,368 @@
                     </div>
                 </div>
 
-                <!-- Shortcuts Tab -->
-                <div class="settings-content" x-show="settingsTab === 'shortcuts'">
-                    <div class="settings-section">
-                        <h4>Navigation</h4>
-                        <div class="shortcuts-list">
-                            <div class="shortcut-item">
-                                <span class="shortcut-keys"><kbd>←</kbd> <kbd>→</kbd></span>
-                                <span class="shortcut-desc">Previous / Next chapter</span>
-                            </div>
-                            <div class="shortcut-item">
-                                <span class="shortcut-keys"><kbd>↑</kbd> <kbd>↓</kbd></span>
-                                <span class="shortcut-desc">Previous / Next verse</span>
-                            </div>
-                            <div class="shortcut-item">
-                                <span class="shortcut-keys"><kbd>G</kbd></span>
-                                <span class="shortcut-desc">Go to reference input</span>
-                            </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide Modal -->
+    <div class="modal-overlay" x-show="showGuide" x-transition @click.self="showGuide = false">
+        <div class="modal guide-modal">
+            <div class="modal-header">
+                <h2>Guide</h2>
+                <button @click="showGuide = false" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="guide-section">
+                    <h4>Tips</h4>
+                    <ul class="tips-list">
+                        <li>Click any verse to see commentary and cross-references</li>
+                        <li>Click any word (in BSB) to see Hebrew/Greek details</li>
+                        <li>Enable "Original Language" in settings to see interlinear text</li>
+                        <li>Red letter mode highlights words of God (OT) and Jesus (NT)</li>
+                        <li>Use reading plans for structured daily Bible reading</li>
+                        <li>Create notes on verses - tag them for easy organization</li>
+                        <li>Sign in to sync notes and progress across devices</li>
+                        <li>URLs update as you navigate - share or bookmark any verse</li>
+                        <li>Use the book picker to browse by genre-colored categories</li>
+                        <li>Download books for offline reading in Settings > Offline</li>
+                    </ul>
+                </div>
+
+                <!-- Keyboard shortcuts (desktop only) -->
+                <div class="guide-section shortcuts-desktop-only">
+                    <h4>Keyboard Shortcuts</h4>
+                    <div class="shortcuts-list">
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span>
+                            <span class="shortcut-desc">Previous / Next chapter</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span>
+                            <span class="shortcut-desc">Previous / Next verse</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>G</kbd></span>
+                            <span class="shortcut-desc">Go to reference input</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>/</kbd></span>
+                            <span class="shortcut-desc">Open search</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>C</kbd></span>
+                            <span class="shortcut-desc">Copy current verse</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>D</kbd></span>
+                            <span class="shortcut-desc">Toggle dark mode</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <span class="shortcut-keys"><kbd>Esc</kbd></span>
+                            <span class="shortcut-desc">Close panels / modals</span>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                    <div class="settings-section">
-                        <h4>Actions</h4>
-                        <div class="shortcuts-list">
-                            <div class="shortcut-item">
-                                <span class="shortcut-keys"><kbd>/</kbd></span>
-                                <span class="shortcut-desc">Open search</span>
-                            </div>
-                            <div class="shortcut-item">
-                                <span class="shortcut-keys"><kbd>C</kbd></span>
-                                <span class="shortcut-desc">Copy current verse</span>
-                            </div>
-                            <div class="shortcut-item">
-                                <span class="shortcut-keys"><kbd>D</kbd></span>
-                                <span class="shortcut-desc">Toggle dark mode</span>
-                            </div>
-                            <div class="shortcut-item">
-                                <span class="shortcut-keys"><kbd>Esc</kbd></span>
-                                <span class="shortcut-desc">Close panels / modals</span>
-                            </div>
-                        </div>
-                    </div>
+    <!-- About Modal -->
+    <div class="modal-overlay" x-show="showAbout" x-transition @click.self="showAbout = false">
+        <div class="modal about-modal">
+            <div class="modal-header">
+                <h2>About</h2>
+                <button @click="showAbout = false" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="about-section">
+                    <h4>In the Word</h4>
+                    <p class="about-text">
+                        A free, open-source Bible study tool built to help you dig deeper into Scripture.
+                        Cross-reference commentaries, original language insights, and your personal notes
+                        all in one place.
+                    </p>
+                </div>
 
-                    <div class="settings-section">
-                        <h4>Tips</h4>
-                        <ul class="tips-list">
-                            <li>Click any verse to see commentary and cross-references</li>
-                            <li>Click any word (in BSB) to see Hebrew/Greek details</li>
-                            <li>Enable "Original Language" to see interlinear text</li>
-                            <li>URLs update as you navigate - share or bookmark any verse</li>
-                        </ul>
+                <div class="about-section">
+                    <h4>Builder's Note</h4>
+                    <p class="about-text">
+                        This project was born out of a desire to create a simple, focused Bible reading experience
+                        with acess to as much cross refernce and commentary material as possible. 
+                    </p>
+                </div>
+
+                <div class="about-section">
+                    <h4>Feedback</h4>
+                    <p class="about-text">Found a bug, accuracy issue, or have a feature idea?</p>
+                    <template x-if="authUser">
+                        <button @click="openFeedbackFromAbout()" class="btn-secondary">Submit Feedback</button>
+                    </template>
+                    <template x-if="!authUser">
+                        <p class="about-text-muted">Sign in to submit feedback.</p>
+                    </template>
+                </div>
+
+                <div class="about-section about-links">
+                    <h4>Links</h4>
+                    <div class="about-link-list">
+                        <a href="https://github.com" target="_blank" rel="noopener" class="about-link">GitHub</a>
                     </div>
                 </div>
 
-                <!-- Feedback Tab (only visible when signed in) -->
-                <div class="settings-content" x-show="settingsTab === 'feedback' && authUser">
-                    <div class="settings-section">
-                        <h4>Submit Feedback</h4>
-                        <p class="feedback-intro">Help improve BibleMVP by reporting bugs, accuracy issues, or suggesting features.</p>
+                <div class="about-footer">
+                    <span class="about-version">Version 0.1-alpha</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                        <!-- Success message -->
-                        <div class="feedback-success" x-show="feedbackSuccess">
-                            <span>Thank you! Your feedback has been submitted.</span>
-                            <button @click="resetFeedbackForm()" class="btn-text">Submit another</button>
-                        </div>
+    <!-- Share Jesus Modal -->
+    <div class="modal-overlay" x-show="showShareJesus" x-transition @click.self="showShareJesus = false">
+        <div class="modal share-jesus-modal">
+            <div class="modal-header">
+                <h2>Share Jesus Without Fear</h2>
+                <button @click="showShareJesus = false" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="share-jesus-section share-jesus-about">
+                    <p class="share-jesus-description">
+                        Share Jesus Without Fear is a simple, conversational approach to sharing the Gospel.
+                        You don't need to have all the answers—just ask questions, let them read Scripture aloud,
+                        and ask "What does this say to you?" The Holy Spirit does the work through God's Word.
+                        Your job is simply to be obedient and share.
+                    </p>
+                </div>
 
-                        <!-- Error message -->
-                        <div class="feedback-error" x-show="feedbackError" x-text="feedbackError"></div>
+                <div class="share-jesus-section">
+                    <h4>5 Opening Questions</h4>
+                    <ol class="share-jesus-list">
+                        <li>Do you have any kind of spiritual beliefs?</li>
+                        <li>To you, who is Jesus Christ?</li>
+                        <li>Do you believe in heaven or hell?</li>
+                        <li>If you died right now, where would you go? If heaven, why?</li>
+                        <li>If what you believe is not true, would you want to know?</li>
+                    </ol>
+                </div>
 
-                        <!-- Feedback form -->
-                        <form x-show="!feedbackSuccess" @submit.prevent="submitFeedback()" class="feedback-form">
-                            <!-- Category selection -->
-                            <div class="feedback-field">
-                                <label>Category</label>
-                                <div class="feedback-category-btns">
-                                    <button type="button" @click="feedbackCategory = 'bug'" :class="{ active: feedbackCategory === 'bug' }" class="category-btn">
-                                        Bug / Issue
-                                    </button>
-                                    <button type="button" @click="feedbackCategory = 'accuracy'" :class="{ active: feedbackCategory === 'accuracy' }" class="category-btn">
-                                        Accuracy
-                                    </button>
-                                    <button type="button" @click="feedbackCategory = 'feature'" :class="{ active: feedbackCategory === 'feature' }" class="category-btn">
-                                        Feature Request
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Accuracy-specific fields -->
-                            <template x-if="feedbackCategory === 'accuracy'">
-                                <div class="accuracy-fields">
-                                    <div class="feedback-field">
-                                        <label>Verse Reference</label>
-                                        <input type="text" x-model="feedbackVerseRef" placeholder="e.g., John 3:16" class="feedback-input">
-                                    </div>
-                                    <div class="feedback-field">
-                                        <label>Translation</label>
-                                        <select x-model="feedbackTranslation" class="feedback-select">
-                                            <option value="">Select translation</option>
-                                            <option value="BSB">BSB</option>
-                                            <option value="KJV">KJV</option>
-                                            <option value="WEB">WEB</option>
-                                        </select>
-                                    </div>
-                                    <div class="feedback-field">
-                                        <label>Issue Type</label>
-                                        <select x-model="feedbackAccuracyType" class="feedback-select">
-                                            <option value="">Select type</option>
-                                            <option value="text">Bible Text</option>
-                                            <option value="original_lang">Original Language / Greek / Hebrew</option>
-                                            <option value="commentary">Commentary</option>
-                                            <option value="cross_ref">Cross References</option>
-                                            <option value="other">Other</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </template>
-
-                            <!-- Description (always shown) -->
-                            <div class="feedback-field">
-                                <label x-text="feedbackCategory === 'accuracy' ? 'Describe the issue' : (feedbackCategory === 'feature' ? 'Describe your feature idea' : 'Describe the bug or issue')"></label>
-                                <textarea x-model="feedbackDescription" :placeholder="feedbackCategory === 'accuracy' ? 'What is incorrect and what should it be?' : (feedbackCategory === 'feature' ? 'What would you like to see added?' : 'What happened? What did you expect?')" class="feedback-textarea" rows="4"></textarea>
-                            </div>
-
-                            <!-- Screenshot (for bugs only) -->
-                            <template x-if="feedbackCategory === 'bug'">
-                                <div class="feedback-field">
-                                    <label>Screenshot (optional)</label>
-                                    <input type="file" @change="handleScreenshotSelect($event)" accept="image/*" class="feedback-file-input">
-                                    <div x-show="feedbackScreenshotPreview" class="screenshot-preview">
-                                        <img :src="feedbackScreenshotPreview" alt="Screenshot preview">
-                                        <button type="button" @click="clearScreenshot()" class="btn-remove-screenshot">Remove</button>
-                                    </div>
-                                </div>
-                            </template>
-
-                            <!-- Submit button -->
-                            <div class="feedback-actions">
-                                <button type="submit" class="btn-primary" :disabled="feedbackSubmitting || !feedbackDescription.trim()">
-                                    <span x-show="!feedbackSubmitting">Submit Feedback</span>
-                                    <span x-show="feedbackSubmitting">Submitting...</span>
-                                </button>
-                            </div>
-                        </form>
+                <div class="share-jesus-section">
+                    <h4>7 Verses</h4>
+                    <p class="share-jesus-intro">Have them read each verse aloud, then ask: "What does this say to you?"</p>
+                    <button @click="startShareJesusVerses()" class="btn-primary btn-start-verses">
+                        Go to Verses →
+                    </button>
+                    <div class="share-jesus-verses-list">
+                        <div class="verse-list-item"><span class="verse-num">1.</span> Romans 3:23 <span class="verse-theme">— All have sinned</span></div>
+                        <div class="verse-list-item"><span class="verse-num">2.</span> Romans 6:23 <span class="verse-theme">— Wages of sin / Gift of God</span></div>
+                        <div class="verse-list-item"><span class="verse-num">3.</span> John 3:3 <span class="verse-theme">— Must be born again</span></div>
+                        <div class="verse-list-item"><span class="verse-num">4.</span> John 14:6 <span class="verse-theme">— Jesus is the only way</span></div>
+                        <div class="verse-list-item"><span class="verse-num">5.</span> Romans 10:9-11 <span class="verse-theme">— Confess and believe</span></div>
+                        <div class="verse-list-item"><span class="verse-num">6.</span> 2 Corinthians 5:15 <span class="verse-theme">— Live for Him</span></div>
+                        <div class="verse-list-item"><span class="verse-num">7.</span> Revelation 3:20 <span class="verse-theme">— Jesus knocks</span></div>
                     </div>
                 </div>
+
+                <div class="share-jesus-section">
+                    <h4>5 Final Questions</h4>
+                    <ol class="share-jesus-list">
+                        <li>Are you a sinner?</li>
+                        <li>Do you want forgiveness of sins?</li>
+                        <li>Do you believe Jesus died on the cross and rose again?</li>
+                        <li>Are you willing to surrender your life to Jesus Christ?</li>
+                        <li>Are you ready to invite Jesus into your life and heart?</li>
+                    </ol>
+                </div>
+
+                <div class="share-jesus-section">
+                    <h4>The Prayer</h4>
+                    <p class="share-jesus-intro">If they answer yes to all five questions, lead them in this prayer:</p>
+                    <div class="share-jesus-prayer">
+                        <p>"Dear God, I am a sinner and need forgiveness. I believe that Jesus Christ shed His precious blood and died for my sin. I am willing to turn from sin. I now invite Christ to come into my heart and life as my personal Savior."</p>
+                    </div>
+                </div>
+
+                <div class="share-jesus-section share-jesus-success">
+                    <h4>If They Say Yes</h4>
+                    <p class="share-jesus-encouragement">
+                        <strong>Celebrate with them!</strong> They have just made the most important decision of their life.
+                        Help them understand what happened and take these next steps:
+                    </p>
+                    <ol class="share-jesus-next-steps">
+                        <li><strong>Read the Bible daily</strong> — Start with the Gospel of John to learn more about Jesus.</li>
+                        <li><strong>Pray</strong> — Talk to God daily. He wants to hear from you.</li>
+                        <li><strong>Find a Bible-believing church</strong> — Connect with other believers who can encourage and teach you.</li>
+                        <li><strong>Tell someone</strong> — Share your decision with a friend or family member.</li>
+                        <li><strong>Get baptized</strong> — This is your public declaration of faith in Christ.</li>
+                    </ol>
+                    <p class="share-jesus-encouragement">
+                        Stay connected with them! Offer to read the Bible together, invite them to church, and be available as they grow in their new faith.
+                    </p>
+                </div>
+
+                <div class="share-jesus-section share-jesus-rejection">
+                    <h4>If They Say No</h4>
+                    <p class="share-jesus-encouragement">
+                        <strong>You did not fail.</strong> Remember: they are not rejecting you—they are rejecting Jesus and God's Word.
+                        Therefore you did not fail in your obedience.
+                    </p>
+                    <p class="share-jesus-encouragement">
+                        Research shows it takes an average of 7.6 times hearing the gospel before someone responds.
+                        You never know if you're the first person to share, or if you're planting that 6th or 7th seed. Either way, you were faithful.
+                    </p>
+                    <p class="share-jesus-encouragement">
+                        As Bill Fay says: <em>"If you get a 'no' that sticks, it's not your problem—it's God's."</em>
+                    </p>
+                    <p class="share-jesus-encouragement">
+                        Simply ask: <em>"Would it be okay if I prayed for you?"</em> Most people will say yes. And keep loving them—your relationship doesn't end here.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Single Verse View (reusable for Share Jesus, verse of the day, etc.) -->
+    <div class="single-verse-overlay" x-show="singleVerseMode" x-transition>
+        <div class="single-verse-header">
+            <button @click="exitSingleVerseMode()" class="btn-exit-single-verse">✕ Exit</button>
+            <div class="single-verse-progress" x-show="singleVerseList.length > 1">
+                <span x-text="singleVerseIndex + ' of ' + singleVerseList.length"></span>
+            </div>
+            <div x-show="singleVerseList.length <= 1"></div>
+            <button @click="nextSingleVerse()" class="btn-next-single-verse" x-show="singleVerseIndex < singleVerseList.length">
+                Next →
+            </button>
+            <button @click="finishSingleVerseMode()" class="btn-finish-single-verse" x-show="singleVerseIndex >= singleVerseList.length">
+                Done
+            </button>
+        </div>
+        <div class="single-verse-body">
+            <div class="single-verse-content">
+                <div class="single-verse-ref" x-text="getCurrentSingleVerse().ref"></div>
+                <div class="single-verse-loading" x-show="singleVerseLoading">
+                    <div class="loading-spinner"></div>
+                </div>
+                <div class="single-verse-text" x-show="!singleVerseLoading" x-html="singleVerseText"></div>
+            </div>
+            <!-- Prompt below the verse -->
+            <div class="single-verse-prompt" x-show="singleVersePrompt">
+                <p class="single-verse-prompt-text">What does this say to you?</p>
+            </div>
+            <!-- Link to view full passage -->
+            <button @click="viewFullPassageFromSingleVerse()" class="btn-view-full-passage">
+                View full passage →
+            </button>
+        </div>
+        <div class="single-verse-nav" x-show="singleVerseList.length > 1">
+            <button @click="prevSingleVerse()" class="btn-prev-single-verse" :disabled="singleVerseIndex <= 1">
+                ← Previous
+            </button>
+            <div class="single-verse-dots">
+                <template x-for="i in singleVerseList.length" :key="i">
+                    <span class="single-verse-dot" :class="{ 'active': i === singleVerseIndex }" @click="goToSingleVerse(i)"></span>
+                </template>
+            </div>
+            <button @click="nextSingleVerse()" class="btn-next-single-verse" x-show="singleVerseIndex < singleVerseList.length">
+                Next →
+            </button>
+            <button @click="finishSingleVerseMode()" class="btn-finish-single-verse" x-show="singleVerseIndex >= singleVerseList.length">
+                Done
+            </button>
+        </div>
+    </div>
+
+    <!-- Feedback Modal (standalone) -->
+    <div class="modal-overlay" x-show="showFeedback" x-transition @click.self="showFeedback = false">
+        <div class="modal feedback-modal">
+            <div class="modal-header">
+                <h2>Submit Feedback</h2>
+                <button @click="showFeedback = false" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="feedback-intro">Help improve In the Word by reporting bugs, accuracy issues, or suggesting features.</p>
+
+                <!-- Success message -->
+                <div class="feedback-success" x-show="feedbackSuccess">
+                    <span>Thank you! Your feedback has been submitted.</span>
+                    <button @click="resetFeedbackForm()" class="btn-text">Submit another</button>
+                </div>
+
+                <!-- Error message -->
+                <div class="feedback-error" x-show="feedbackError" x-text="feedbackError"></div>
+
+                <!-- Feedback form -->
+                <form x-show="!feedbackSuccess" @submit.prevent="submitFeedback()" class="feedback-form">
+                    <!-- Category selection -->
+                    <div class="feedback-field">
+                        <label>Category</label>
+                        <div class="feedback-category-btns">
+                            <button type="button" @click="feedbackCategory = 'bug'" :class="{ active: feedbackCategory === 'bug' }" class="category-btn">
+                                Bug / Issue
+                            </button>
+                            <button type="button" @click="feedbackCategory = 'accuracy'" :class="{ active: feedbackCategory === 'accuracy' }" class="category-btn">
+                                Accuracy
+                            </button>
+                            <button type="button" @click="feedbackCategory = 'feature'" :class="{ active: feedbackCategory === 'feature' }" class="category-btn">
+                                Feature Request
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Accuracy-specific fields -->
+                    <template x-if="feedbackCategory === 'accuracy'">
+                        <div class="accuracy-fields">
+                            <div class="feedback-field">
+                                <label>Verse Reference</label>
+                                <input type="text" x-model="feedbackVerseRef" placeholder="e.g., John 3:16" class="feedback-input">
+                            </div>
+                            <div class="feedback-field">
+                                <label>Translation</label>
+                                <select x-model="feedbackTranslation" class="feedback-select">
+                                    <option value="">Select translation</option>
+                                    <option value="BSB">BSB</option>
+                                    <option value="KJV">KJV</option>
+                                    <option value="WEB">WEB</option>
+                                </select>
+                            </div>
+                            <div class="feedback-field">
+                                <label>Issue Type</label>
+                                <select x-model="feedbackAccuracyType" class="feedback-select">
+                                    <option value="">Select type</option>
+                                    <option value="text">Bible Text</option>
+                                    <option value="original_lang">Original Language / Greek / Hebrew</option>
+                                    <option value="commentary">Commentary</option>
+                                    <option value="cross_ref">Cross References</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Description (always shown) -->
+                    <div class="feedback-field">
+                        <label x-text="feedbackCategory === 'accuracy' ? 'Describe the issue' : (feedbackCategory === 'feature' ? 'Describe your feature idea' : 'Describe the bug or issue')"></label>
+                        <textarea x-model="feedbackDescription" :placeholder="feedbackCategory === 'accuracy' ? 'What is incorrect and what should it be?' : (feedbackCategory === 'feature' ? 'What would you like to see added?' : 'What happened? What did you expect?')" class="feedback-textarea" rows="4"></textarea>
+                    </div>
+
+                    <!-- Screenshot (for bugs only) -->
+                    <template x-if="feedbackCategory === 'bug'">
+                        <div class="feedback-field">
+                            <label>Screenshot (optional)</label>
+                            <input type="file" @change="handleScreenshotSelect($event)" accept="image/*" class="feedback-file-input">
+                            <div x-show="feedbackScreenshotPreview" class="screenshot-preview">
+                                <img :src="feedbackScreenshotPreview" alt="Screenshot preview">
+                                <button type="button" @click="clearScreenshot()" class="btn-remove-screenshot">&times;</button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Submit button -->
+                    <div class="feedback-actions">
+                        <button type="submit" class="btn-primary" :disabled="feedbackSubmitting || !feedbackDescription.trim()">
+                            <span x-show="!feedbackSubmitting">Submit Feedback</span>
+                            <span x-show="feedbackSubmitting">Submitting...</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
