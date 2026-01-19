@@ -385,6 +385,18 @@ function bibleApp() {
         },
         toasts: [],
 
+        // Feedback/bug report state
+        feedbackCategory: 'bug',  // 'bug', 'accuracy', 'feature'
+        feedbackDescription: '',
+        feedbackVerseRef: '',
+        feedbackTranslation: '',
+        feedbackAccuracyType: '',
+        feedbackScreenshot: null,  // File object
+        feedbackScreenshotPreview: '',  // Data URL for preview
+        feedbackSubmitting: false,
+        feedbackSuccess: false,
+        feedbackError: null,
+
         // Initialize
         async init() {
             // Detect touch device
@@ -1612,6 +1624,99 @@ function bibleApp() {
             // Refresh offline stats when opening settings
             if (tab === 'offline') {
                 this.updateOfflineStats();
+            }
+        },
+
+        // ========== Feedback/Bug Report Functions ==========
+
+        // Handle screenshot file selection
+        handleScreenshotSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.feedbackScreenshot = file;
+                // Create preview URL
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.feedbackScreenshotPreview = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        },
+
+        // Clear screenshot
+        clearScreenshot() {
+            this.feedbackScreenshot = null;
+            this.feedbackScreenshotPreview = '';
+        },
+
+        // Reset feedback form
+        resetFeedbackForm() {
+            this.feedbackCategory = 'bug';
+            this.feedbackDescription = '';
+            this.feedbackVerseRef = '';
+            this.feedbackTranslation = '';
+            this.feedbackAccuracyType = '';
+            this.feedbackScreenshot = null;
+            this.feedbackScreenshotPreview = '';
+            this.feedbackSubmitting = false;
+            this.feedbackSuccess = false;
+            this.feedbackError = null;
+        },
+
+        // Submit feedback
+        async submitFeedback() {
+            if (!this.authUser) {
+                this.feedbackError = 'Please sign in to submit feedback';
+                return;
+            }
+
+            if (!this.feedbackDescription.trim()) {
+                this.feedbackError = 'Please provide a description';
+                return;
+            }
+
+            this.feedbackSubmitting = true;
+            this.feedbackError = null;
+
+            try {
+                let screenshotPath = null;
+
+                // Upload screenshot if present (for bugs)
+                if (this.feedbackCategory === 'bug' && this.feedbackScreenshot) {
+                    try {
+                        screenshotPath = await SupabaseAuth.uploadBugScreenshot(this.feedbackScreenshot);
+                    } catch (err) {
+                        console.warn('Screenshot upload failed, continuing without:', err);
+                        // Continue without screenshot - don't fail the whole submission
+                    }
+                }
+
+                // Build report object
+                const report = {
+                    category: this.feedbackCategory,
+                    description: this.feedbackDescription.trim(),
+                    screenshotPath: screenshotPath,
+                    currentUrl: window.location.href
+                };
+
+                // Add accuracy-specific fields if applicable
+                if (this.feedbackCategory === 'accuracy') {
+                    report.verseReference = this.feedbackVerseRef || null;
+                    report.translation = this.feedbackTranslation || null;
+                    report.accuracyType = this.feedbackAccuracyType || null;
+                }
+
+                // Submit to Supabase
+                await SupabaseAuth.submitBugReport(report);
+
+                this.feedbackSuccess = true;
+                this.showToast('Feedback submitted. Thank you!', 'success');
+
+            } catch (err) {
+                console.error('Failed to submit feedback:', err);
+                this.feedbackError = err.message || 'Failed to submit feedback. Please try again.';
+            } finally {
+                this.feedbackSubmitting = false;
             }
         },
 

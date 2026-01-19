@@ -828,6 +828,9 @@
                     <button @click="settingsTab = 'shortcuts'" :class="{ active: settingsTab === 'shortcuts' }" class="settings-nav-btn">
                         Shortcuts
                     </button>
+                    <button x-show="authUser" @click="settingsTab = 'feedback'" :class="{ active: settingsTab === 'feedback' }" class="settings-nav-btn">
+                        Feedback
+                    </button>
                 </div>
 
                 <!-- Account Settings Tab -->
@@ -1270,6 +1273,98 @@
                             <li>Enable "Original Language" to see interlinear text</li>
                             <li>URLs update as you navigate - share or bookmark any verse</li>
                         </ul>
+                    </div>
+                </div>
+
+                <!-- Feedback Tab (only visible when signed in) -->
+                <div class="settings-content" x-show="settingsTab === 'feedback' && authUser">
+                    <div class="settings-section">
+                        <h4>Submit Feedback</h4>
+                        <p class="feedback-intro">Help improve BibleMVP by reporting bugs, accuracy issues, or suggesting features.</p>
+
+                        <!-- Success message -->
+                        <div class="feedback-success" x-show="feedbackSuccess">
+                            <span>Thank you! Your feedback has been submitted.</span>
+                            <button @click="resetFeedbackForm()" class="btn-text">Submit another</button>
+                        </div>
+
+                        <!-- Error message -->
+                        <div class="feedback-error" x-show="feedbackError" x-text="feedbackError"></div>
+
+                        <!-- Feedback form -->
+                        <form x-show="!feedbackSuccess" @submit.prevent="submitFeedback()" class="feedback-form">
+                            <!-- Category selection -->
+                            <div class="feedback-field">
+                                <label>Category</label>
+                                <div class="feedback-category-btns">
+                                    <button type="button" @click="feedbackCategory = 'bug'" :class="{ active: feedbackCategory === 'bug' }" class="category-btn">
+                                        Bug / Issue
+                                    </button>
+                                    <button type="button" @click="feedbackCategory = 'accuracy'" :class="{ active: feedbackCategory === 'accuracy' }" class="category-btn">
+                                        Accuracy
+                                    </button>
+                                    <button type="button" @click="feedbackCategory = 'feature'" :class="{ active: feedbackCategory === 'feature' }" class="category-btn">
+                                        Feature Request
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Accuracy-specific fields -->
+                            <template x-if="feedbackCategory === 'accuracy'">
+                                <div class="accuracy-fields">
+                                    <div class="feedback-field">
+                                        <label>Verse Reference</label>
+                                        <input type="text" x-model="feedbackVerseRef" placeholder="e.g., John 3:16" class="feedback-input">
+                                    </div>
+                                    <div class="feedback-field">
+                                        <label>Translation</label>
+                                        <select x-model="feedbackTranslation" class="feedback-select">
+                                            <option value="">Select translation</option>
+                                            <option value="BSB">BSB</option>
+                                            <option value="KJV">KJV</option>
+                                            <option value="WEB">WEB</option>
+                                        </select>
+                                    </div>
+                                    <div class="feedback-field">
+                                        <label>Issue Type</label>
+                                        <select x-model="feedbackAccuracyType" class="feedback-select">
+                                            <option value="">Select type</option>
+                                            <option value="text">Bible Text</option>
+                                            <option value="original_lang">Original Language / Greek / Hebrew</option>
+                                            <option value="commentary">Commentary</option>
+                                            <option value="cross_ref">Cross References</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Description (always shown) -->
+                            <div class="feedback-field">
+                                <label x-text="feedbackCategory === 'accuracy' ? 'Describe the issue' : (feedbackCategory === 'feature' ? 'Describe your feature idea' : 'Describe the bug or issue')"></label>
+                                <textarea x-model="feedbackDescription" :placeholder="feedbackCategory === 'accuracy' ? 'What is incorrect and what should it be?' : (feedbackCategory === 'feature' ? 'What would you like to see added?' : 'What happened? What did you expect?')" class="feedback-textarea" rows="4"></textarea>
+                            </div>
+
+                            <!-- Screenshot (for bugs only) -->
+                            <template x-if="feedbackCategory === 'bug'">
+                                <div class="feedback-field">
+                                    <label>Screenshot (optional)</label>
+                                    <input type="file" @change="handleScreenshotSelect($event)" accept="image/*" class="feedback-file-input">
+                                    <div x-show="feedbackScreenshotPreview" class="screenshot-preview">
+                                        <img :src="feedbackScreenshotPreview" alt="Screenshot preview">
+                                        <button type="button" @click="clearScreenshot()" class="btn-remove-screenshot">Remove</button>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Submit button -->
+                            <div class="feedback-actions">
+                                <button type="submit" class="btn-primary" :disabled="feedbackSubmitting || !feedbackDescription.trim()">
+                                    <span x-show="!feedbackSubmitting">Submit Feedback</span>
+                                    <span x-show="feedbackSubmitting">Submitting...</span>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>

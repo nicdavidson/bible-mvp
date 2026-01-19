@@ -564,6 +564,69 @@ async function syncLocalPlanProgress(planId, startDate, completedDays) {
     }
 }
 
+// ========== Bug Report Functions ==========
+
+// Submit a bug report
+async function submitBugReport(report) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabaseClient
+        .from('bug_reports')
+        .insert({
+            user_id: user.id,
+            user_email: user.email,
+            category: report.category,
+            description: report.description,
+            verse_reference: report.verseReference || null,
+            translation: report.translation || null,
+            accuracy_type: report.accuracyType || null,
+            screenshot_path: report.screenshotPath || null,
+            current_url: report.currentUrl || window.location.href,
+            user_agent: navigator.userAgent
+        })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+}
+
+// Upload screenshot to Supabase Storage
+async function uploadBugScreenshot(file) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+    const { data, error } = await supabaseClient
+        .storage
+        .from('bug-screenshots')
+        .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+        });
+
+    if (error) throw error;
+    return data.path;
+}
+
+// Fetch user's own bug reports (for viewing history)
+async function fetchUserBugReports() {
+    const user = await getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabaseClient
+        .from('bug_reports')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+}
+
 // Export for use in app.js
 window.SupabaseAuth = {
     getUser,
@@ -596,5 +659,9 @@ window.SupabaseAuth = {
     markDayComplete,
     unmarkDayComplete,
     bulkMarkDaysComplete,
-    syncLocalPlanProgress
+    syncLocalPlanProgress,
+    // Bug report functions
+    submitBugReport,
+    uploadBugScreenshot,
+    fetchUserBugReports
 };
