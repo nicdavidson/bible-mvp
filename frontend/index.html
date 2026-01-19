@@ -117,6 +117,9 @@
                 <span class="status-dot"></span>
                 <span class="offline-label" x-text="isOnline ? '' : 'Offline'"></span>
             </div>
+            <button @click="openReadingPlan()" class="btn-icon" title="Reading Plans">
+                📅
+            </button>
             <button @click="openSearch()" class="btn-icon" title="Search (/)">
                 🔍
             </button>
@@ -177,14 +180,51 @@
                     </div>
                 </div>
 
-                <div x-show="!loading && !error && verses.length > 0" class="verses">
+                <!-- Plan reading header bar (shown when in combined plan reading mode) -->
+                <div x-show="combinedPlanReading && currentPlan" class="plan-reading-bar">
+                    <button @click="showReadingPlan = true; combinedPlanReading = false" class="btn-exit-plan">← Back to Plan</button>
+                    <div class="plan-reading-info">
+                        <div class="plan-title-row">
+                            <span class="plan-name" x-text="currentPlan?.name"></span>
+                            <span class="plan-day-label" x-text="'Day ' + planDay"></span>
+                        </div>
+                        <div class="plan-readings-subtitle" x-show="getPlanDayReadings(planDay)">
+                            <span x-text="getPlanDayReadings(planDay)?.chronological"></span>
+                            <span x-show="getPlanDayReadings(planDay)?.psalms"> · </span>
+                            <span x-text="getPlanDayReadings(planDay)?.psalms"></span>
+                            <span x-show="getPlanDayReadings(planDay)?.proverbs"> · </span>
+                            <span x-text="getPlanDayReadings(planDay)?.proverbs"></span>
+                        </div>
+                    </div>
+                    <button @click="markPlanDayAndContinue()" class="btn-complete-day">
+                        <span x-text="isDayCompleted(planDay) ? 'Next Day →' : 'Complete & Next →'"></span>
+                    </button>
+                </div>
+
+                <div x-show="!loading && !error && verses.length > 0" class="verses" :class="{ 'selection-mode': noteEditMode }">
                     <template x-for="(verse, verseIdx) in verses" :key="'v-' + verseIdx">
-                        <div
-                            class="verse-box"
-                            :id="'verse-' + verse.verse"
-                            :class="{ 'verse-highlighted': isVerseHighlighted(verse.verse), 'has-interlinear': showInterlinear && hasInterlinear(verse.verse) }"
-                            @click="handleVerseBoxClick($event, verse.verse)"
-                        >
+                        <div class="verse-wrapper" :class="{ 'has-section-header': verse._chapterStart && combinedPlanReading }">
+                            <!-- Section/Chapter header for combined plan reading -->
+                            <div x-show="verse._chapterStart && combinedPlanReading" class="combined-section-header" :class="'section-' + verse._sectionType">
+                                <span class="section-label" x-text="verse._sectionLabel" x-show="verse._sectionLabel"></span>
+                                <span class="section-ref" x-text="verse._chapterRef"></span>
+                            </div>
+                            <div
+                                class="verse-box"
+                                :id="'verse-' + verse.verse"
+                                :class="{
+                                    'verse-highlighted': isVerseHighlighted(verse.verse),
+                                    'has-interlinear': showInterlinear && hasInterlinear(verse.verse),
+                                    'verse-selected-for-note': noteEditMode && isVerseSelectedForNote(verse.verse)
+                                }"
+                                @click="handleVerseBoxClick($event, verse.verse, verseIdx)"
+                            >
+                            <!-- Tag indicator dots -->
+                            <span class="verse-tag-dots" x-show="getVerseTagColors(verse.verse).length > 0">
+                                <template x-for="(color, idx) in getVerseTagColors(verse.verse)" :key="'dot-' + verse.verse + '-' + idx">
+                                    <span class="tag-dot" :style="'background-color: ' + color"></span>
+                                </template>
+                            </span>
                             <sup class="verse-num" x-text="verse.verse"></sup>
                             <span
                                 class="verse-text"
@@ -213,6 +253,7 @@
                                 <span x-show="copyFeedback !== verse.verse">📋</span>
                                 <span x-show="copyFeedback === verse.verse">✓</span>
                             </button>
+                            </div>
                         </div>
                     </template>
                 </div>
@@ -273,45 +314,133 @@
                             <span class="empty-state-hint">Try another passage or check back later</span>
                         </div>
                     </template>
-                    <!-- Grouped by source with collapsible sections -->
-                    <template x-for="(group, source) in getGroupedCommentary()" :key="'comm-group-' + source">
-                        <div class="commentary-group">
-                            <button
-                                class="commentary-group-header"
-                                @click="toggleCommentarySource(source)"
-                                :class="{ 'expanded': isCommentarySourceExpanded(source) }"
-                            >
-                                <span class="commentary-source-name" x-text="source"></span>
-                                <span class="commentary-entry-count" x-text="'(' + group.length + (group.length === 1 ? ' entry' : ' entries') + ')'"></span>
-                                <span class="commentary-toggle-icon" x-text="isCommentarySourceExpanded(source) ? '▼' : '▶'"></span>
-                            </button>
-                            <div class="commentary-preview" x-show="!isCommentarySourceExpanded(source)" x-text="getCommentaryPreview(group)"></div>
-                            <div class="commentary-entries" x-show="isCommentarySourceExpanded(source)" x-transition>
-                                <template x-for="(entry, idx) in group" :key="'comm-' + source + '-' + idx">
-                                    <div class="commentary-entry">
-                                        <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
+                    <!-- Normal mode: Grouped by source with collapsible sections -->
+                    <template x-if="!combinedPlanReading">
+                        <div>
+                            <template x-for="(group, source) in getGroupedCommentary()" :key="'comm-group-' + source">
+                                <div class="commentary-group">
+                                    <button
+                                        class="commentary-group-header"
+                                        @click="toggleCommentarySource(source)"
+                                        :class="{ 'expanded': isCommentarySourceExpanded(source) }"
+                                    >
+                                        <span class="commentary-source-name" x-text="source"></span>
+                                        <span class="commentary-entry-count" x-text="'(' + group.length + (group.length === 1 ? ' entry' : ' entries') + ')'"></span>
+                                        <span class="commentary-toggle-icon" x-text="isCommentarySourceExpanded(source) ? '▼' : '▶'"></span>
+                                    </button>
+                                    <div class="commentary-preview" x-show="!isCommentarySourceExpanded(source)" x-text="getCommentaryPreview(group)"></div>
+                                    <div class="commentary-entries" x-show="isCommentarySourceExpanded(source)" x-transition>
+                                        <template x-for="(entry, idx) in group" :key="'comm-' + source + '-' + idx">
+                                            <div class="commentary-entry" :class="{ 'commentary-active': commentaryMatchesActiveVerse(entry) }">
+                                                <button
+                                                    class="commentary-verse-ref"
+                                                    x-show="entry.reference_start"
+                                                    @click="selectVerseFromRef(entry.reference_start)"
+                                                    x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
+                                                ></button>
+                                                <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
+                                            </div>
+                                        </template>
                                     </div>
-                                </template>
-                            </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Combined plan reading mode: Grouped by chapter, then by source -->
+                    <template x-if="combinedPlanReading">
+                        <div>
+                            <template x-for="chapterKey in getCommentaryChapterKeys()" :key="'ch-' + chapterKey">
+                                <div class="commentary-chapter-group">
+                                    <button
+                                        class="commentary-chapter-header"
+                                        @click="toggleCommentaryChapter(chapterKey)"
+                                        :class="{ 'expanded': isCommentaryChapterExpanded(chapterKey) }"
+                                    >
+                                        <span class="commentary-chapter-name" x-text="chapterKey"></span>
+                                        <span class="commentary-toggle-icon" x-text="isCommentaryChapterExpanded(chapterKey) ? '▼' : '▶'"></span>
+                                    </button>
+                                    <div class="commentary-chapter-content" x-show="isCommentaryChapterExpanded(chapterKey)" x-transition>
+                                        <template x-for="(entries, source) in getGroupedCommentaryByChapter()[chapterKey]" :key="'ch-src-' + chapterKey + '-' + source">
+                                            <div class="commentary-group">
+                                                <button
+                                                    class="commentary-group-header"
+                                                    @click="toggleCommentarySource(chapterKey + '-' + source)"
+                                                    :class="{ 'expanded': isCommentarySourceExpanded(chapterKey + '-' + source) }"
+                                                >
+                                                    <span class="commentary-source-name" x-text="source"></span>
+                                                    <span class="commentary-entry-count" x-text="'(' + entries.length + ')'"></span>
+                                                    <span class="commentary-toggle-icon" x-text="isCommentarySourceExpanded(chapterKey + '-' + source) ? '▼' : '▶'"></span>
+                                                </button>
+                                                <div class="commentary-entries" x-show="isCommentarySourceExpanded(chapterKey + '-' + source)" x-transition>
+                                                    <template x-for="(entry, idx) in entries" :key="'ch-comm-' + chapterKey + '-' + source + '-' + idx">
+                                                        <div class="commentary-entry">
+                                                            <button
+                                                                class="commentary-verse-ref"
+                                                                x-show="entry.reference_start"
+                                                                @click="selectVerseFromRef(entry.reference_start)"
+                                                                x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
+                                                            ></button>
+                                                            <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </template>
                 </div>
 
                 <!-- Notes Tab -->
                 <div x-show="activeTab === 'notes'" class="tab-content">
-                    <template x-if="!currentBook">
+                    <template x-if="!currentBook && !combinedPlanReading">
                         <div class="empty-state">
                             <span class="empty-state-icon">✏️</span>
                             <span class="empty-state-title">Select a passage</span>
                             <span class="empty-state-hint">Add your study notes here</span>
                         </div>
                     </template>
+                    <!-- Combined reading mode note about adding notes -->
+                    <template x-if="combinedPlanReading">
+                        <div class="combined-notes-header">
+                            <span class="combined-notes-hint">Viewing notes from today's readings. Click a verse reference to edit notes for that passage.</span>
+                        </div>
+                    </template>
                     <template x-if="currentBook">
                         <div class="notes-editor">
+                            <!-- Verse selection mode toggle -->
+                            <div class="note-mode-row">
+                                <button
+                                    @click="toggleNoteEditMode()"
+                                    class="btn-select-verses"
+                                    :class="{ active: noteEditMode }"
+                                >
+                                    <span x-show="!noteEditMode">Select Verses</span>
+                                    <span x-show="noteEditMode">Done Selecting</span>
+                                </button>
+                                <span x-show="noteEditMode" class="select-hint">Click verses to select them</span>
+                            </div>
+
+                            <!-- Reference display -->
                             <div class="note-reference-row">
                                 <span class="note-for">Note for:</span>
-                                <span class="note-ref" x-text="currentBook + ' ' + currentChapter + ':' + getNoteStartVerse()"></span>
-                                <template x-if="showNoteRange">
+                                <template x-if="noteEditMode && selectedVerses.length > 0">
+                                    <span class="note-ref" x-text="currentBook + ' ' + currentChapter + ':' + getSelectedVerseRange()"></span>
+                                </template>
+                                <template x-if="!noteEditMode || selectedVerses.length === 0">
+                                    <span class="note-ref" x-text="currentBook + ' ' + currentChapter + ':' + getNoteStartVerse()"></span>
+                                </template>
+                                <template x-if="!noteEditMode && !showNoteRange">
+                                    <button
+                                        @click="showNoteRange = true"
+                                        class="btn-range-toggle"
+                                        title="Add verse range"
+                                    >+</button>
+                                </template>
+                                <template x-if="!noteEditMode && showNoteRange">
                                     <span class="note-range-to">
                                         -<input
                                             type="number"
@@ -321,20 +450,40 @@
                                             class="input-end-verse"
                                             placeholder="end"
                                         >
+                                        <button
+                                            @click="showNoteRange = false; noteEndVerse = null"
+                                            class="btn-range-toggle"
+                                            title="Single verse"
+                                        >−</button>
                                     </span>
                                 </template>
-                                <button
-                                    @click="showNoteRange = !showNoteRange; if(!showNoteRange) noteEndVerse = null"
-                                    class="btn-range-toggle"
-                                    :title="showNoteRange ? 'Single verse' : 'Add verse range'"
-                                    x-text="showNoteRange ? '−' : '+'"
-                                ></button>
                             </div>
+
                             <textarea
                                 x-model="currentNote"
                                 placeholder="Add your notes for this passage..."
                                 class="note-textarea"
                             ></textarea>
+
+                            <!-- Tag picker for new notes -->
+                            <div class="note-tag-section" x-show="tags.length > 0">
+                                <span class="note-tag-label">Tags:</span>
+                                <div class="note-tag-list">
+                                    <template x-for="tag in tags" :key="'pick-' + tag.id">
+                                        <button
+                                            type="button"
+                                            class="note-tag-chip selectable"
+                                            :class="{ selected: isPendingTag(tag.id) }"
+                                            :style="'background-color: ' + tag.color"
+                                            @click="togglePendingTag(tag.id)"
+                                            x-text="tag.name"
+                                        ></button>
+                                    </template>
+                                </div>
+                                <span class="note-tag-hint" x-show="pendingNoteTags.length === 0">Click tags to select</span>
+                                <span class="note-tag-hint" x-show="pendingNoteTags.length > 0" x-text="pendingNoteTags.length + ' tag' + (pendingNoteTags.length === 1 ? '' : 's') + ' selected'"></span>
+                            </div>
+
                             <button @click="saveNote" class="btn-save" :disabled="!currentNote.trim()">
                                 Save Note
                             </button>
@@ -342,18 +491,66 @@
                     </template>
                     <div class="saved-notes">
                         <template x-for="note in getRelevantNotes()" :key="note.id">
-                            <div class="note-card">
+                            <div class="note-card" :class="{ 'note-active': noteMatchesActiveVerse(note), 'note-editing': editingNoteId === note.id }">
                                 <div class="note-meta">
-                                    <span x-text="formatNoteReference(note)"></span>
+                                    <button class="note-verse-ref" @click="selectVerseFromRef(note.startVerse)" x-text="formatNoteReference(note)"></button>
                                     <span x-text="formatDate(note.created_at)"></span>
-                                    <button @click="deleteNote(note.id)" class="btn-delete-note" title="Delete note">×</button>
+                                    <button @click="startEditNote(note)" class="btn-edit-note" title="Edit note" x-show="editingNoteId !== note.id">✎</button>
+                                    <button @click="deleteNote(note.id)" class="btn-delete-note" title="Delete note" x-show="editingNoteId !== note.id">×</button>
                                 </div>
-                                <div class="note-content" x-text="note.content"></div>
+                                <!-- View mode -->
+                                <template x-if="editingNoteId !== note.id">
+                                    <div class="note-content" x-html="formatNoteContent(note.content)" @click="handleNoteRefClick($event)"></div>
+                                </template>
+                                <!-- Edit mode -->
+                                <template x-if="editingNoteId === note.id">
+                                    <div class="note-edit-form">
+                                        <textarea
+                                            x-model="editingNoteContent"
+                                            class="note-textarea"
+                                            @keydown.escape="cancelEditNote()"
+                                        ></textarea>
+                                        <div class="note-edit-actions">
+                                            <button @click="saveEditNote(note)" class="btn-save-edit" :disabled="!editingNoteContent.trim()">Save</button>
+                                            <button @click="cancelEditNote()" class="btn-cancel-edit">Cancel</button>
+                                        </div>
+                                    </div>
+                                </template>
+                                <!-- Tags on this note -->
+                                <div class="note-tags" x-show="getNoteTagObjects(note.id).length > 0 || tags.length > 0">
+                                    <template x-for="tag in getNoteTagObjects(note.id)" :key="'nt-' + note.id + '-' + tag.id">
+                                        <span
+                                            class="note-tag-badge"
+                                            :style="'background-color: ' + tag.color"
+                                            @click="toggleNoteTag(note.id, tag.id)"
+                                            :title="'Click to remove ' + tag.name"
+                                            x-text="tag.name"
+                                        ></span>
+                                    </template>
+                                    <!-- Add tag button -->
+                                    <div class="add-tag-dropdown" x-data="{ open: false }">
+                                        <button @click="open = !open" class="btn-add-tag" title="Add tag">+</button>
+                                        <div class="tag-dropdown-menu" x-show="open" @click.outside="open = false" x-transition>
+                                            <template x-for="tag in tags.filter(t => !noteHasTag(note.id, t.id))" :key="'add-' + note.id + '-' + tag.id">
+                                                <button
+                                                    class="tag-dropdown-item"
+                                                    @click="toggleNoteTag(note.id, tag.id); open = false"
+                                                >
+                                                    <span class="tag-color-dot" :style="'background-color: ' + tag.color"></span>
+                                                    <span x-text="tag.name"></span>
+                                                </button>
+                                            </template>
+                                            <template x-if="tags.filter(t => !noteHasTag(note.id, t.id)).length === 0">
+                                                <div class="tag-dropdown-empty">All tags applied</div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </template>
-                        <template x-if="getRelevantNotes().length === 0 && currentBook">
+                        <template x-if="getRelevantNotes().length === 0 && (currentBook || combinedPlanReading)">
                             <div class="empty-state" style="padding: 1rem;">
-                                <span class="empty-state-hint">No notes for this passage yet</span>
+                                <span class="empty-state-hint" x-text="combinedPlanReading ? 'No notes for today\\'s readings' : 'No notes for this passage yet'"></span>
                             </div>
                         </template>
                     </div>
@@ -381,6 +578,7 @@
                                 @mouseenter="previewVerse(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, $event)"
                                 @mouseleave="hidePreview()"
                             >
+                                <span class="crossref-source" x-show="combinedPlanReading && ref._sourceRef" x-text="ref._sourceBook + ' ' + ref._sourceChapter + ':' + ref.source_verse + ' →'"></span>
                                 <a
                                     href="#"
                                     @click.prevent="loadReference(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse)"
@@ -610,6 +808,10 @@
                     <button @click="settingsTab = 'general'" :class="{ active: settingsTab === 'general' }" class="settings-nav-btn">
                         General
                     </button>
+                    <button @click="settingsTab = 'tags'" :class="{ active: settingsTab === 'tags' }" class="settings-nav-btn">
+                        Tags
+                        <span class="tag-count-badge" x-show="tags.length > 0" x-text="tags.length"></span>
+                    </button>
                     <button @click="settingsTab = 'offline'" :class="{ active: settingsTab === 'offline' }" class="settings-nav-btn">
                         Offline
                         <span class="offline-badge" :class="isOnline ? 'online' : 'offline'"></span>
@@ -765,6 +967,90 @@
                                 <input type="checkbox" x-model="defaultShowInterlinear" @change="saveInterlinearPref()">
                                 <span class="toggle-slider"></span>
                             </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tags Settings Tab -->
+                <div class="settings-content" x-show="settingsTab === 'tags'">
+                    <div class="settings-section">
+                        <h4>Your Tags</h4>
+                        <p class="settings-description">Create custom tags with colors to organize your notes.</p>
+
+                        <!-- Create new tag form -->
+                        <div class="tag-create-form">
+                            <input
+                                type="text"
+                                x-model="newTagName"
+                                placeholder="Tag name"
+                                class="tag-name-input"
+                                @keydown.enter="createTag()"
+                                maxlength="30"
+                            >
+                            <div class="tag-color-picker">
+                                <template x-for="color in tagColors" :key="color">
+                                    <button
+                                        type="button"
+                                        class="color-swatch"
+                                        :class="{ selected: newTagColor === color }"
+                                        :style="'background-color: ' + color"
+                                        @click="newTagColor = color"
+                                        :title="color"
+                                    ></button>
+                                </template>
+                            </div>
+                            <button @click="createTag()" class="btn-create-tag" :disabled="!newTagName.trim()">
+                                Add Tag
+                            </button>
+                        </div>
+
+                        <!-- Existing tags list -->
+                        <div class="tags-list" x-show="tags.length > 0">
+                            <template x-for="tag in tags" :key="tag.id">
+                                <div class="tag-item" :class="{ editing: editingTag?.id === tag.id }">
+                                    <template x-if="editingTag?.id !== tag.id">
+                                        <div class="tag-display">
+                                            <span class="tag-color-dot" :style="'background-color: ' + tag.color"></span>
+                                            <span class="tag-name" x-text="tag.name"></span>
+                                            <div class="tag-actions">
+                                                <button @click="editingTag = {...tag}" class="btn-edit-tag" title="Edit">Edit</button>
+                                                <button @click="deleteTag(tag.id)" class="btn-delete-tag" title="Delete">×</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="editingTag?.id === tag.id">
+                                        <div class="tag-edit-form">
+                                            <input
+                                                type="text"
+                                                x-model="editingTag.name"
+                                                class="tag-name-input"
+                                                maxlength="30"
+                                            >
+                                            <div class="tag-color-picker compact">
+                                                <template x-for="color in tagColors" :key="'edit-' + color">
+                                                    <button
+                                                        type="button"
+                                                        class="color-swatch small"
+                                                        :class="{ selected: editingTag.color === color }"
+                                                        :style="'background-color: ' + color"
+                                                        @click="editingTag.color = color"
+                                                    ></button>
+                                                </template>
+                                            </div>
+                                            <div class="tag-edit-actions">
+                                                <button @click="tag.name = editingTag.name; tag.color = editingTag.color; updateTag(tag)" class="btn-save-tag">Save</button>
+                                                <button @click="editingTag = null" class="btn-cancel-tag">Cancel</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Empty state -->
+                        <div class="tags-empty" x-show="tags.length === 0">
+                            <p>No tags yet. Create your first tag above!</p>
+                            <p class="tags-hint">Tags help you categorize notes by theme (e.g., "Faith", "Prayer", "Prophecy")</p>
                         </div>
                     </div>
                 </div>
@@ -948,6 +1234,179 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Reading Plan Modal -->
+    <div class="modal-overlay" x-show="showReadingPlan" x-transition @click.self="showReadingPlan = false">
+        <div class="modal reading-plan-modal">
+            <div class="modal-header">
+                <h2>Reading Plans</h2>
+                <button @click="showReadingPlan = false" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading state -->
+                <div x-show="planLoading" class="plan-loading">
+                    <div class="loading-spinner"></div>
+                    <span>Loading plans...</span>
+                </div>
+
+                <!-- No active plan - show plan selection -->
+                <template x-if="!planLoading && !currentPlan">
+                    <div class="plan-selection">
+                        <p class="plan-intro">Choose a reading plan to start your Bible reading journey.</p>
+                        <div class="plan-list">
+                            <template x-for="plan in readingPlans" :key="plan.id">
+                                <div class="plan-card">
+                                    <div class="plan-card-header">
+                                        <h3 x-text="plan.name"></h3>
+                                        <span class="plan-duration" x-text="plan.duration_days + ' days'"></span>
+                                    </div>
+                                    <p class="plan-description" x-text="plan.description"></p>
+                                    <div class="plan-tracks">
+                                        <template x-for="track in plan.tracks" :key="track.id">
+                                            <span class="plan-track-badge" x-text="track.name"></span>
+                                        </template>
+                                    </div>
+                                    <button @click="promptStartPlan(plan.id)" class="btn-start-plan">Start Plan</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Start date picker modal -->
+                <template x-if="showPlanStartPicker">
+                    <div class="plan-start-picker">
+                        <h3>When would you like to start?</h3>
+                        <p class="picker-description">Choose a start date for your reading plan. For annual plans, many prefer starting January 1st.</p>
+                        <div class="date-picker-options">
+                            <button @click="planStartDate = new Date().toISOString().split('T')[0]; confirmStartPlan()" class="btn-date-option">
+                                Today
+                            </button>
+                            <button @click="planStartDate = new Date().getFullYear() + '-01-01'; confirmStartPlan()" class="btn-date-option">
+                                January 1st, <span x-text="new Date().getFullYear()"></span>
+                            </button>
+                        </div>
+                        <div class="custom-date-picker">
+                            <label>Or choose a custom date:</label>
+                            <input type="date" x-model="planStartDate" class="input-date-picker">
+                        </div>
+                        <div class="date-picker-actions">
+                            <button @click="cancelStartPlan()" class="btn-secondary">Cancel</button>
+                            <button @click="confirmStartPlan()" class="btn-primary" :disabled="!planStartDate">Start Plan</button>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Active plan view -->
+                <template x-if="!planLoading && currentPlan">
+                    <div class="plan-active">
+                        <!-- Plan header with progress -->
+                        <div class="plan-header-info">
+                            <div class="plan-name-row">
+                                <h3 x-text="currentPlan.name"></h3>
+                                <button @click="resetPlan(currentPlan.id)" class="btn-reset-plan" title="Reset plan">Reset</button>
+                            </div>
+                            <div class="plan-progress-bar">
+                                <div class="plan-progress-fill" :style="'width: ' + getPlanProgressPercent() + '%'"></div>
+                            </div>
+                            <div class="plan-progress-text">
+                                <span x-text="getCompletedDaysCount() + ' of ' + currentPlan.duration_days + ' days completed'"></span>
+                                <span x-text="'(' + getPlanProgressPercent() + '%)'"></span>
+                            </div>
+                            <div class="plan-start-date" x-show="formatPlanDate(currentPlan.id)">
+                                Started: <span x-text="formatPlanDate(currentPlan.id)"></span>
+                            </div>
+                        </div>
+
+                        <!-- Day navigation -->
+                        <div class="plan-day-nav">
+                            <button @click="goToPlanDay(planDay - 1)" class="btn-day-nav" :disabled="planDay <= 1">← Prev</button>
+                            <div class="plan-day-selector">
+                                <span>Day</span>
+                                <input type="number" x-model.number="planDay" min="1" :max="currentPlan.duration_days" class="input-day-num" @change="goToPlanDay(planDay)">
+                                <span x-text="'of ' + currentPlan.duration_days"></span>
+                            </div>
+                            <button @click="goToPlanDay(planDay + 1)" class="btn-day-nav" :disabled="planDay >= currentPlan.duration_days">Next →</button>
+                        </div>
+
+                        <!-- Today button -->
+                        <button @click="goToTodaysPlanDay()" class="btn-go-today" x-show="getTodaysPlanDay(currentPlan.id) !== planDay">
+                            Go to Today (Day <span x-text="getTodaysPlanDay(currentPlan.id)"></span>)
+                        </button>
+
+                        <!-- Day's readings -->
+                        <div class="plan-day-readings" x-show="getPlanDayReadings(planDay)">
+                            <div class="day-header">
+                                <span class="day-label" x-text="'Day ' + planDay"></span>
+                                <label class="day-complete-toggle">
+                                    <input type="checkbox" :checked="isDayCompleted(planDay)" @change="toggleDayComplete(planDay)">
+                                    <span x-text="isDayCompleted(planDay) ? 'Completed' : 'Mark complete'"></span>
+                                </label>
+                            </div>
+
+                            <div class="reading-list">
+                                <!-- Main/Chronological reading -->
+                                <div class="reading-item" x-show="getPlanDayReadings(planDay)?.chronological">
+                                    <span class="reading-type">Main Reading</span>
+                                    <button class="reading-ref" @click="goToPlanPassage(getPlanDayReadings(planDay)?.chronological)" x-text="getPlanDayReadings(planDay)?.chronological"></button>
+                                </div>
+
+                                <!-- Psalms -->
+                                <div class="reading-item" x-show="getPlanDayReadings(planDay)?.psalms">
+                                    <span class="reading-type">Psalms</span>
+                                    <button class="reading-ref" @click="goToPlanPassage(getPlanDayReadings(planDay)?.psalms)" x-text="getPlanDayReadings(planDay)?.psalms"></button>
+                                </div>
+
+                                <!-- Proverbs -->
+                                <div class="reading-item" x-show="getPlanDayReadings(planDay)?.proverbs">
+                                    <span class="reading-type">Proverbs</span>
+                                    <button class="reading-ref" @click="goToPlanPassage(getPlanDayReadings(planDay)?.proverbs)" x-text="getPlanDayReadings(planDay)?.proverbs"></button>
+                                </div>
+                            </div>
+
+                            <!-- Start combined reading button -->
+                            <button @click="startPlanReading()" class="btn-start-reading">
+                                Read All Together
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plan Reading Mode Overlay (shows all passages combined) -->
+    <div class="plan-reading-overlay" x-show="planReadingMode" x-transition>
+        <div class="plan-reading-header">
+            <button @click="exitPlanReadingMode()" class="btn-exit-plan-reading">← Back</button>
+            <div class="plan-reading-title">
+                <span x-text="currentPlan?.name"></span>
+                <span class="plan-reading-day" x-text="'Day ' + planDay"></span>
+            </div>
+            <button @click="markPlanDayAndContinue()" class="btn-mark-complete">
+                <span x-text="isDayCompleted(planDay) ? 'Next Day →' : 'Complete & Next →'"></span>
+            </button>
+        </div>
+        <div class="plan-reading-content">
+            <template x-for="(reading, idx) in planReadings" :key="'pr-' + idx">
+                <div class="plan-reading-section">
+                    <div class="reading-section-header">
+                        <span class="reading-section-label" x-text="reading.label"></span>
+                        <span class="reading-section-ref" x-text="reading.reference"></span>
+                    </div>
+                    <div class="reading-section-verses">
+                        <template x-for="(verse, vIdx) in reading.verses" :key="'prv-' + idx + '-' + vIdx">
+                            <span class="plan-verse">
+                                <span x-show="verse._chapterStart" class="chapter-divider" x-text="verse._chapterRef"></span>
+                                <sup class="verse-num" x-text="verse.verse"></sup>
+                                <span x-text="verse.text"></span>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+            </template>
         </div>
     </div>
 

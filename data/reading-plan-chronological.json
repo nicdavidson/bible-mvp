@@ -1,0 +1,2215 @@
+{
+  "id": "chronological-year",
+  "name": "Chronological Bible in a Year",
+  "description": "Read through the entire Bible in chronological order, plus daily Psalms and Proverbs",
+  "duration_days": 365,
+  "tracks": [
+    {
+      "id": "chronological",
+      "name": "Chronological Reading",
+      "description": "Main chronological passage"
+    },
+    {
+      "id": "psalms",
+      "name": "Psalms",
+      "description": "Daily Psalm"
+    },
+    {
+      "id": "proverbs",
+      "name": "Proverbs",
+      "description": "Daily Proverb portion"
+    }
+  ],
+  "days": [
+    {
+      "day": 1,
+      "chronological": "Genesis 1-3",
+      "psalms": "Psalm 1:1-6",
+      "proverbs": "Proverbs 1:1-6"
+    },
+    {
+      "day": 2,
+      "chronological": "Genesis 4-6",
+      "psalms": "Psalm 2:1-12",
+      "proverbs": "Proverbs 1:7-9"
+    },
+    {
+      "day": 3,
+      "chronological": "Genesis 7-9",
+      "psalms": "Psalm 3:1-8",
+      "proverbs": "Proverbs 1:10-19"
+    },
+    {
+      "day": 4,
+      "chronological": "Genesis 10-11",
+      "psalms": "Psalm 4:1-8",
+      "proverbs": "Proverbs 1:20-23"
+    },
+    {
+      "day": 5,
+      "chronological": "Job 1-3",
+      "psalms": "Psalm 5:1-12",
+      "proverbs": "Proverbs 1:24-28"
+    },
+    {
+      "day": 6,
+      "chronological": "Job 4-6",
+      "psalms": "Psalm 6:1-10",
+      "proverbs": "Proverbs 1:29-33"
+    },
+    {
+      "day": 7,
+      "chronological": "Job 7-9",
+      "psalms": "Psalm 7:1-17",
+      "proverbs": "Proverbs 2:1-5"
+    },
+    {
+      "day": 8,
+      "chronological": "Job 10-12",
+      "psalms": "Psalm 8:1-9",
+      "proverbs": "Proverbs 2:6-15"
+    },
+    {
+      "day": 9,
+      "chronological": "Job 13-16",
+      "psalms": "Psalm 9:1-12",
+      "proverbs": "Proverbs 2:16-22"
+    },
+    {
+      "day": 10,
+      "chronological": "Job 17-19",
+      "psalms": "Psalm 9:13-20",
+      "proverbs": "Proverbs 3:1-6"
+    },
+    {
+      "day": 11,
+      "chronological": "Job 20-22",
+      "psalms": "Psalm 10:1-15",
+      "proverbs": "Proverbs 3:7-8"
+    },
+    {
+      "day": 12,
+      "chronological": "Job 23-25",
+      "psalms": "Psalm 10:16-18",
+      "proverbs": "Proverbs 3:9-10"
+    },
+    {
+      "day": 13,
+      "chronological": "Job 26-28",
+      "psalms": "Psalm 11:1-7",
+      "proverbs": "Proverbs 3:11-12"
+    },
+    {
+      "day": 14,
+      "chronological": "Job 29-31",
+      "psalms": "Psalm 12:1-8",
+      "proverbs": "Proverbs 3:13-15"
+    },
+    {
+      "day": 15,
+      "chronological": "Job 32-34",
+      "psalms": "Psalm 13:1-6",
+      "proverbs": "Proverbs 3:16-18"
+    },
+    {
+      "day": 16,
+      "chronological": "Job 35-37",
+      "psalms": "Psalm 14:1-7",
+      "proverbs": "Proverbs 3:19-20"
+    },
+    {
+      "day": 17,
+      "chronological": "Job 38-40",
+      "psalms": "Psalm 15:1-5",
+      "proverbs": "Proverbs 3:21-26"
+    },
+    {
+      "day": 18,
+      "chronological": "Job 41-42",
+      "psalms": "Psalm 16:1-11",
+      "proverbs": "Proverbs 3:27-32"
+    },
+    {
+      "day": 19,
+      "chronological": "Genesis 12-15",
+      "psalms": "Psalm 17:1-15",
+      "proverbs": "Proverbs 3:33-35"
+    },
+    {
+      "day": 20,
+      "chronological": "Genesis 16-18",
+      "psalms": "Psalm 18:1-15",
+      "proverbs": "Proverbs 4:1-6"
+    },
+    {
+      "day": 21,
+      "chronological": "Genesis 19-21",
+      "psalms": "Psalm 18:16-36",
+      "proverbs": "Proverbs 4:7-10"
+    },
+    {
+      "day": 22,
+      "chronological": "Genesis 22-24",
+      "psalms": "Psalm 18:37-50",
+      "proverbs": "Proverbs 4:11-13"
+    },
+    {
+      "day": 23,
+      "chronological": "Genesis 25-26",
+      "psalms": "Psalm 19:1-14",
+      "proverbs": "Proverbs 4:14-19"
+    },
+    {
+      "day": 24,
+      "chronological": "Genesis 27-29",
+      "psalms": "Psalm 20:1-9",
+      "proverbs": "Proverbs 4:20-27"
+    },
+    {
+      "day": 25,
+      "chronological": "Genesis 30-31",
+      "psalms": "Psalm 21:1-13",
+      "proverbs": "Proverbs 5:1-6"
+    },
+    {
+      "day": 26,
+      "chronological": "Genesis 32-34",
+      "psalms": "Psalm 22:1-18",
+      "proverbs": "Proverbs 5:7-14"
+    },
+    {
+      "day": 27,
+      "chronological": "Genesis 35-37",
+      "psalms": "Psalm 22:19-31",
+      "proverbs": "Proverbs 5:15-21"
+    },
+    {
+      "day": 28,
+      "chronological": "Genesis 38-40",
+      "psalms": "Psalm 23:1-6",
+      "proverbs": "Proverbs  5:22-23"
+    },
+    {
+      "day": 29,
+      "chronological": "Genesis 41-42",
+      "psalms": "Psalm 24:1-10",
+      "proverbs": "Proverbs 6:1-5"
+    },
+    {
+      "day": 30,
+      "chronological": "Genesis 43-45",
+      "psalms": "Psalm 25:1-15",
+      "proverbs": "Proverbs 6:6-11"
+    },
+    {
+      "day": 31,
+      "chronological": "Genesis 46-47",
+      "psalms": "Psalm 25:16-22",
+      "proverbs": "Proverbs 6:12-15"
+    },
+    {
+      "day": 32,
+      "chronological": "Genesis 48-50",
+      "psalms": "Psalm 26:1-12",
+      "proverbs": "Proverbs 6:16-19"
+    },
+    {
+      "day": 33,
+      "chronological": "Exodus 1-3",
+      "psalms": "Psalm 27:1-6",
+      "proverbs": "Proverbs 6:20-26"
+    },
+    {
+      "day": 34,
+      "chronological": "Exodus 4-6",
+      "psalms": "Psalm 27:7-14",
+      "proverbs": "Proverbs 6:27-35"
+    },
+    {
+      "day": 35,
+      "chronological": "Exodus 7-9",
+      "psalms": "Psalm 28:1-9",
+      "proverbs": "Proverbs 7:1-5"
+    },
+    {
+      "day": 36,
+      "chronological": "Exodus 10-12",
+      "psalms": "Psalm 29:1-11",
+      "proverbs": "Proverbs 7:6-23"
+    },
+    {
+      "day": 37,
+      "chronological": "Exodus 13-15",
+      "psalms": "Psalm 30:1-12",
+      "proverbs": "Proverbs 7:24-27"
+    },
+    {
+      "day": 38,
+      "chronological": "Exodus 16-17",
+      "psalms": "Psalm 31:1-8",
+      "proverbs": "Proverbs 8:1-11"
+    },
+    {
+      "day": 39,
+      "chronological": "Exodus 18-19",
+      "psalms": "Psalm 31:9-18",
+      "proverbs": "Proverbs 8:12-13"
+    },
+    {
+      "day": 40,
+      "chronological": "Exodus 20-21",
+      "psalms": "Psalm 31:19-24",
+      "proverbs": "Proverbs 8:14-26"
+    },
+    {
+      "day": 41,
+      "chronological": "Exodus 22-23",
+      "psalms": "Psalm 32:1-11",
+      "proverbs": "Proverbs 8:27-32"
+    },
+    {
+      "day": 42,
+      "chronological": "Exodus 24-25",
+      "psalms": "Psalm 33:1-11",
+      "proverbs": "Proverbs 8:33-36"
+    },
+    {
+      "day": 43,
+      "chronological": "Exodus 26-27",
+      "psalms": "Psalm 33:12-22",
+      "proverbs": "Proverbs 9:1-6"
+    },
+    {
+      "day": 44,
+      "chronological": "Exodus 28-29",
+      "psalms": "Psalm 34:1-10",
+      "proverbs": "Proverbs 9:7-8"
+    },
+    {
+      "day": 45,
+      "chronological": "Exodus 30-31",
+      "psalms": "Psalm 34:11-22",
+      "proverbs": "Proverbs 9:9-10"
+    },
+    {
+      "day": 46,
+      "chronological": "Exodus 32-33",
+      "psalms": "Psalm 35:1-16",
+      "proverbs": "Proverbs 9:11-12"
+    },
+    {
+      "day": 47,
+      "chronological": "Exodus 34-36",
+      "psalms": "Psalm 35:17-28",
+      "proverbs": "Proverbs 9:13-18"
+    },
+    {
+      "day": 48,
+      "chronological": "Exodus 37-38",
+      "psalms": "Psalm 36:1-12",
+      "proverbs": "Proverbs 10:1-2"
+    },
+    {
+      "day": 49,
+      "chronological": "Exodus 39-40",
+      "psalms": "Psalm 37:1-11",
+      "proverbs": "Proverbs 10:3-4"
+    },
+    {
+      "day": 50,
+      "chronological": "Leviticus 1-3",
+      "psalms": "Psalm 37:12-29",
+      "proverbs": "Proverbs 10:5"
+    },
+    {
+      "day": 51,
+      "chronological": "Leviticus 4-6",
+      "psalms": "Psalm 37:30-40",
+      "proverbs": "Proverbs 10:6-7"
+    },
+    {
+      "day": 52,
+      "chronological": "Leviticus 7-9",
+      "psalms": "Psalm 38:1-22",
+      "proverbs": "Proverbs 10:8-9"
+    },
+    {
+      "day": 53,
+      "chronological": "Leviticus 10-12",
+      "psalms": "Psalm 39:1-13",
+      "proverbs": "Proverbs 10:10"
+    },
+    {
+      "day": 54,
+      "chronological": "Leviticus 13-14",
+      "psalms": "Psalm 40:1-10",
+      "proverbs": "Proverbs 10:11-12"
+    },
+    {
+      "day": 55,
+      "chronological": "Leviticus 15-16",
+      "psalms": "Psalm 40:11-17",
+      "proverbs": "Proverbs 10:13-14"
+    },
+    {
+      "day": 56,
+      "chronological": "Leviticus 17-18",
+      "psalms": "Psalm 41:1-13",
+      "proverbs": "Proverbs 10:15-16"
+    },
+    {
+      "day": 57,
+      "chronological": "Leviticus 19-20",
+      "psalms": "Psalm 42:1-11",
+      "proverbs": "Proverbs 10:17"
+    },
+    {
+      "day": 58,
+      "chronological": "Leviticus 21-23",
+      "psalms": "Psalm 43:1-5",
+      "proverbs": "Proverbs 10:18"
+    },
+    {
+      "day": 59,
+      "chronological": "Leviticus 24-25",
+      "psalms": "Psalm 44:1-8",
+      "proverbs": "Proverbs 10:19"
+    },
+    {
+      "day": 60,
+      "chronological": "Leviticus 26-27",
+      "psalms": "Psalm 44:9-26",
+      "proverbs": "Proverbs 10:20-21"
+    },
+    {
+      "day": 61,
+      "chronological": "Numbers 1-2",
+      "psalms": "Psalm 45:1-17",
+      "proverbs": "Proverbs 10:22"
+    },
+    {
+      "day": 62,
+      "chronological": "Numbers 3-4",
+      "psalms": "Psalm 46:1-11",
+      "proverbs": "Proverbs 10:23"
+    },
+    {
+      "day": 63,
+      "chronological": "Numbers 5-6",
+      "psalms": "Psalm 47:1-9",
+      "proverbs": "Proverbs 10:24-25"
+    },
+    {
+      "day": 64,
+      "chronological": "Numbers 7",
+      "psalms": "Psalm 48:1-14",
+      "proverbs": "Proverbs 10:26"
+    },
+    {
+      "day": 65,
+      "chronological": "Numbers 8-10",
+      "psalms": "Psalm 49:1-20",
+      "proverbs": "Proverbs 10:27-28"
+    },
+    {
+      "day": 66,
+      "chronological": "Numbers 11-13",
+      "psalms": "Psalm 50:1-23",
+      "proverbs": "Proverbs 10:29-30"
+    },
+    {
+      "day": 67,
+      "chronological": "Numbers 14-15",
+      "psalms": "Psalm 51:1-19",
+      "proverbs": "Proverbs 10:31-32"
+    },
+    {
+      "day": 68,
+      "chronological": "Numbers 16-17",
+      "psalms": "Psalm 52:1-9",
+      "proverbs": "proverbs 11:1-3"
+    },
+    {
+      "day": 69,
+      "chronological": "Numbers 18-20",
+      "psalms": "Psalm 53:1-6",
+      "proverbs": "Proverbs 11:4"
+    },
+    {
+      "day": 70,
+      "chronological": "Numbers 21-22",
+      "psalms": "Psalm 54:1-7",
+      "proverbs": "Proverbs 11:5-6"
+    },
+    {
+      "day": 71,
+      "chronological": "Numbers 23-25",
+      "psalms": "Psalm 55:1-23",
+      "proverbs": "Proverbs 11:7"
+    },
+    {
+      "day": 72,
+      "chronological": "Numbers 26-27",
+      "psalms": "Psalm 56:1-13",
+      "proverbs": "Proverbs 11:8"
+    },
+    {
+      "day": 73,
+      "chronological": "Numbers 28-30",
+      "psalms": "Psalm 57:1-11",
+      "proverbs": "Proverbs 11:9-11"
+    },
+    {
+      "day": 74,
+      "chronological": "Numbers 31-32",
+      "psalms": "Psalm 58:1-11",
+      "proverbs": "Proverbs 11:12-13"
+    },
+    {
+      "day": 75,
+      "chronological": "Numbers 33-34",
+      "psalms": "Psalm 59:1-17",
+      "proverbs": "Proverbs 11:14"
+    },
+    {
+      "day": 76,
+      "chronological": "Numbers 35-36",
+      "psalms": "Psalm 60:1-12",
+      "proverbs": "Proverbs 11:15"
+    },
+    {
+      "day": 77,
+      "chronological": "Deuteronomy 1-2",
+      "psalms": "Psalm 61:1-8",
+      "proverbs": "Proverbs 11:16-17"
+    },
+    {
+      "day": 78,
+      "chronological": "Deuteronomy 3-4",
+      "psalms": "Psalm 62:1-12",
+      "proverbs": "Proverbs 11:18-19"
+    },
+    {
+      "day": 79,
+      "chronological": "Deuteronomy 5-7",
+      "psalms": "Psalm 63:1-11",
+      "proverbs": "Proverbs 11:20-21"
+    },
+    {
+      "day": 80,
+      "chronological": "Deuteronomy 8-10",
+      "psalms": "Psalm 64:1-10",
+      "proverbs": "Proverbs 11:22"
+    },
+    {
+      "day": 81,
+      "chronological": "Deuteronomy 11-13",
+      "psalms": "Psalm 65:1-13",
+      "proverbs": "Proverbs 11:23"
+    },
+    {
+      "day": 82,
+      "chronological": "Deuteronomy 14-16",
+      "psalms": "Psalm 66:1-20",
+      "proverbs": "Proverbs 11:24-26"
+    },
+    {
+      "day": 83,
+      "chronological": "Deuteronomy 17-20",
+      "psalms": "Psalm 67:1-7",
+      "proverbs": "Proverbs 11:27"
+    },
+    {
+      "day": 84,
+      "chronological": "Deuteronomy 21-23",
+      "psalms": "Psalm 68:1-18",
+      "proverbs": "Proverbs 11:28"
+    },
+    {
+      "day": 85,
+      "chronological": "Deuteronomy 24-27",
+      "psalms": "Psalm 68:19-35",
+      "proverbs": "Proverbs 11:29-31"
+    },
+    {
+      "day": 86,
+      "chronological": "Deuteronomy 28-29",
+      "psalms": "Psalm 69:1-18",
+      "proverbs": "Proverbs 12:1"
+    },
+    {
+      "day": 87,
+      "chronological": "Deuteronomy 30-31",
+      "psalms": "Psalm 69:19-36",
+      "proverbs": "Proverbs 12:2-3"
+    },
+    {
+      "day": 88,
+      "chronological": "Deuteronomy 32-34",
+      "psalms": "Psalm 70:1-5",
+      "proverbs": "Proverbs 12:4"
+    },
+    {
+      "day": 89,
+      "chronological": "Joshua 1-2",
+      "psalms": "Psalm 71:1-24",
+      "proverbs": "Proverbs 12:5-7"
+    },
+    {
+      "day": 90,
+      "chronological": "Joshua 3-4",
+      "psalms": "Psalm 72:1-20",
+      "proverbs": "Proverbs 12:8-9"
+    },
+    {
+      "day": 91,
+      "chronological": "Joshua 5-6",
+      "psalms": "Psalm 73:1-28",
+      "proverbs": "Proverbs 12:10"
+    },
+    {
+      "day": 92,
+      "chronological": "Joshua 7-8",
+      "psalms": "Psalm 74:1-23",
+      "proverbs": "Proverbs 12:11"
+    },
+    {
+      "day": 93,
+      "chronological": "Joshua 9-11",
+      "psalms": "Psalm 75:1-10",
+      "proverbs": "Proverbs 12:12-14"
+    },
+    {
+      "day": 94,
+      "chronological": "Joshua 12-14",
+      "psalms": "Psalm 76:1-12",
+      "proverbs": "Proverbs 12:15-17"
+    },
+    {
+      "day": 95,
+      "chronological": "Joshua 15-17",
+      "psalms": "Psalm 77:1-20",
+      "proverbs": "Proverbs 12:18"
+    },
+    {
+      "day": 96,
+      "chronological": "Joshua 18-19",
+      "psalms": "Psalm 78:1-31",
+      "proverbs": "Proverbs 12:19-20"
+    },
+    {
+      "day": 97,
+      "chronological": "Joshua 20-22",
+      "psalms": "Psalm 78:32-55",
+      "proverbs": "Proverbs 12:21-23"
+    },
+    {
+      "day": 98,
+      "chronological": "Joshua 23-24",
+      "psalms": "Psalm 78:56-64",
+      "proverbs": "Proverbs 12:24"
+    },
+    {
+      "day": 99,
+      "chronological": "Judges 1-2",
+      "psalms": "Psalm 78:65-72",
+      "proverbs": "Proverbs 12:25"
+    },
+    {
+      "day": 100,
+      "chronological": "Judges 3-4",
+      "psalms": "Psalm 79:1-13",
+      "proverbs": "Proverbs 12:26"
+    },
+    {
+      "day": 101,
+      "chronological": "Judges 5-6",
+      "psalms": "Psalm 80:1-19",
+      "proverbs": "Proverbs 12:27-28"
+    },
+    {
+      "day": 102,
+      "chronological": "Judges 7-8",
+      "psalms": "Psalm 81:1-16",
+      "proverbs": "Proverbs 13:1"
+    },
+    {
+      "day": 103,
+      "chronological": "Judges 9-10",
+      "psalms": "Psalm 82:1-8",
+      "proverbs": "Proverbs 13:2-3"
+    },
+    {
+      "day": 104,
+      "chronological": "Judges 11-12",
+      "psalms": "Psalm 83:1-18",
+      "proverbs": "Proverbs 13:4"
+    },
+    {
+      "day": 105,
+      "chronological": "Judges 13-14",
+      "psalms": "Psalm 84:1-12",
+      "proverbs": "Proverbs 13:5-6"
+    },
+    {
+      "day": 106,
+      "chronological": "Judges 15-16",
+      "psalms": "Psalm 85:1-13",
+      "proverbs": "Proverbs 13:7-8"
+    },
+    {
+      "day": 107,
+      "chronological": "Judges 17-18",
+      "psalms": "Psalm 86:1-17",
+      "proverbs": "Proverbs 13:9-10"
+    },
+    {
+      "day": 108,
+      "chronological": "Judges 19-21",
+      "psalms": "Psalm 87:1-7",
+      "proverbs": "Proverbs 13:11"
+    },
+    {
+      "day": 109,
+      "chronological": "Ruth 1-2",
+      "psalms": "Psalm 88:1-18",
+      "proverbs": "Proverbs 13:12-14"
+    },
+    {
+      "day": 110,
+      "chronological": "Ruth 3-4",
+      "psalms": "Psalm 89:1-13",
+      "proverbs": "Proverbs 13:15-16"
+    },
+    {
+      "day": 111,
+      "chronological": "1 Samuel 1-3",
+      "psalms": "Psalm 89:14-37",
+      "proverbs": "Proverbs 13:17-19"
+    },
+    {
+      "day": 112,
+      "chronological": "1 Samuel 4-6",
+      "psalms": "Psalm 89:38-52",
+      "proverbs": "Proverbs 13:20-23"
+    },
+    {
+      "day": 113,
+      "chronological": "1 Samuel 7-9",
+      "psalms": "Psalm 90:1-91:16",
+      "proverbs": "Proverbs 13:24-25"
+    },
+    {
+      "day": 114,
+      "chronological": "1 Samuel 10-12",
+      "psalms": "Psalm 92:1-93:5",
+      "proverbs": "Proverbs 14:1-2"
+    },
+    {
+      "day": 115,
+      "chronological": "1 Samuel 13-15",
+      "psalms": "Psalm 94:1-23",
+      "proverbs": "Proverbs 14:3-4"
+    },
+    {
+      "day": 116,
+      "chronological": "1 Samuel 16-17",
+      "psalms": "Psalm 95:1-96:13",
+      "proverbs": "Proverbs 14:5-6"
+    },
+    {
+      "day": 117,
+      "chronological": "1 Samuel 18-20",
+      "psalms": "Psalm 97:1-98:9",
+      "proverbs": "Proverbs 14:7-8"
+    },
+    {
+      "day": 118,
+      "chronological": "1 Samuel 21-23",
+      "psalms": "Psalm 99:1-9",
+      "proverbs": "Proverbs 14:9-10"
+    },
+    {
+      "day": 119,
+      "chronological": "1 Samuel 24-25",
+      "psalms": "Psalm 100:1-5",
+      "proverbs": "Proverbs 14:11-12"
+    },
+    {
+      "day": 120,
+      "chronological": "1 Samuel 26-28",
+      "psalms": "Psalm 101:1-8",
+      "proverbs": "Proverbs 14:13-14"
+    },
+    {
+      "day": 121,
+      "chronological": "1 Samuel 29-31",
+      "psalms": "Psalm 102:1-28",
+      "proverbs": "Proverbs 14:15-16"
+    },
+    {
+      "day": 122,
+      "chronological": "1 Chronicles 1-2",
+      "psalms": "Psalm 103:1-22",
+      "proverbs": "Proverbs 14:17-19"
+    },
+    {
+      "day": 123,
+      "chronological": "1 Chronicles 3-5",
+      "psalms": "Psalm 104:1-23",
+      "proverbs": "Proverbs 14:20-21"
+    },
+    {
+      "day": 124,
+      "chronological": "1 Chronicles 6-7",
+      "psalms": "Psalm 104:24-35",
+      "proverbs": "Proverbs 14:22-24"
+    },
+    {
+      "day": 125,
+      "chronological": "1 Chronicles 8-10",
+      "psalms": "Psalm 105:1-15",
+      "proverbs": "Proverbs 14:25"
+    },
+    {
+      "day": 126,
+      "chronological": "2 Samuel 5; 1 Chron. 11-12",
+      "psalms": "Psalm 105:16-36",
+      "proverbs": "Proverbs 14:26-27"
+    },
+    {
+      "day": 127,
+      "chronological": "1 Chronicles 13-16",
+      "psalms": "Psalm 105:37-45",
+      "proverbs": "Proverbs 14:28-29"
+    },
+    {
+      "day": 128,
+      "chronological": "2 Samuel 6-7; 1 Chron. 17",
+      "psalms": "Psalm 106:1-12",
+      "proverbs": "Proverbs 14:30-31"
+    },
+    {
+      "day": 129,
+      "chronological": "2 Samuel 8-9; 1 Chron. 18",
+      "psalms": "Psalm 106:13-31",
+      "proverbs": "Proverbs 14:32-33"
+    },
+    {
+      "day": 130,
+      "chronological": "2 Samuel 10; 1 Chron. 19",
+      "psalms": "Psalm 106:32-48",
+      "proverbs": "Proverbs 14:34-35"
+    },
+    {
+      "day": 131,
+      "chronological": "2 Sam. 11-12; 1 Chron. 20",
+      "psalms": "Psalm 107:1-43",
+      "proverbs": "Proverbs 15:1-3"
+    },
+    {
+      "day": 132,
+      "chronological": "2 Samuel 13-15",
+      "psalms": "Psalm 108:1-13",
+      "proverbs": "Proverbs 15:4"
+    },
+    {
+      "day": 133,
+      "chronological": "2 Samuel 16-18",
+      "psalms": "Psalm 109:1-31",
+      "proverbs": "Proverbs 15:5-7"
+    },
+    {
+      "day": 134,
+      "chronological": "2 Samuel 19-21",
+      "psalms": "Psalm 110:1-7",
+      "proverbs": "Proverbs 15:8-10"
+    },
+    {
+      "day": 135,
+      "chronological": "2 Samuel 22-23",
+      "psalms": "Psalm 111:1-10",
+      "proverbs": "Proverbs 15:11"
+    },
+    {
+      "day": 136,
+      "chronological": "2 Sam. 24; 1 Chron. 21-22",
+      "psalms": "Psalm 112:1-10",
+      "proverbs": "Proverbs 15:12-14"
+    },
+    {
+      "day": 137,
+      "chronological": "1 Chronicles 23-25",
+      "psalms": "Psalm 113:1-114:8",
+      "proverbs": "Proverbs 15:15-17"
+    },
+    {
+      "day": 138,
+      "chronological": "1 Chronicles 26-29",
+      "psalms": "Psalm 115:1-18",
+      "proverbs": "Proverbs 15:18-19"
+    },
+    {
+      "day": 139,
+      "chronological": "1 Kings 1-4",
+      "psalms": "Psalm 116:1-19",
+      "proverbs": "Proverbs 15:20-21"
+    },
+    {
+      "day": 140,
+      "chronological": "2 Chronicles 1",
+      "psalms": "Psalm 117:1-2",
+      "proverbs": "proverbs 15:22-23"
+    },
+    {
+      "day": 141,
+      "chronological": "Song of Solomon 1-4",
+      "psalms": "Psalm 118:1-18",
+      "proverbs": "Proverbs 15:24-26"
+    },
+    {
+      "day": 142,
+      "chronological": "Song of Solomon 5-8",
+      "psalms": "Psalm 118:19--29",
+      "proverbs": "Proverbs 15:27-28"
+    },
+    {
+      "day": 143,
+      "chronological": "1 Kings 5-6; 2 Chronicles 2-3",
+      "psalms": "Psalm 119:1-16",
+      "proverbs": "Proverbs 15:29-30"
+    },
+    {
+      "day": 144,
+      "chronological": "1 Kings 7; 2 Chronicles 4",
+      "psalms": "Psalm 119:17-32",
+      "proverbs": "Proverbs 15:31-32"
+    },
+    {
+      "day": 145,
+      "chronological": "1 Kings 8; 2 Chron. 5",
+      "psalms": "Psalm 119:33-48",
+      "proverbs": "Proverbs 15:33"
+    },
+    {
+      "day": 146,
+      "chronological": "2 Chronicles 6-7",
+      "psalms": "Psalm 119:49-64",
+      "proverbs": "Proverbs 16:1-3"
+    },
+    {
+      "day": 147,
+      "chronological": "1 Kings 9; 2 Chron. 8",
+      "psalms": "Psalm 119:65-80",
+      "proverbs": "Proverbs 16:4-5"
+    },
+    {
+      "day": 148,
+      "chronological": "Ecclesiastes 1-6",
+      "psalms": "Psalm 119:81-96",
+      "proverbs": "Proverbs 16:6-7"
+    },
+    {
+      "day": 149,
+      "chronological": "Ecclesiastes 7-12",
+      "psalms": "Pslam 119:97-112",
+      "proverbs": "Proverbs 16:8-9"
+    },
+    {
+      "day": 150,
+      "chronological": "1 Kings 10-11; 2 Chron. 9",
+      "psalms": "Psalm 119:113-128",
+      "proverbs": "Proverbs 16:10-11"
+    },
+    {
+      "day": 151,
+      "chronological": "1 Kings 12-14",
+      "psalms": "Psalm 119:129-152",
+      "proverbs": "Proverbs 16:12-13"
+    },
+    {
+      "day": 152,
+      "chronological": "2 Chronicles 10-12",
+      "psalms": "Psalm 119:153-176",
+      "proverbs": "Proverbs 16:14-15"
+    },
+    {
+      "day": 153,
+      "chronological": "1 Kings 15; 2 Chron. 13-16",
+      "psalms": "Psalm 120:1-7",
+      "proverbs": "Proverbs 16:16-17"
+    },
+    {
+      "day": 154,
+      "chronological": "1 Kings 16; 2 Chronicles 17",
+      "psalms": "Psalm 121:1-8",
+      "proverbs": "Proverbs 16:18"
+    },
+    {
+      "day": 155,
+      "chronological": "1 Kings 17-19",
+      "psalms": "Psalm 122:1-9",
+      "proverbs": "Proverbs 16:19-20"
+    },
+    {
+      "day": 156,
+      "chronological": "1 Kings 20-21",
+      "psalms": "Psalm 123:1-4",
+      "proverbs": "Proverbs 16:21-23"
+    },
+    {
+      "day": 157,
+      "chronological": "1 Kings 22; 2 Chronicles 18",
+      "psalms": "Psalm 124:1-8",
+      "proverbs": "Proverbs 16:24"
+    },
+    {
+      "day": 158,
+      "chronological": "2 Chronicles 19-23",
+      "psalms": "Psalm125:1-5",
+      "proverbs": "Proverbs 16:25"
+    },
+    {
+      "day": 159,
+      "chronological": "Obadiah",
+      "psalms": "Psalm 126:1-6",
+      "proverbs": "Proverbs 16:26-27"
+    },
+    {
+      "day": 160,
+      "chronological": "2 Kings 1-4",
+      "psalms": "Psalm 127:1-5",
+      "proverbs": "Proverbs 16:28-30"
+    },
+    {
+      "day": 161,
+      "chronological": "2 Kings 5-8",
+      "psalms": "Psalm 128:1-6",
+      "proverbs": "Proverbs 16:31-33"
+    },
+    {
+      "day": 162,
+      "chronological": "2 Kings 9-11",
+      "psalms": "Psalm 129:1-8",
+      "proverbs": "Proverbs 17:1"
+    },
+    {
+      "day": 163,
+      "chronological": "2 Kings 12-13; 2 Chron. 24",
+      "psalms": "Psalm 130:1-8",
+      "proverbs": "Proverbs 17:2-3"
+    },
+    {
+      "day": 164,
+      "chronological": "2 Kings 14; 2 Chron. 25",
+      "psalms": "Psalm 131:1-3",
+      "proverbs": "Proverbs 17:4-5"
+    },
+    {
+      "day": 165,
+      "chronological": "Jonah",
+      "psalms": "Psalm 132:1-18",
+      "proverbs": "Proverbs 17:6"
+    },
+    {
+      "day": 166,
+      "chronological": "2 Kings 15; 2 Chron. 26",
+      "psalms": "Psalm 133:1-3",
+      "proverbs": "Proverbs 17:7-8"
+    },
+    {
+      "day": 167,
+      "chronological": "Isaiah 1-4",
+      "psalms": "Psalm 134:1-3",
+      "proverbs": "Proverbs 17:9-11"
+    },
+    {
+      "day": 168,
+      "chronological": "Isaiah 5-8",
+      "psalms": "Psalm 135:1-21",
+      "proverbs": "Proverbs 17:12-13"
+    },
+    {
+      "day": 169,
+      "chronological": "Amos 1-5",
+      "psalms": "Psalm 136:1-26",
+      "proverbs": "Proverbs 17:14-15"
+    },
+    {
+      "day": 170,
+      "chronological": "Amos 6-9",
+      "psalms": "Psalm 137:1-9",
+      "proverbs": "Proverbs 17:16"
+    },
+    {
+      "day": 171,
+      "chronological": "2 Chron. 27; Isaiah 9-12",
+      "psalms": "Psalm 138:1-8",
+      "proverbs": "Proverbs 17:17-18"
+    },
+    {
+      "day": 172,
+      "chronological": "Micah",
+      "psalms": "Psalm 139:1-24",
+      "proverbs": "Proverbs 17:19-21"
+    },
+    {
+      "day": 173,
+      "chronological": "2 Chron. 28; 2 Kings 16-17",
+      "psalms": "Psalm 140:1-13",
+      "proverbs": "Proverbs 17:22"
+    },
+    {
+      "day": 174,
+      "chronological": "Isaiah 13-17",
+      "psalms": "Pslam 141:1-10",
+      "proverbs": "Proverbs 17:23"
+    },
+    {
+      "day": 175,
+      "chronological": "Isaiah 18-22",
+      "psalms": "Psalm 142:1-7",
+      "proverbs": "Proverbs 17:24-25"
+    },
+    {
+      "day": 176,
+      "chronological": "Isaiah 23-27",
+      "psalms": "Psalm 143:1-12",
+      "proverbs": "Proverbs 17:26"
+    },
+    {
+      "day": 177,
+      "chronological": "2 Kings 18; 2 Chron. 29-31",
+      "psalms": "Psalm 144:1-15",
+      "proverbs": "Proverbs 17:27-28"
+    },
+    {
+      "day": 178,
+      "chronological": "Hosea 1-7",
+      "psalms": "Psalm 145:1-21",
+      "proverbs": "Proverbs 18:1"
+    },
+    {
+      "day": 179,
+      "chronological": "Hosea 8-14",
+      "psalms": "Psalm 146:1-10",
+      "proverbs": "Proverbs 18:2-3"
+    },
+    {
+      "day": 180,
+      "chronological": "Isaiah 28-30",
+      "psalms": "Psalm 147:1-20",
+      "proverbs": "Proverbs 18:4-5"
+    },
+    {
+      "day": 181,
+      "chronological": "Isaiah 31-34",
+      "psalms": "Psalm 148:1-14",
+      "proverbs": "Proverbs 18:6-7"
+    },
+    {
+      "day": 182,
+      "chronological": "Isaiah 35-36",
+      "psalms": "Psalm 149:1-9",
+      "proverbs": "Proverbs 18:8"
+    },
+    {
+      "day": 183,
+      "chronological": "Isaiah 37-39",
+      "psalms": "Psalm 150:1-6",
+      "proverbs": "Proverbs 18:9-10"
+    },
+    {
+      "day": 184,
+      "chronological": "Isaiah 40-42",
+      "psalms": "Psalm 1:1-6",
+      "proverbs": "Proverbs 18:11-12"
+    },
+    {
+      "day": 185,
+      "chronological": "Isaiah 43-45",
+      "psalms": "Psalm 2:1-12",
+      "proverbs": "Proverbs 18:13"
+    },
+    {
+      "day": 186,
+      "chronological": "Isaiah 46-48",
+      "psalms": "Psalm 3:1-8",
+      "proverbs": "Proverbs 18:14-15"
+    },
+    {
+      "day": 187,
+      "chronological": "2 Kings 19",
+      "psalms": "Psalm 4:1-8",
+      "proverbs": "Proverbs 18:16-18"
+    },
+    {
+      "day": 188,
+      "chronological": "Isaiah 49-53",
+      "psalms": "Psalm 5:1-12",
+      "proverbs": "Proverbs 18:19"
+    },
+    {
+      "day": 189,
+      "chronological": "Isaiah 54-58",
+      "psalms": "Psalm 6:1-10",
+      "proverbs": "Proverbs 18:20-21"
+    },
+    {
+      "day": 190,
+      "chronological": "Isaiah 59-63",
+      "psalms": "Psalm 7:1-17",
+      "proverbs": "Proverbs 18:22"
+    },
+    {
+      "day": 191,
+      "chronological": "Isaiah 64-66",
+      "psalms": "Psalm 8:1-9",
+      "proverbs": "Proverbs 18:23-24"
+    },
+    {
+      "day": 192,
+      "chronological": "2 Kings 20-21",
+      "psalms": "Psalm 9:1-12",
+      "proverbs": "Proverbs 19:1-3"
+    },
+    {
+      "day": 193,
+      "chronological": "2 Chronicles 32-33",
+      "psalms": "Psalm 9:13-20",
+      "proverbs": "Proverbs 19:4-5"
+    },
+    {
+      "day": 194,
+      "chronological": "Nahum",
+      "psalms": "Psalm 10:1-15",
+      "proverbs": "Proverbs 19:6-7"
+    },
+    {
+      "day": 195,
+      "chronological": "2 Kings 22-23; 2 Chron. 34-35",
+      "psalms": "Psalm 10:16-18",
+      "proverbs": "Proverbs 19:8-9"
+    },
+    {
+      "day": 196,
+      "chronological": "Zephaniah",
+      "psalms": "Psalm 11:1-7",
+      "proverbs": "Proverbs 19:10-12"
+    },
+    {
+      "day": 197,
+      "chronological": "Jeremiah 1-3",
+      "psalms": "Psalm 12:1-8",
+      "proverbs": "Proverbs 19:13-14"
+    },
+    {
+      "day": 198,
+      "chronological": "Jeremiah 4-6",
+      "psalms": "Psalm 13:1-6",
+      "proverbs": "Proverbs 19:15-16"
+    },
+    {
+      "day": 199,
+      "chronological": "Jeremiah 7-9",
+      "psalms": "Psalm 14:1-7",
+      "proverbs": "Proverbs 19:17"
+    },
+    {
+      "day": 200,
+      "chronological": "Jeremiah 10-13",
+      "psalms": "Psalm 15:1-5",
+      "proverbs": "Proverbs 19:18-19"
+    },
+    {
+      "day": 201,
+      "chronological": "Jeremiah 14-17",
+      "psalms": "Psalm 16:1-11",
+      "proverbs": "Proverbs 19:20-21"
+    },
+    {
+      "day": 202,
+      "chronological": "Jeremiah 18-22",
+      "psalms": "Psalm 17:1-15",
+      "proverbs": "Proverbs 19:22-23"
+    },
+    {
+      "day": 203,
+      "chronological": "Jeremiah 23-25",
+      "psalms": "Psalm 18:1-15",
+      "proverbs": "Proverbs 19:24-25"
+    },
+    {
+      "day": 204,
+      "chronological": "Jeremiah 26-29",
+      "psalms": "Psalm 18:16-36",
+      "proverbs": "Proverbs 19:26"
+    },
+    {
+      "day": 205,
+      "chronological": "Jeremiah 30-31",
+      "psalms": "Psalm 18:37-50",
+      "proverbs": "Proverbs 19:27-29"
+    },
+    {
+      "day": 206,
+      "chronological": "Jeremiah 32-34",
+      "psalms": "Psalm 19:1-14",
+      "proverbs": "Proverbs 20:1"
+    },
+    {
+      "day": 207,
+      "chronological": "Jeremiah 35-37",
+      "psalms": "Psalm 20:1-9",
+      "proverbs": "Proverbs 20:2-3"
+    },
+    {
+      "day": 208,
+      "chronological": "Jeremiah 38-40",
+      "psalms": "Psalm 21:1-13",
+      "proverbs": "Proverbs 20:4-6"
+    },
+    {
+      "day": 209,
+      "chronological": "2 Kings 24-25; 2 Chron. 36",
+      "psalms": "Psalm 22:1-18",
+      "proverbs": "Proverbs 20:7"
+    },
+    {
+      "day": 210,
+      "chronological": "Habakkuk",
+      "psalms": "Psalm 22:19-31",
+      "proverbs": "Proverbs 20:8-10"
+    },
+    {
+      "day": 211,
+      "chronological": "Jeremiah 41-45",
+      "psalms": "Psalm 23:1-6",
+      "proverbs": "Proverbs 20:11"
+    },
+    {
+      "day": 212,
+      "chronological": "Jeremiah 46-48",
+      "psalms": "Psalm 24:1-10",
+      "proverbs": "Proverbs 20:12"
+    },
+    {
+      "day": 213,
+      "chronological": "Jeremiah 49-50",
+      "psalms": "Psalm 25:1-15",
+      "proverbs": "Proverbs 20:13-15"
+    },
+    {
+      "day": 214,
+      "chronological": "Jeremiah 51-52",
+      "psalms": "Psalm 25:16-22",
+      "proverbs": "Proverbs 20:16-18"
+    },
+    {
+      "day": 215,
+      "chronological": "Lamentations 1-2",
+      "psalms": "Psalm 26:1-12",
+      "proverbs": "Proverbs 20:19"
+    },
+    {
+      "day": 216,
+      "chronological": "Lamentations 3-5",
+      "psalms": "Psalm 27:1-6",
+      "proverbs": "Proverbs 20:20-21"
+    },
+    {
+      "day": 217,
+      "chronological": "Ezekiel 1-4",
+      "psalms": "Psalm 27:7-14",
+      "proverbs": "Proverbs 20:22-23"
+    },
+    {
+      "day": 218,
+      "chronological": "Ezekiel 5-8",
+      "psalms": "Psalm 28:1-9",
+      "proverbs": "Proverbs 20:24-25"
+    },
+    {
+      "day": 219,
+      "chronological": "Ezekiel 9-12",
+      "psalms": "Psalm 29:1-11",
+      "proverbs": "Proverbs 20:26-27"
+    },
+    {
+      "day": 220,
+      "chronological": "Ezekiel 13-15",
+      "psalms": "Psalm 30:1-12",
+      "proverbs": "Proverbs 20:28-30"
+    },
+    {
+      "day": 221,
+      "chronological": "Ezekiel 16-17",
+      "psalms": "Psalm 31:1-8",
+      "proverbs": "Proverbs 21:1-2"
+    },
+    {
+      "day": 222,
+      "chronological": "Ezekiel 18-20",
+      "psalms": "Psalm 31:9-18",
+      "proverbs": "Proverbs 21:3"
+    },
+    {
+      "day": 223,
+      "chronological": "Ezekiel 21-22",
+      "psalms": "Psalm 31:19-24",
+      "proverbs": "Proverbs 21:4"
+    },
+    {
+      "day": 224,
+      "chronological": "Ezekiel 23-24",
+      "psalms": "Psalm 32:1-11",
+      "proverbs": "Proverbs 21:5-7"
+    },
+    {
+      "day": 225,
+      "chronological": "Ezekiel 25-27",
+      "psalms": "Psalm 33:1-11",
+      "proverbs": "Proverbs 21:8-10"
+    },
+    {
+      "day": 226,
+      "chronological": "Ezekiel 28-30",
+      "psalms": "Psalm 33:12-22",
+      "proverbs": "Proverbs 21:11-12"
+    },
+    {
+      "day": 227,
+      "chronological": "Ezekiel 31-33",
+      "psalms": "Psalm 34:1-10",
+      "proverbs": "Proverbs 21:13"
+    },
+    {
+      "day": 228,
+      "chronological": "Ezekiel 34-36",
+      "psalms": "Psalm 34:11-22",
+      "proverbs": "Proverbs 21:14-16"
+    },
+    {
+      "day": 229,
+      "chronological": "Ezekiel 37-39",
+      "psalms": "Psalm 35:1-16",
+      "proverbs": "Proverbs 21:17-18"
+    },
+    {
+      "day": 230,
+      "chronological": "Ezekiel 40-42",
+      "psalms": "Psalm 35:17-28",
+      "proverbs": "Proverbs 21:19-20"
+    },
+    {
+      "day": 231,
+      "chronological": "Ezekiel 43-45",
+      "psalms": "Psalm 36:1-12",
+      "proverbs": "Proverbs 21:21-22"
+    },
+    {
+      "day": 232,
+      "chronological": "Ezekiel 46-48",
+      "psalms": "Psalm 37:1-11",
+      "proverbs": "Proverbs 21:23-24"
+    },
+    {
+      "day": 233,
+      "chronological": "Joel",
+      "psalms": "Psalm 37:12-29",
+      "proverbs": "Proverbs 21:25-26"
+    },
+    {
+      "day": 234,
+      "chronological": "Daniel 1-3",
+      "psalms": "Psalm 37:30-40",
+      "proverbs": "Proverbs 21:27"
+    },
+    {
+      "day": 235,
+      "chronological": "Daniel 4-6",
+      "psalms": "Psalm 38:1-22",
+      "proverbs": "Proverbs 21:28-29"
+    },
+    {
+      "day": 236,
+      "chronological": "Daniel 7-9",
+      "psalms": "Psalm 39:1-13",
+      "proverbs": "Proverbs 21:30-31"
+    },
+    {
+      "day": 237,
+      "chronological": "Daniel 10-12",
+      "psalms": "Psalm 40:1-10",
+      "proverbs": "Proverbs 22:1"
+    },
+    {
+      "day": 238,
+      "chronological": "Ezra 1-3",
+      "psalms": "Psalm 40:11-17",
+      "proverbs": "Proverbs 22:2-4"
+    },
+    {
+      "day": 239,
+      "chronological": "Ezra 4-6",
+      "psalms": "Psalm 41:1-13",
+      "proverbs": "Proverbs 22:5-6"
+    },
+    {
+      "day": 240,
+      "chronological": "Haggai",
+      "psalms": "Psalm 42:1-11",
+      "proverbs": "Proverbs 22:7"
+    },
+    {
+      "day": 241,
+      "chronological": "Zechariah 1-3",
+      "psalms": "Psalm 43:1-5",
+      "proverbs": "Proverbs 22:8-9"
+    },
+    {
+      "day": 242,
+      "chronological": "Zechariah 4-6",
+      "psalms": "Psalm 44:1-8",
+      "proverbs": "Proverbs 22:10-12"
+    },
+    {
+      "day": 243,
+      "chronological": "Zechariah 7-9",
+      "psalms": "Psalm 44:9-26",
+      "proverbs": "Proverbs 22:13"
+    },
+    {
+      "day": 244,
+      "chronological": "Zechariah 10-12",
+      "psalms": "Psalm 45:1-17",
+      "proverbs": "Proverbs 22:14"
+    },
+    {
+      "day": 245,
+      "chronological": "Zechariah 13-14",
+      "psalms": "Psalm 46:1-11",
+      "proverbs": "Proverbs 22:15"
+    },
+    {
+      "day": 246,
+      "chronological": "Esther 1-2",
+      "psalms": "Psalm 47:1-9",
+      "proverbs": "Proverbs 22:16"
+    },
+    {
+      "day": 247,
+      "chronological": "Esther 3-5",
+      "psalms": "Psalm 48:1-14",
+      "proverbs": "Proverbs 22:17-19"
+    },
+    {
+      "day": 248,
+      "chronological": "Esther 6-7",
+      "psalms": "Psalm 49:1-20",
+      "proverbs": "Proverbs 22:20-21"
+    },
+    {
+      "day": 249,
+      "chronological": "Esther 8-10",
+      "psalms": "Psalm 50:1-23",
+      "proverbs": "Proverbs 22:22-23"
+    },
+    {
+      "day": 250,
+      "chronological": "Ezra 7-8",
+      "psalms": "Psalm 51:1-19",
+      "proverbs": "Proverbs 22:24-25"
+    },
+    {
+      "day": 251,
+      "chronological": "Ezra 9-10",
+      "psalms": "Psalm 52:1-9",
+      "proverbs": "Proverbs 22:26-27"
+    },
+    {
+      "day": 252,
+      "chronological": "Nehemiah 1-3",
+      "psalms": "Psalm 53:1-6",
+      "proverbs": "Proverbs 22:28-29"
+    },
+    {
+      "day": 253,
+      "chronological": "Nehemiah 4-5",
+      "psalms": "Psalm 54:1-7",
+      "proverbs": "Proverbs 23:1-3"
+    },
+    {
+      "day": 254,
+      "chronological": "Nehemiah 6-7",
+      "psalms": "Psalm 55:1-23",
+      "proverbs": "Proverbs 23:4-5"
+    },
+    {
+      "day": 255,
+      "chronological": "Nehemiah 8-10",
+      "psalms": "Psalm 56:1-13",
+      "proverbs": "Proverbs 23:6-8"
+    },
+    {
+      "day": 256,
+      "chronological": "Nehemiah 11-13",
+      "psalms": "Psalm 57:1-11",
+      "proverbs": "Proverbs 23:9-11"
+    },
+    {
+      "day": 257,
+      "chronological": "Malachi",
+      "psalms": "Psalm 58:1-11",
+      "proverbs": "Proverbs 23:12"
+    },
+    {
+      "day": 258,
+      "chronological": "Luke 1; John 1",
+      "psalms": "Psalm 59:1-17",
+      "proverbs": "Proverbs 23:13-14"
+    },
+    {
+      "day": 259,
+      "chronological": "Matthew 1; Luke 2",
+      "psalms": "Psalm 60:1-12",
+      "proverbs": "Proverbs 23:15-16"
+    },
+    {
+      "day": 260,
+      "chronological": "Matthew 2",
+      "psalms": "Psalm 61:1-8",
+      "proverbs": "Proverbs 23:17-18"
+    },
+    {
+      "day": 261,
+      "chronological": "Matthew 3; Mark 1; Luke 3",
+      "psalms": "Psalm 62:1-12",
+      "proverbs": "Proverbs 23:19-21"
+    },
+    {
+      "day": 262,
+      "chronological": "Matthew 4; Luke 4-5",
+      "psalms": "Psalm 63:1-11",
+      "proverbs": "Proverbs 23:22"
+    },
+    {
+      "day": 263,
+      "chronological": "John 2-4",
+      "psalms": "Psalm 64:1-10",
+      "proverbs": "Proverbs 23:23"
+    },
+    {
+      "day": 264,
+      "chronological": "Matthew 8; Mark 2",
+      "psalms": "Psalm 65:1-13",
+      "proverbs": "Proverbs 23:24"
+    },
+    {
+      "day": 265,
+      "chronological": "John 5",
+      "psalms": "Psalm 66:1-20",
+      "proverbs": "Proverbs 23:25-28"
+    },
+    {
+      "day": 266,
+      "chronological": "Matthew 12; Mark 3; Luke 6",
+      "psalms": "Psalm 67:1-7",
+      "proverbs": "Proverbs 23:29-35"
+    },
+    {
+      "day": 267,
+      "chronological": "Matthew 5-7",
+      "psalms": "Psalm 68:1-18",
+      "proverbs": "Proverbs 24:1-2"
+    },
+    {
+      "day": 268,
+      "chronological": "Matthew 9; Luke 7",
+      "psalms": "Psalm 68:19-35",
+      "proverbs": "Proverbs 24:3-4"
+    },
+    {
+      "day": 269,
+      "chronological": "Matthew 11",
+      "psalms": "Psalm 69:1-18",
+      "proverbs": "Proverbs 24:5-6"
+    },
+    {
+      "day": 270,
+      "chronological": "Luke 11",
+      "psalms": "Psalm 69:19-36",
+      "proverbs": "Proverbs 24:7"
+    },
+    {
+      "day": 271,
+      "chronological": "Matthew 13; Luke 8",
+      "psalms": "Pslam 70:1-5",
+      "proverbs": "Proverbs 24:8"
+    },
+    {
+      "day": 272,
+      "chronological": "Mark 4-5",
+      "psalms": "Psalm 71:1-24",
+      "proverbs": "Proverbs 24:9-10"
+    },
+    {
+      "day": 273,
+      "chronological": "Matthew 10",
+      "psalms": "Psalm 72:1-20",
+      "proverbs": "Proverbs 24:11-12"
+    },
+    {
+      "day": 274,
+      "chronological": "Matthew 14; Mark 6; Luke 9",
+      "psalms": "Psalm 73:1-28",
+      "proverbs": "Proverbs 24:13-14"
+    },
+    {
+      "day": 275,
+      "chronological": "John 6",
+      "psalms": "Psalm 74:1-23",
+      "proverbs": "Proverbs 24:15-16"
+    },
+    {
+      "day": 276,
+      "chronological": "Matthew 15; Mark 7",
+      "psalms": "Psalm 75:1-10",
+      "proverbs": "Proverbs 24:17-20"
+    },
+    {
+      "day": 277,
+      "chronological": "Matthew 16; Mark 8",
+      "psalms": "Psalm 76:1-12",
+      "proverbs": "Proverbs 24:21-22"
+    },
+    {
+      "day": 278,
+      "chronological": "Matthew 17; Mark 9",
+      "psalms": "Psalm 77:1-20",
+      "proverbs": "Proverbs 24:23-25"
+    },
+    {
+      "day": 279,
+      "chronological": "Matthew 18",
+      "psalms": "Psalm 78:1-31",
+      "proverbs": "Proverbs 24:26"
+    },
+    {
+      "day": 280,
+      "chronological": "John 7-8",
+      "psalms": "Psalm 78:32-55",
+      "proverbs": "Proverbs 24:27"
+    },
+    {
+      "day": 281,
+      "chronological": "John 9-10",
+      "psalms": "Psalm 78:56-72",
+      "proverbs": "Proverbs 24:28-29"
+    },
+    {
+      "day": 282,
+      "chronological": "Luke 10",
+      "psalms": "Psalm 79:1-13",
+      "proverbs": "Proverbs 24:30-34"
+    },
+    {
+      "day": 283,
+      "chronological": "Luke 12-13",
+      "psalms": "Psalm 80:1-19",
+      "proverbs": "Proverbs 25:1-5"
+    },
+    {
+      "day": 284,
+      "chronological": "Luke 14-15",
+      "psalms": "Psalm 81:1-16",
+      "proverbs": "Proverbs 25:6-7a"
+    },
+    {
+      "day": 285,
+      "chronological": "Luke 16-17",
+      "psalms": "Psalm 82:1-8",
+      "proverbs": "Proverbs 25:7b-10"
+    },
+    {
+      "day": 286,
+      "chronological": "John 11",
+      "psalms": "Psalm 83:1-18",
+      "proverbs": "Proverbs 25:11-14"
+    },
+    {
+      "day": 287,
+      "chronological": "Luke 18",
+      "psalms": "Psalm 84:1-12",
+      "proverbs": "Proverbs 25:15"
+    },
+    {
+      "day": 288,
+      "chronological": "Matthew 19; Mark 10",
+      "psalms": "Psalm 85:1-13",
+      "proverbs": "Proverbs 25:16"
+    },
+    {
+      "day": 289,
+      "chronological": "Matthew 20-21",
+      "psalms": "Psalm 86:1-17",
+      "proverbs": "Proverbs 25:17"
+    },
+    {
+      "day": 290,
+      "chronological": "Luke 19",
+      "psalms": "Psalm 87:1-7",
+      "proverbs": "Proverbs 25:18-19"
+    },
+    {
+      "day": 291,
+      "chronological": "Mark 11; John 12",
+      "psalms": "Psalm 88:1-18",
+      "proverbs": "Proverbs 25:20-22"
+    },
+    {
+      "day": 292,
+      "chronological": "Matthew 22; Mark 12",
+      "psalms": "Psalm 89:1-13",
+      "proverbs": "Proverbs 25:23-24"
+    },
+    {
+      "day": 293,
+      "chronological": "Matthew 23; Luke 20-21",
+      "psalms": "Psalm 89:14-37",
+      "proverbs": "Proverbs 25:25-27"
+    },
+    {
+      "day": 294,
+      "chronological": "Mark 13",
+      "psalms": "Psalm 89:38-52",
+      "proverbs": "Proverbs 25:28"
+    },
+    {
+      "day": 295,
+      "chronological": "Matthew 24",
+      "psalms": "Psalm 90:1-91:16",
+      "proverbs": "Proverbs 26:1-2"
+    },
+    {
+      "day": 296,
+      "chronological": "Matthew 25",
+      "psalms": "Psalm 92:1-93:5",
+      "proverbs": "Proverbs 26:3-5"
+    },
+    {
+      "day": 297,
+      "chronological": "Matthew 26; Mark 14",
+      "psalms": "Psalm 94:1-23",
+      "proverbs": "Proverbs 26:6-8"
+    },
+    {
+      "day": 298,
+      "chronological": "Luke 22; John 13",
+      "psalms": "Psalm 95:1-96:13",
+      "proverbs": "Proverbs 26:9-12"
+    },
+    {
+      "day": 299,
+      "chronological": "John 14-15",
+      "psalms": "Psalm 97:1-98:9",
+      "proverbs": "Proverbs 26:13-16"
+    },
+    {
+      "day": 300,
+      "chronological": "John 16-17",
+      "psalms": "Psalm 99:1-9",
+      "proverbs": "Proverbs 26:17"
+    },
+    {
+      "day": 301,
+      "chronological": "Matthew 27; Mark 15",
+      "psalms": "Psalm 100:1-5",
+      "proverbs": "Proverbs 26:18-19"
+    },
+    {
+      "day": 302,
+      "chronological": "Luke 23; John 18-19",
+      "psalms": "Psalm 101:1-8",
+      "proverbs": "Proverbs 26:20"
+    },
+    {
+      "day": 303,
+      "chronological": "Matthew 28; Mark 16",
+      "psalms": "Psalm 102:1-28",
+      "proverbs": "Proverbs 26:21-22"
+    },
+    {
+      "day": 304,
+      "chronological": "Luke 24; John 20-21",
+      "psalms": "Psalm 103:1-22",
+      "proverbs": "Proverbs 26:23"
+    },
+    {
+      "day": 305,
+      "chronological": "Acts 1-2",
+      "psalms": "Psalm 104:1-23",
+      "proverbs": "Proverbs 26:24-26"
+    },
+    {
+      "day": 306,
+      "chronological": "Acts 3-4",
+      "psalms": "Psalm 104:24-35",
+      "proverbs": "Proverbs 26:27"
+    },
+    {
+      "day": 307,
+      "chronological": "Acts 5-6",
+      "psalms": "Psalm 105:1-15",
+      "proverbs": "Proverbs 26:28"
+    },
+    {
+      "day": 308,
+      "chronological": "Acts 7-8",
+      "psalms": "Psalm 105:16-36",
+      "proverbs": "Proverbs 27:1-2"
+    },
+    {
+      "day": 309,
+      "chronological": "Acts 9-10",
+      "psalms": "Psalm 105:37-45",
+      "proverbs": "Proverbs 27:3"
+    },
+    {
+      "day": 310,
+      "chronological": "Acts 11-12",
+      "psalms": "Psalm 106:1-12",
+      "proverbs": "Proverbs 27:4-6"
+    },
+    {
+      "day": 311,
+      "chronological": "Acts 13-14",
+      "psalms": "Psalm 106:13-31",
+      "proverbs": "Proverbs 27:7-9"
+    },
+    {
+      "day": 312,
+      "chronological": "James 1-2",
+      "psalms": "Psalm 106:32-48",
+      "proverbs": "Proverbs 27:10"
+    },
+    {
+      "day": 313,
+      "chronological": "James 3-5",
+      "psalms": "Psalm 107:1-43",
+      "proverbs": "Proverbs 27:11"
+    },
+    {
+      "day": 314,
+      "chronological": "Galatians 1-2",
+      "psalms": "Psalm 108:1-13",
+      "proverbs": "Proverbs 27:12"
+    },
+    {
+      "day": 315,
+      "chronological": "Galatians 3-4",
+      "psalms": "Psalm 109:1-31",
+      "proverbs": "Proverbs 27:13"
+    },
+    {
+      "day": 316,
+      "chronological": "Galatians 5-6",
+      "psalms": "Psalm 110:1-7",
+      "proverbs": "Proverbs 27:14"
+    },
+    {
+      "day": 317,
+      "chronological": "Acts 17",
+      "psalms": "Psalm 111:1-10",
+      "proverbs": "Proverbs 27:15-16"
+    },
+    {
+      "day": 318,
+      "chronological": "1 Thessalonians",
+      "psalms": "Psalm 112:1-10",
+      "proverbs": "Proverbs 27:17"
+    },
+    {
+      "day": 319,
+      "chronological": "2 Thessalonians",
+      "psalms": "Psalm 113:1-114:8",
+      "proverbs": "Proverbs 27:18-20"
+    },
+    {
+      "day": 320,
+      "chronological": "Acts 18-19",
+      "psalms": "Psalm 115:1-18",
+      "proverbs": "Proverbs 27:21-22"
+    },
+    {
+      "day": 321,
+      "chronological": "1 Corinthians 1-4",
+      "psalms": "Psalm 116:1-19",
+      "proverbs": "Proverbs 27:23-27"
+    },
+    {
+      "day": 322,
+      "chronological": "1 Corinthians 5-8",
+      "psalms": "Psalm 117:1-2",
+      "proverbs": "Proverbs 28:1"
+    },
+    {
+      "day": 323,
+      "chronological": "1 Corinthians 9-11",
+      "psalms": "Psalm 118:1-18",
+      "proverbs": "Proverbs 28:2"
+    },
+    {
+      "day": 324,
+      "chronological": "1 Corinthians 12-14",
+      "psalms": "Psalm 118:19-29",
+      "proverbs": "Proverbs 28:3-5"
+    },
+    {
+      "day": 325,
+      "chronological": "1 Corinthians 15-16",
+      "psalms": "Psalm 119:1-16",
+      "proverbs": "Proverbs 28:6-7"
+    },
+    {
+      "day": 326,
+      "chronological": "2 Corinthians 1-4",
+      "psalms": "Psalm 119:17-32",
+      "proverbs": "Proverbs 28:8-10"
+    },
+    {
+      "day": 327,
+      "chronological": "2 Corinthians 5-8",
+      "psalms": "Psalm 119:33-48",
+      "proverbs": "Proverbs 28:11"
+    },
+    {
+      "day": 328,
+      "chronological": "2 Corinthians 9-10",
+      "psalms": "Psalm 119:49-64",
+      "proverbs": "Proverbs 28:12-13"
+    },
+    {
+      "day": 329,
+      "chronological": "2 Corinthians 11-13",
+      "psalms": "Psalm 119:65-80",
+      "proverbs": "Proverbs 28:14"
+    },
+    {
+      "day": 330,
+      "chronological": "Romans 1-3",
+      "psalms": "Psalm 119:81-96",
+      "proverbs": "Proverbs 28:15-16"
+    },
+    {
+      "day": 331,
+      "chronological": "Romans 4-7",
+      "psalms": "Psalm 119:97-112",
+      "proverbs": "Proverbs 28:17-18"
+    },
+    {
+      "day": 332,
+      "chronological": "Romans 8-10",
+      "psalms": "Psalm 119:113-128",
+      "proverbs": "Proverbs 28:19-20"
+    },
+    {
+      "day": 333,
+      "chronological": "Romans 11-13",
+      "psalms": "Psalm 119:129-152",
+      "proverbs": "Proverbs 28:21-22"
+    },
+    {
+      "day": 334,
+      "chronological": "Romans 14-16",
+      "psalms": "Psalm 119:153-176",
+      "proverbs": "Proberbs 28:23-24"
+    },
+    {
+      "day": 335,
+      "chronological": "Acts 20-21",
+      "psalms": "Psalm 120:1-7",
+      "proverbs": "Proverbs 28:25-26"
+    },
+    {
+      "day": 336,
+      "chronological": "Acts 22-23",
+      "psalms": "Psalm 121:1-8",
+      "proverbs": "Proverbs 28:27-28"
+    },
+    {
+      "day": 337,
+      "chronological": "Acts 24-26",
+      "psalms": "Psalm 122:1-9",
+      "proverbs": "Proverbs 29:1"
+    },
+    {
+      "day": 338,
+      "chronological": "Acts 27-28",
+      "psalms": "Psalm 123:1-4",
+      "proverbs": "Proverbs 29:2-4"
+    },
+    {
+      "day": 339,
+      "chronological": "Colossians",
+      "psalms": "Psalm 124:1-8",
+      "proverbs": "Proverbs 29:5-8"
+    },
+    {
+      "day": 340,
+      "chronological": "Philemon",
+      "psalms": "Pslam 125:1-5",
+      "proverbs": "Proverbs 29:9-11"
+    },
+    {
+      "day": 341,
+      "chronological": "Ephesians 1-3",
+      "psalms": "Psalm 126:1-6",
+      "proverbs": "Proverbs 29:12-14"
+    },
+    {
+      "day": 342,
+      "chronological": "Ephesians 4-6",
+      "psalms": "Psalm 127:1-5",
+      "proverbs": "Proverbs 29:15-17"
+    },
+    {
+      "day": 343,
+      "chronological": "Philippians 1-2",
+      "psalms": "Psalm 128:1-6",
+      "proverbs": "Proverbs 29:18"
+    },
+    {
+      "day": 344,
+      "chronological": "Philippians 3-4",
+      "psalms": "Psalm 129:1-8",
+      "proverbs": "Proverbs 29:19-20"
+    },
+    {
+      "day": 345,
+      "chronological": "1 Timothy 1-3",
+      "psalms": "Psalm 130:1-8",
+      "proverbs": "Proverbs 29:21-22"
+    },
+    {
+      "day": 346,
+      "chronological": "1 Timothy 4-6",
+      "psalms": "Psalm 131:1-3",
+      "proverbs": "Proverbs 29:23"
+    },
+    {
+      "day": 347,
+      "chronological": "Titus",
+      "psalms": "Psalm 132:1-18",
+      "proverbs": "Proverbs 29:24-25"
+    },
+    {
+      "day": 348,
+      "chronological": "1 Peter",
+      "psalms": "Psalm 133:1-3",
+      "proverbs": "Proverbs 29:26-27"
+    },
+    {
+      "day": 349,
+      "chronological": "Hebrews 1-3",
+      "psalms": "Psalm 134:1-3",
+      "proverbs": "Proverbs 30:1-4"
+    },
+    {
+      "day": 350,
+      "chronological": "Hebrews 4-6",
+      "psalms": "Psalm 135:1-21",
+      "proverbs": "Proverbs 30:5-6"
+    },
+    {
+      "day": 351,
+      "chronological": "Hebrews 7-10",
+      "psalms": "Psalm 136:1-26",
+      "proverbs": "Proverbs 30:7-9"
+    },
+    {
+      "day": 352,
+      "chronological": "Hebrews 11-13",
+      "psalms": "Psalm 137:1-9",
+      "proverbs": "Proverbs 30:10"
+    },
+    {
+      "day": 353,
+      "chronological": "2 Timothy 1-2",
+      "psalms": "Psalm 138:1-8",
+      "proverbs": "Proverbs 30:11-14"
+    },
+    {
+      "day": 354,
+      "chronological": "2 Timothy 3-4",
+      "psalms": "Psalm 139:1-24",
+      "proverbs": "Proverbs 30:15-16"
+    },
+    {
+      "day": 355,
+      "chronological": "2 Peter",
+      "psalms": "Psalm 140:1-13",
+      "proverbs": "Proverbs 30:17"
+    },
+    {
+      "day": 356,
+      "chronological": "Jude",
+      "psalms": "Psalm 141:1-10",
+      "proverbs": "Proverbs 30:18-20"
+    },
+    {
+      "day": 357,
+      "chronological": "1 John",
+      "psalms": "Psalm 142:1-7",
+      "proverbs": "Proverbs 30:21-23"
+    },
+    {
+      "day": 358,
+      "chronological": "2 & 3 John",
+      "psalms": "Psalm 143:1-12",
+      "proverbs": "Proverbs 30:24-28"
+    },
+    {
+      "day": 359,
+      "chronological": "Revelation 1-3",
+      "psalms": "Psalm 144:1-15",
+      "proverbs": "Proverbs 30:29-31"
+    },
+    {
+      "day": 360,
+      "chronological": "Revelation 4-6",
+      "psalms": "Psalm 145:1-21",
+      "proverbs": "Proverbs 30:32"
+    },
+    {
+      "day": 361,
+      "chronological": "Revelation 7-9",
+      "psalms": "Psalm 146:1-10",
+      "proverbs": "Proverbs 30:33"
+    },
+    {
+      "day": 362,
+      "chronological": "Revelation 10-12",
+      "psalms": "Psalm 147:1-20",
+      "proverbs": "Proverbs 31:1-7"
+    },
+    {
+      "day": 363,
+      "chronological": "Revelation 13-15",
+      "psalms": "Psalm 148:1-14",
+      "proverbs": "Proverbs 31:8-9"
+    },
+    {
+      "day": 364,
+      "chronological": "Revelation 16-18",
+      "psalms": "Psalm 149:1-9",
+      "proverbs": "Proverbs 31:10-24"
+    },
+    {
+      "day": 365,
+      "chronological": "Revelation 19-22",
+      "psalms": "Psalm 150:1-6",
+      "proverbs": "Proverbs 31:25-31"
+    }
+  ]
+}

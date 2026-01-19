@@ -606,6 +606,70 @@ async def get_devotional_sources():
         conn.close()
 
 
+# ========== READING PLAN ENDPOINTS ==========
+
+@app.get("/api/reading-plans")
+async def get_reading_plans():
+    """Get list of available reading plans."""
+    import json
+    data_path = Path(__file__).parent.parent / "data"
+    plans = []
+
+    for plan_file in data_path.glob("reading-plan-*.json"):
+        with open(plan_file) as f:
+            plan = json.load(f)
+            plans.append({
+                "id": plan["id"],
+                "name": plan["name"],
+                "description": plan["description"],
+                "duration_days": plan["duration_days"],
+                "tracks": plan.get("tracks", [])
+            })
+
+    return {"plans": plans}
+
+
+@app.get("/api/reading-plans/{plan_id}")
+async def get_reading_plan(plan_id: str):
+    """Get full reading plan with all days."""
+    import json
+    data_path = Path(__file__).parent.parent / "data"
+    plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
+
+    if not plan_file.exists():
+        raise HTTPException(status_code=404, detail=f"Reading plan not found: {plan_id}")
+
+    with open(plan_file) as f:
+        return json.load(f)
+
+
+@app.get("/api/reading-plans/{plan_id}/day/{day}")
+async def get_reading_plan_day(plan_id: str, day: int):
+    """Get a specific day's reading from a plan."""
+    import json
+    data_path = Path(__file__).parent.parent / "data"
+    plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
+
+    if not plan_file.exists():
+        raise HTTPException(status_code=404, detail=f"Reading plan not found: {plan_id}")
+
+    with open(plan_file) as f:
+        plan = json.load(f)
+
+    # Find the day
+    for d in plan["days"]:
+        if d["day"] == day:
+            return {
+                "plan_id": plan_id,
+                "plan_name": plan["name"],
+                "day": day,
+                "total_days": plan["duration_days"],
+                "readings": d
+            }
+
+    raise HTTPException(status_code=404, detail=f"Day {day} not found in plan")
+
+
 # Helper functions
 
 def parse_reference(reference: str) -> Optional[tuple]:

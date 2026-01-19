@@ -116,6 +116,35 @@ async function deleteUserNote(noteId) {
     if (error) throw error;
 }
 
+async function updateUserNote(noteId, updates) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const updateData = {};
+    if (updates.content !== undefined) updateData.content = updates.content;
+
+    const { data, error } = await supabaseClient
+        .from('user_notes')
+        .update(updateData)
+        .eq('id', noteId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    return {
+        id: data.id,
+        book: data.book,
+        chapter: data.chapter,
+        startVerse: data.start_verse,
+        endVerse: data.end_verse,
+        content: data.content,
+        created_at: data.created_at,
+        synced: true
+    };
+}
+
 async function syncLocalNotesToSupabase(localNotes) {
     const user = await getUser();
     if (!user) return { synced: 0, errors: [] };
@@ -148,6 +177,181 @@ async function syncLocalNotesToSupabase(localNotes) {
     return { synced, errors };
 }
 
+// Tag sync functions
+async function fetchUserTags() {
+    const user = await getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabaseClient
+        .from('user_tags')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+
+    return data.map(tag => ({
+        id: tag.id,
+        name: tag.name,
+        color: tag.color,
+        sortOrder: tag.sort_order,
+        synced: true
+    }));
+}
+
+async function createUserTag(name, color) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabaseClient
+        .from('user_tags')
+        .insert({
+            user_id: user.id,
+            name,
+            color
+        })
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    return {
+        id: data.id,
+        name: data.name,
+        color: data.color,
+        sortOrder: data.sort_order,
+        synced: true
+    };
+}
+
+async function updateUserTag(tagId, updates) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const updateData = {};
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.color !== undefined) updateData.color = updates.color;
+    if (updates.sortOrder !== undefined) updateData.sort_order = updates.sortOrder;
+
+    const { data, error } = await supabaseClient
+        .from('user_tags')
+        .update(updateData)
+        .eq('id', tagId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    return {
+        id: data.id,
+        name: data.name,
+        color: data.color,
+        sortOrder: data.sort_order,
+        synced: true
+    };
+}
+
+async function deleteUserTag(tagId) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabaseClient
+        .from('user_tags')
+        .delete()
+        .eq('id', tagId)
+        .eq('user_id', user.id);
+
+    if (error) throw error;
+}
+
+async function addTagToNote(noteId, tagId) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabaseClient
+        .from('note_tags')
+        .insert({
+            note_id: noteId,
+            tag_id: tagId
+        });
+
+    if (error) throw error;
+}
+
+async function removeTagFromNote(noteId, tagId) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabaseClient
+        .from('note_tags')
+        .delete()
+        .eq('note_id', noteId)
+        .eq('tag_id', tagId);
+
+    if (error) throw error;
+}
+
+async function fetchNoteTagIds(noteId) {
+    const user = await getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabaseClient
+        .from('note_tags')
+        .select('tag_id')
+        .eq('note_id', noteId);
+
+    if (error) throw error;
+
+    return data.map(row => row.tag_id);
+}
+
+async function fetchAllNoteTags() {
+    const user = await getUser();
+    if (!user) return {};
+
+    const { data, error } = await supabaseClient
+        .from('note_tags')
+        .select('note_id, tag_id');
+
+    if (error) throw error;
+
+    // Group by note_id
+    const noteTagsMap = {};
+    for (const row of data) {
+        if (!noteTagsMap[row.note_id]) {
+            noteTagsMap[row.note_id] = [];
+        }
+        noteTagsMap[row.note_id].push(row.tag_id);
+    }
+    return noteTagsMap;
+}
+
+async function setNoteTagIds(noteId, tagIds) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Delete all existing tags for this note
+    const { error: deleteError } = await supabaseClient
+        .from('note_tags')
+        .delete()
+        .eq('note_id', noteId);
+
+    if (deleteError) throw deleteError;
+
+    // Insert new tags
+    if (tagIds.length > 0) {
+        const { error: insertError } = await supabaseClient
+            .from('note_tags')
+            .insert(tagIds.map(tagId => ({
+                note_id: noteId,
+                tag_id: tagId
+            })));
+
+        if (insertError) throw insertError;
+    }
+}
+
 // Listen for auth state changes
 function onAuthStateChange(callback) {
     return supabaseClient.auth.onAuthStateChange((event, session) => {
@@ -164,7 +368,18 @@ window.SupabaseAuth = {
     resetPassword,
     fetchUserNotes,
     saveUserNote,
+    updateUserNote,
     deleteUserNote,
     syncLocalNotesToSupabase,
-    onAuthStateChange
+    onAuthStateChange,
+    // Tag functions
+    fetchUserTags,
+    createUserTag,
+    updateUserTag,
+    deleteUserTag,
+    addTagToNote,
+    removeTagFromNote,
+    fetchNoteTagIds,
+    fetchAllNoteTags,
+    setNoteTagIds
 };
