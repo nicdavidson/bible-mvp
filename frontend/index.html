@@ -84,7 +84,7 @@
                             <h4>Old Testament</h4>
                             <div class="picker-book-grid">
                                 <template x-for="book in otBooks" :key="book">
-                                    <button @click="selectPickerBook(book)" class="picker-book-btn" x-text="book"></button>
+                                    <button @click="selectPickerBook(book)" class="picker-book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
                                 </template>
                             </div>
                         </div>
@@ -92,7 +92,7 @@
                             <h4>New Testament</h4>
                             <div class="picker-book-grid">
                                 <template x-for="book in ntBooks" :key="book">
-                                    <button @click="selectPickerBook(book)" class="picker-book-btn" x-text="book"></button>
+                                    <button @click="selectPickerBook(book)" class="picker-book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
                                 </template>
                             </div>
                         </div>
@@ -976,6 +976,26 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h4>Book Genre Colors</h4>
+                        <p class="settings-description">Customize colors for book categories in the book picker.</p>
+                        <div class="genre-colors-grid">
+                            <template x-for="(color, genre) in genreColors" :key="genre">
+                                <div class="genre-color-row">
+                                    <div class="genre-color-swatch" :style="'background-color: ' + color"></div>
+                                    <label class="genre-color-label" x-text="genre.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())"></label>
+                                    <input
+                                        type="color"
+                                        :value="color"
+                                        @change="genreColors[genre] = $event.target.value; saveGenreColor(genre)"
+                                        class="genre-color-input"
+                                    >
+                                </div>
+                            </template>
+                        </div>
+                        <button @click="resetGenreColors()" class="btn-reset-colors">Reset to Defaults</button>
                     </div>
                 </div>
 

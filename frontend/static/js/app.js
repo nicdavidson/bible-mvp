@@ -122,6 +122,59 @@ BIBLE_BOOKS.forEach(book => {
     BOOK_ABBREVS[book] = book;
 });
 
+// Book genre categories for color-coding
+const BOOK_GENRES = {
+    'law': ['Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy'],
+    'history': ['Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel', '1 Kings', '2 Kings',
+                '1 Chronicles', '2 Chronicles', 'Ezra', 'Nehemiah', 'Esther', 'Acts'],
+    'wisdom': ['Job', 'Psalms', 'Proverbs', 'Ecclesiastes', 'Song of Solomon'],
+    'major-prophets': ['Isaiah', 'Jeremiah', 'Lamentations', 'Ezekiel', 'Daniel'],
+    'minor-prophets': ['Hosea', 'Joel', 'Amos', 'Obadiah', 'Jonah', 'Micah', 'Nahum',
+                       'Habakkuk', 'Zephaniah', 'Haggai', 'Zechariah', 'Malachi'],
+    'gospels': ['Matthew', 'Mark', 'Luke', 'John'],
+    'pauline': ['Romans', '1 Corinthians', '2 Corinthians', 'Galatians', 'Ephesians',
+                'Philippians', 'Colossians', '1 Thessalonians', '2 Thessalonians',
+                '1 Timothy', '2 Timothy', 'Titus', 'Philemon'],
+    'general-epistles': ['Hebrews', 'James', '1 Peter', '2 Peter', '1 John', '2 John', '3 John', 'Jude'],
+    'apocalyptic': ['Revelation']
+};
+
+// Default genre colors
+const DEFAULT_GENRE_COLORS = {
+    'law': '#3b82f6',           // Blue
+    'history': '#22c55e',        // Green
+    'wisdom': '#eab308',         // Gold/Amber
+    'major-prophets': '#8b5cf6', // Purple
+    'minor-prophets': '#14b8a6', // Teal
+    'gospels': '#ef4444',        // Red
+    'pauline': '#f97316',        // Orange
+    'general-epistles': '#f87171', // Coral
+    'apocalyptic': '#7c3aed'     // Deep Purple
+};
+
+// Genre display names
+const GENRE_NAMES = {
+    'law': 'Law/Torah',
+    'history': 'History',
+    'wisdom': 'Wisdom/Poetry',
+    'major-prophets': 'Major Prophets',
+    'minor-prophets': 'Minor Prophets',
+    'gospels': 'Gospels',
+    'pauline': 'Pauline Epistles',
+    'general-epistles': 'General Epistles',
+    'apocalyptic': 'Apocalyptic'
+};
+
+// Helper to get genre for a book
+function getBookGenre(book) {
+    for (const [genre, books] of Object.entries(BOOK_GENRES)) {
+        if (books.includes(book)) {
+            return genre;
+        }
+    }
+    return null;
+}
+
 // Build regex pattern for matching Bible references
 const BOOK_PATTERN = Object.keys(BOOK_ABBREVS)
     .sort((a, b) => b.length - a.length)  // Longer matches first
@@ -230,6 +283,7 @@ function bibleApp() {
         settingsTab: 'general',
         defaultTranslation: 'BSB',
         defaultShowInterlinear: false,
+        genreColors: { ...DEFAULT_GENRE_COLORS },  // User-customizable genre colors
 
         // Auth state
         authUser: null,
@@ -340,6 +394,17 @@ function bibleApp() {
             this.showInterlinear = this.defaultShowInterlinear;
             this.autoCacheEnabled = localStorage.getItem('autoCacheEnabled') !== 'false';
             this.forcedOffline = localStorage.getItem('forcedOffline') === 'true';
+
+            // Load genre colors from localStorage
+            const savedGenreColors = localStorage.getItem('genreColors');
+            if (savedGenreColors) {
+                try {
+                    this.genreColors = { ...DEFAULT_GENRE_COLORS, ...JSON.parse(savedGenreColors) };
+                } catch (e) {
+                    this.genreColors = { ...DEFAULT_GENRE_COLORS };
+                }
+            }
+            this.applyGenreColors();
 
             // If forced offline, reflect that in isOnline
             if (this.forcedOffline) {
@@ -1496,6 +1561,32 @@ function bibleApp() {
         // Save auto-cache preference
         saveAutoCachePref() {
             localStorage.setItem('autoCacheEnabled', this.autoCacheEnabled);
+        },
+
+        // Save genre color preference
+        saveGenreColor(genre) {
+            localStorage.setItem('genreColors', JSON.stringify(this.genreColors));
+            this.applyGenreColors();
+        },
+
+        // Apply genre colors as CSS custom properties
+        applyGenreColors() {
+            const root = document.documentElement;
+            for (const [genre, color] of Object.entries(this.genreColors)) {
+                root.style.setProperty(`--genre-${genre}`, color);
+            }
+        },
+
+        // Reset genre colors to defaults
+        resetGenreColors() {
+            this.genreColors = { ...DEFAULT_GENRE_COLORS };
+            localStorage.setItem('genreColors', JSON.stringify(this.genreColors));
+            this.applyGenreColors();
+        },
+
+        // Get book genre
+        getBookGenre(book) {
+            return getBookGenre(book);
         },
 
         // Open settings modal, optionally to a specific tab

@@ -68,3 +68,6 @@ data/__MACOSX/
 
 # Grok config
 .grok/
+
+# Clear-Bible alignment data (large source files)
+data/clear-bible/

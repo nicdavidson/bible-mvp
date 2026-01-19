@@ -17,6 +17,17 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
     --radius: 6px;
+
+    /* Genre colors (defaults - overridden by JS) */
+    --genre-law: #3b82f6;
+    --genre-history: #22c55e;
+    --genre-wisdom: #eab308;
+    --genre-major-prophets: #8b5cf6;
+    --genre-minor-prophets: #14b8a6;
+    --genre-gospels: #ef4444;
+    --genre-pauline: #f97316;
+    --genre-general-epistles: #f87171;
+    --genre-apocalyptic: #7c3aed;
 }
 
 /* Dark mode */
@@ -293,6 +304,46 @@ body {
     border-color: var(--color-primary);
     color: white;
 }
+
+/* Genre-colored book buttons */
+.picker-book-btn.genre-law {
+    border-left: 3px solid var(--genre-law);
+}
+.picker-book-btn.genre-history {
+    border-left: 3px solid var(--genre-history);
+}
+.picker-book-btn.genre-wisdom {
+    border-left: 3px solid var(--genre-wisdom);
+}
+.picker-book-btn.genre-major-prophets {
+    border-left: 3px solid var(--genre-major-prophets);
+}
+.picker-book-btn.genre-minor-prophets {
+    border-left: 3px solid var(--genre-minor-prophets);
+}
+.picker-book-btn.genre-gospels {
+    border-left: 3px solid var(--genre-gospels);
+}
+.picker-book-btn.genre-pauline {
+    border-left: 3px solid var(--genre-pauline);
+}
+.picker-book-btn.genre-general-epistles {
+    border-left: 3px solid var(--genre-general-epistles);
+}
+.picker-book-btn.genre-apocalyptic {
+    border-left: 3px solid var(--genre-apocalyptic);
+}
+
+/* Hover states maintain genre color */
+.picker-book-btn.genre-law:hover { background: var(--genre-law); border-color: var(--genre-law); }
+.picker-book-btn.genre-history:hover { background: var(--genre-history); border-color: var(--genre-history); }
+.picker-book-btn.genre-wisdom:hover { background: var(--genre-wisdom); border-color: var(--genre-wisdom); }
+.picker-book-btn.genre-major-prophets:hover { background: var(--genre-major-prophets); border-color: var(--genre-major-prophets); }
+.picker-book-btn.genre-minor-prophets:hover { background: var(--genre-minor-prophets); border-color: var(--genre-minor-prophets); }
+.picker-book-btn.genre-gospels:hover { background: var(--genre-gospels); border-color: var(--genre-gospels); }
+.picker-book-btn.genre-pauline:hover { background: var(--genre-pauline); border-color: var(--genre-pauline); }
+.picker-book-btn.genre-general-epistles:hover { background: var(--genre-general-epistles); border-color: var(--genre-general-epistles); }
+.picker-book-btn.genre-apocalyptic:hover { background: var(--genre-apocalyptic); border-color: var(--genre-apocalyptic); }
 
 .picker-header {
     display: flex;
@@ -2723,6 +2774,72 @@ body {
 .setting-select:focus {
     outline: none;
     border-color: var(--color-primary);
+}
+
+/* Genre Colors Settings */
+.genre-colors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.genre-color-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-bg);
+    border-radius: var(--radius);
+}
+
+.genre-color-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.genre-color-label {
+    flex: 1;
+    font-size: 0.8125rem;
+    color: var(--color-text);
+    text-transform: capitalize;
+}
+
+.genre-color-input {
+    width: 32px;
+    height: 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+    background: transparent;
+}
+
+.genre-color-input::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.genre-color-input::-webkit-color-swatch {
+    border-radius: 2px;
+    border: none;
+}
+
+.btn-reset-colors {
+    padding: 0.5rem 1rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-reset-colors:hover {
+    background: var(--color-border);
+    color: var(--color-text);
 }
 
 /* Toggle Switch */
