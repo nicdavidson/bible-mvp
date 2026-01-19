@@ -703,6 +703,12 @@ function bibleApp() {
 
         // Load a reference (from cross-ref click, etc.)
         async loadReference(ref) {
+            // Exit combined plan reading mode when navigating to a different reference
+            if (this.combinedPlanReading) {
+                this.combinedPlanReading = false;
+                this.planReadingSections = [];
+                this.planReadingChapters = [];
+            }
             this.referenceInput = ref;
             await this.loadPassage();
         },
