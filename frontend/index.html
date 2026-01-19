@@ -136,7 +136,7 @@
             <div class="panel-header">
                 <h2 x-text="currentReference || 'Select a passage'"></h2>
                 <div class="header-controls" x-show="currentReference">
-                    <label class="interlinear-toggle-header" x-show="otBooks.includes(currentBook) || ntBooks.includes(currentBook)" title="Show Hebrew/Greek text">
+                    <label class="interlinear-toggle-header" x-show="combinedPlanReading || otBooks.includes(currentBook) || ntBooks.includes(currentBook)" title="Show Hebrew/Greek text">
                         <input type="checkbox" x-model="showInterlinear">
                         <span class="toggle-label-text">Original Language</span>
                     </label>
@@ -178,6 +178,13 @@
                             </template>
                         </div>
                     </div>
+                </div>
+
+                <!-- "Return to Plan" bar (shown when navigated away from plan reading) -->
+                <div x-show="wasInPlanReading && currentPlan && !combinedPlanReading" class="plan-return-bar">
+                    <span class="return-hint">You were reading Day <span x-text="planDay"></span> of <span x-text="currentPlan?.name"></span></span>
+                    <button @click="returnToPlanReading()" class="btn-return-plan">Return to Plan Reading</button>
+                    <button @click="wasInPlanReading = false" class="btn-dismiss-return" title="Dismiss">×</button>
                 </div>
 
                 <!-- Plan reading header bar (shown when in combined plan reading mode) -->

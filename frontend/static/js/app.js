@@ -283,6 +283,7 @@ function bibleApp() {
         combinedPlanReading: false,  // True when showing plan readings in main reader format
         planReadingSections: [],  // Section info for combined reading: [{label, reference, startIndex}]
         planReadingChapters: [],  // Chapters being read in combined mode: [{book, chapter}]
+        wasInPlanReading: false,  // True when user navigated away from plan reading (for "return" button)
 
         // Commentary grouping state
         expandedCommentarySources: {},  // { source: boolean }
@@ -625,10 +626,11 @@ function bibleApp() {
         },
 
         selectPickerChapter(chapter) {
-            this.referenceInput = `${this.pickerSelectedBook} ${chapter}`;
+            const ref = `${this.pickerSelectedBook} ${chapter}`;
             this.showBookPicker = false;
             this.pickerSelectedBook = null;
-            this.loadPassage();
+            // Use loadReference to properly handle plan reading state
+            this.loadReference(ref);
         },
 
         getChapterCount(book) {
@@ -704,7 +706,9 @@ function bibleApp() {
         // Load a reference (from cross-ref click, etc.)
         async loadReference(ref) {
             // Exit combined plan reading mode when navigating to a different reference
+            // but remember we were in it so user can return
             if (this.combinedPlanReading) {
+                this.wasInPlanReading = true;
                 this.combinedPlanReading = false;
                 this.planReadingSections = [];
                 this.planReadingChapters = [];
@@ -3159,6 +3163,7 @@ function bibleApp() {
         exitPlanReadingMode() {
             this.planReadingMode = false;
             this.combinedPlanReading = false;
+            this.wasInPlanReading = false;
             this.planReadings = [];
             this.planReadingSections = [];
             this.planReadingChapters = [];
@@ -3169,6 +3174,12 @@ function bibleApp() {
                 this.referenceInput = 'Genesis 1';
                 this.loadPassage();
             }
+        },
+
+        // Return to plan reading after navigating away (e.g., clicking a cross-ref)
+        returnToPlanReading() {
+            this.wasInPlanReading = false;
+            this.startPlanReading();
         },
 
         markPlanDayAndContinue() {
