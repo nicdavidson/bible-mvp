@@ -120,6 +120,16 @@ function bibleApp() {
         defaultTranslation: 'BSB',
         defaultShowInterlinear: false,
 
+        // Auth state
+        authUser: null,
+        authLoading: false,
+        authError: null,
+        authSuccess: null,
+        authMode: 'signin',  // 'signin' or 'signup'
+        authEmail: '',
+        authPassword: '',
+        authPasswordConfirm: '',
+
         // Devotional state (kept for offline downloads)
         devotional: { entries: [], month: 0, day: 0 },
         loadingDevotional: false,
@@ -197,7 +207,8 @@ function bibleApp() {
             // Load offline stats
             await this.updateOfflineStats();
 
-            // Load notes from IndexedDB
+            // Initialize auth and load notes
+            await this.initAuth();
             await this.loadNotes();
 
             // Check URL for initial reference - support both /Book/Chapter:Verse and ?ref= formats
@@ -1227,16 +1238,124 @@ function bibleApp() {
             this.$nextTick(() => this.$refs.searchInput?.focus());
         },
 
-        // Notes (IndexedDB)
-        async loadNotes() {
-            // Simple localStorage fallback for now
-            // Full implementation would use IndexedDB
+        // Auth methods
+        async initAuth() {
             try {
-                const saved = localStorage.getItem('bible-notes');
-                this.notes = saved ? JSON.parse(saved) : [];
+                if (window.SupabaseAuth) {
+                    // Check for existing session
+                    const user = await window.SupabaseAuth.getUser();
+                    this.authUser = user;
+
+                    // Listen for auth changes
+                    window.SupabaseAuth.onAuthStateChange((event, user) => {
+                        this.authUser = user;
+                        if (event === 'SIGNED_IN') {
+                            this.loadNotes();
+                            this.showToast('Signed in successfully', 'success');
+                        } else if (event === 'SIGNED_OUT') {
+                            this.loadNotes();
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('Auth initialization failed:', err);
+            }
+        },
+
+        async handleSignIn() {
+            this.authError = null;
+            this.authSuccess = null;
+            this.authLoading = true;
+
+            try {
+                await window.SupabaseAuth.signIn(this.authEmail, this.authPassword);
+                this.authEmail = '';
+                this.authPassword = '';
+            } catch (err) {
+                this.authError = err.message || 'Failed to sign in';
+            } finally {
+                this.authLoading = false;
+            }
+        },
+
+        async handleSignUp() {
+            this.authError = null;
+            this.authSuccess = null;
+
+            if (this.authPassword !== this.authPasswordConfirm) {
+                this.authError = 'Passwords do not match';
+                return;
+            }
+
+            if (this.authPassword.length < 6) {
+                this.authError = 'Password must be at least 6 characters';
+                return;
+            }
+
+            this.authLoading = true;
+
+            try {
+                await window.SupabaseAuth.signUp(this.authEmail, this.authPassword);
+                this.authSuccess = 'Check your email to confirm your account';
+                this.authEmail = '';
+                this.authPassword = '';
+                this.authPasswordConfirm = '';
+            } catch (err) {
+                this.authError = err.message || 'Failed to create account';
+            } finally {
+                this.authLoading = false;
+            }
+        },
+
+        async handleSignOut() {
+            this.authLoading = true;
+            try {
+                await window.SupabaseAuth.signOut();
+                this.authUser = null;
+                await this.loadNotes();  // Reload local notes
+                this.showToast('Signed out', 'info');
+            } catch (err) {
+                this.showToast('Failed to sign out', 'error');
+            } finally {
+                this.authLoading = false;
+            }
+        },
+
+        async handleForgotPassword() {
+            if (!this.authEmail) {
+                this.authError = 'Enter your email address first';
+                return;
+            }
+
+            this.authLoading = true;
+            this.authError = null;
+
+            try {
+                await window.SupabaseAuth.resetPassword(this.authEmail);
+                this.authSuccess = 'Check your email for password reset link';
+            } catch (err) {
+                this.authError = err.message || 'Failed to send reset email';
+            } finally {
+                this.authLoading = false;
+            }
+        },
+
+        // Notes (Supabase for logged-in users, localStorage for guests)
+        async loadNotes() {
+            try {
+                if (this.authUser && window.SupabaseAuth) {
+                    // Load from Supabase
+                    this.notes = await window.SupabaseAuth.fetchUserNotes();
+                } else {
+                    // Load from localStorage (guest mode)
+                    const saved = localStorage.getItem('bible-notes');
+                    this.notes = saved ? JSON.parse(saved) : [];
+                }
             } catch (err) {
                 console.error('Failed to load notes:', err);
-                this.notes = [];
+                // Fall back to localStorage
+                const saved = localStorage.getItem('bible-notes');
+                this.notes = saved ? JSON.parse(saved) : [];
             }
         },
 
@@ -1280,27 +1399,58 @@ function bibleApp() {
             const startVerse = this.getNoteStartVerse();
             const endVerse = this.showNoteRange && this.noteEndVerse ? parseInt(this.noteEndVerse) : startVerse;
 
-            const note = {
-                id: Date.now(),
+            const noteData = {
                 book: this.currentBook,
                 chapter: this.currentChapter,
                 startVerse: startVerse,
                 endVerse: endVerse,
-                content: this.currentNote,
-                created_at: new Date().toISOString()
+                content: this.currentNote
             };
 
-            this.notes.unshift(note);
-            localStorage.setItem('bible-notes', JSON.stringify(this.notes));
-            this.currentNote = '';
-            this.noteEndVerse = null;
-            this.showNoteRange = false;
+            try {
+                if (this.authUser && window.SupabaseAuth) {
+                    // Save to Supabase
+                    const savedNote = await window.SupabaseAuth.saveUserNote(noteData);
+                    this.notes.unshift(savedNote);
+                } else {
+                    // Save to localStorage (guest mode)
+                    const note = {
+                        id: Date.now(),
+                        ...noteData,
+                        created_at: new Date().toISOString(),
+                        synced: false
+                    };
+                    this.notes.unshift(note);
+                    localStorage.setItem('bible-notes', JSON.stringify(this.notes));
+                }
+
+                this.currentNote = '';
+                this.noteEndVerse = null;
+                this.showNoteRange = false;
+            } catch (err) {
+                console.error('Failed to save note:', err);
+                this.showToast('Failed to save note', 'error');
+            }
         },
 
         // Delete a note
-        deleteNote(noteId) {
-            this.notes = this.notes.filter(n => n.id !== noteId);
-            localStorage.setItem('bible-notes', JSON.stringify(this.notes));
+        async deleteNote(noteId) {
+            try {
+                if (this.authUser && window.SupabaseAuth) {
+                    // Delete from Supabase
+                    await window.SupabaseAuth.deleteUserNote(noteId);
+                }
+                // Always remove from local state
+                this.notes = this.notes.filter(n => n.id !== noteId);
+
+                // Update localStorage for guests
+                if (!this.authUser) {
+                    localStorage.setItem('bible-notes', JSON.stringify(this.notes));
+                }
+            } catch (err) {
+                console.error('Failed to delete note:', err);
+                this.showToast('Failed to delete note', 'error');
+            }
         },
 
         // Format date

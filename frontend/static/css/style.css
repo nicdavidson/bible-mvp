@@ -2221,6 +2221,230 @@ body {
     50% { opacity: 0.4; }
 }
 
+/* Auth badge in settings nav */
+.auth-badge {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-text-secondary);
+    opacity: 0.5;
+}
+
+.auth-badge.signed-in {
+    background: var(--color-accent);
+    opacity: 1;
+}
+
+/* Auth UI Styles */
+.auth-signed-in {
+    padding: 1rem 0;
+}
+
+.auth-user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+}
+
+.auth-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.auth-details {
+    flex: 1;
+}
+
+.auth-email {
+    font-weight: 500;
+    word-break: break-all;
+}
+
+.auth-status {
+    font-size: 0.75rem;
+    color: var(--color-accent);
+}
+
+.auth-notes-info {
+    padding: 1rem;
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.auth-notes-info p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+}
+
+.auth-notes-count {
+    margin-top: 0.5rem !important;
+    font-weight: 500;
+    color: var(--color-text) !important;
+}
+
+.auth-signed-out {
+    padding: 1rem 0;
+}
+
+.auth-intro {
+    margin-bottom: 1.5rem;
+}
+
+.auth-intro h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+}
+
+.auth-intro p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+}
+
+.auth-form {
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.auth-tab-btn {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    transition: all 0.15s;
+}
+
+.auth-tab-btn:hover {
+    background: var(--color-border);
+}
+
+.auth-tab-btn.active {
+    background: var(--color-primary);
+    color: white;
+}
+
+.auth-error {
+    padding: 0.75rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.dark .auth-error {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: rgba(220, 38, 38, 0.3);
+}
+
+.auth-success {
+    padding: 0.75rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 6px;
+    color: #16a34a;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.dark .auth-success {
+    background: rgba(22, 163, 74, 0.1);
+    border-color: rgba(22, 163, 74, 0.3);
+}
+
+.auth-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    box-sizing: border-box;
+}
+
+.auth-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.auth-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.auth-actions .btn-primary,
+.auth-actions .btn-secondary {
+    flex: 1;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+}
+
+.auth-links {
+    text-align: center;
+    margin-top: 0.75rem;
+}
+
+.auth-link {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
+}
+
+.auth-guest-info {
+    padding: 0.75rem;
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+}
+
+.auth-guest-info p {
+    margin: 0;
+}
+
 .settings-content {
     min-height: 280px;
 }

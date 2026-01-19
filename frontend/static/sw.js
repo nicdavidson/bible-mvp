@@ -4,9 +4,9 @@
  * Integrates with IndexedDB via postMessage for smart offline storage.
  */
 
-const CACHE_NAME = 'biblemvp-v6';
-const STATIC_CACHE = 'biblemvp-static-v6';
-const CONTENT_CACHE = 'biblemvp-content-v6';
+const CACHE_NAME = 'biblemvp-v7';
+const STATIC_CACHE = 'biblemvp-static-v7';
+const CONTENT_CACHE = 'biblemvp-content-v7';
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
     '/static/css/style.css',
     '/static/js/app.js',
     '/static/js/offline-storage.js',
+    '/static/js/supabase-client.js',
     '/static/icons/icon.svg',
     '/static/manifest.json'
 ];
@@ -30,7 +31,7 @@ const CACHEABLE_API_PATTERNS = [
 
 // Install event - cache static assets
 self.addEventListener('install', event => {
-    console.log('[SW] Installing service worker v6...');
+    console.log('[SW] Installing service worker v7...');
     event.waitUntil(
         caches.open(STATIC_CACHE)
             .then(cache => cache.addAll(STATIC_ASSETS))
@@ -43,7 +44,7 @@ self.addEventListener('install', event => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', event => {
-    console.log('[SW] Activating service worker v6...');
+    console.log('[SW] Activating service worker v7...');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(

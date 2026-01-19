@@ -13,6 +13,8 @@
     <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
     <link rel="apple-touch-icon" href="/static/icons/icon.svg">
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="/static/js/supabase-client.js"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body x-data="bibleApp()" x-init="init()" :class="{ 'dark': darkMode }">
@@ -601,6 +603,10 @@
             <div class="modal-body">
                 <!-- Settings Navigation -->
                 <div class="settings-nav">
+                    <button @click="settingsTab = 'account'" :class="{ active: settingsTab === 'account' }" class="settings-nav-btn">
+                        Account
+                        <span class="auth-badge" :class="authUser ? 'signed-in' : ''"></span>
+                    </button>
                     <button @click="settingsTab = 'general'" :class="{ active: settingsTab === 'general' }" class="settings-nav-btn">
                         General
                     </button>
@@ -611,6 +617,110 @@
                     <button @click="settingsTab = 'shortcuts'" :class="{ active: settingsTab === 'shortcuts' }" class="settings-nav-btn">
                         Shortcuts
                     </button>
+                </div>
+
+                <!-- Account Settings Tab -->
+                <div class="settings-content" x-show="settingsTab === 'account'">
+                    <!-- Signed In View -->
+                    <template x-if="authUser">
+                        <div class="auth-signed-in">
+                            <div class="auth-user-info">
+                                <div class="auth-avatar">
+                                    <span x-text="authUser.email?.charAt(0).toUpperCase()"></span>
+                                </div>
+                                <div class="auth-details">
+                                    <div class="auth-email" x-text="authUser.email"></div>
+                                    <div class="auth-status">Signed in</div>
+                                </div>
+                            </div>
+                            <div class="auth-notes-info">
+                                <p>Your notes are synced across devices.</p>
+                                <p class="auth-notes-count" x-show="notes.length > 0" x-text="notes.length + ' note' + (notes.length === 1 ? '' : 's') + ' saved'"></p>
+                            </div>
+                            <div class="auth-actions">
+                                <button @click="handleSignOut()" class="btn-secondary" :disabled="authLoading">
+                                    Sign Out
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Signed Out View -->
+                    <template x-if="!authUser">
+                        <div class="auth-signed-out">
+                            <div class="auth-intro">
+                                <h4>Sign in to sync your notes</h4>
+                                <p>Create an account to save your notes across devices. Or continue as a guest - your notes will be saved locally.</p>
+                            </div>
+
+                            <!-- Auth Form -->
+                            <div class="auth-form">
+                                <div class="auth-tabs">
+                                    <button @click="authMode = 'signin'" :class="{ active: authMode === 'signin' }" class="auth-tab-btn">Sign In</button>
+                                    <button @click="authMode = 'signup'" :class="{ active: authMode === 'signup' }" class="auth-tab-btn">Sign Up</button>
+                                </div>
+
+                                <div class="auth-error" x-show="authError" x-text="authError"></div>
+                                <div class="auth-success" x-show="authSuccess" x-text="authSuccess"></div>
+
+                                <div class="auth-fields">
+                                    <input
+                                        type="email"
+                                        x-model="authEmail"
+                                        placeholder="Email"
+                                        class="auth-input"
+                                        @keydown.enter="authMode === 'signin' ? handleSignIn() : handleSignUp()"
+                                    >
+                                    <input
+                                        type="password"
+                                        x-model="authPassword"
+                                        placeholder="Password"
+                                        class="auth-input"
+                                        @keydown.enter="authMode === 'signin' ? handleSignIn() : handleSignUp()"
+                                    >
+                                    <input
+                                        x-show="authMode === 'signup'"
+                                        type="password"
+                                        x-model="authPasswordConfirm"
+                                        placeholder="Confirm Password"
+                                        class="auth-input"
+                                        @keydown.enter="handleSignUp()"
+                                    >
+                                </div>
+
+                                <div class="auth-actions">
+                                    <button
+                                        x-show="authMode === 'signin'"
+                                        @click="handleSignIn()"
+                                        class="btn-primary"
+                                        :disabled="authLoading || !authEmail || !authPassword"
+                                    >
+                                        <span x-show="!authLoading">Sign In</span>
+                                        <span x-show="authLoading">Signing in...</span>
+                                    </button>
+                                    <button
+                                        x-show="authMode === 'signup'"
+                                        @click="handleSignUp()"
+                                        class="btn-primary"
+                                        :disabled="authLoading || !authEmail || !authPassword || authPassword !== authPasswordConfirm"
+                                    >
+                                        <span x-show="!authLoading">Create Account</span>
+                                        <span x-show="authLoading">Creating account...</span>
+                                    </button>
+                                </div>
+
+                                <div class="auth-links">
+                                    <button @click="handleForgotPassword()" class="auth-link" x-show="authMode === 'signin'">
+                                        Forgot password?
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="auth-guest-info">
+                                <p><strong>Guest mode:</strong> Notes are saved in your browser only and won't sync across devices.</p>
+                            </div>
+                        </div>
+                    </template>
                 </div>
 
                 <!-- General Settings Tab -->
