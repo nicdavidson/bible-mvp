@@ -152,6 +152,35 @@
                     <button @click="nextChapter" class="btn-nav" title="Next chapter">Ch →</button>
                 </div>
             </div>
+
+            <!-- "Return to Plan" bar (shown when navigated away from plan reading) - sticky below header -->
+            <div x-show="wasInPlanReading && currentPlan && !combinedPlanReading" class="plan-return-bar">
+                <span class="return-hint">You were reading Day <span x-text="planDay"></span> of <span x-text="currentPlan?.name"></span></span>
+                <button @click="returnToPlanReading()" class="btn-return-plan">Return to Plan Reading</button>
+                <button @click="wasInPlanReading = false" class="btn-dismiss-return" title="Dismiss">×</button>
+            </div>
+
+            <!-- Plan reading header bar (shown when in combined plan reading mode) - sticky below header -->
+            <div x-show="combinedPlanReading && currentPlan" class="plan-reading-bar">
+                <button @click="showReadingPlan = true; combinedPlanReading = false" class="btn-exit-plan">← Back to Plan</button>
+                <div class="plan-reading-info">
+                    <div class="plan-title-row">
+                        <span class="plan-name" x-text="currentPlan?.name"></span>
+                        <span class="plan-day-label" x-text="'Day ' + planDay"></span>
+                    </div>
+                    <div class="plan-readings-subtitle" x-show="getPlanDayReadings(planDay)">
+                        <span x-text="getPlanDayReadings(planDay)?.chronological"></span>
+                        <span x-show="getPlanDayReadings(planDay)?.psalms"> · </span>
+                        <span x-text="getPlanDayReadings(planDay)?.psalms"></span>
+                        <span x-show="getPlanDayReadings(planDay)?.proverbs"> · </span>
+                        <span x-text="getPlanDayReadings(planDay)?.proverbs"></span>
+                    </div>
+                </div>
+                <button @click="markPlanDayAndContinue()" class="btn-complete-day">
+                    <span x-text="isDayCompleted(planDay) ? 'Next Day →' : 'Complete & Next →'"></span>
+                </button>
+            </div>
+
             <div class="panel-body">
                 <div x-show="loading" class="loading">
                     <div class="loading-spinner"></div>
@@ -178,34 +207,6 @@
                             </template>
                         </div>
                     </div>
-                </div>
-
-                <!-- "Return to Plan" bar (shown when navigated away from plan reading) -->
-                <div x-show="wasInPlanReading && currentPlan && !combinedPlanReading" class="plan-return-bar">
-                    <span class="return-hint">You were reading Day <span x-text="planDay"></span> of <span x-text="currentPlan?.name"></span></span>
-                    <button @click="returnToPlanReading()" class="btn-return-plan">Return to Plan Reading</button>
-                    <button @click="wasInPlanReading = false" class="btn-dismiss-return" title="Dismiss">×</button>
-                </div>
-
-                <!-- Plan reading header bar (shown when in combined plan reading mode) -->
-                <div x-show="combinedPlanReading && currentPlan" class="plan-reading-bar">
-                    <button @click="showReadingPlan = true; combinedPlanReading = false" class="btn-exit-plan">← Back to Plan</button>
-                    <div class="plan-reading-info">
-                        <div class="plan-title-row">
-                            <span class="plan-name" x-text="currentPlan?.name"></span>
-                            <span class="plan-day-label" x-text="'Day ' + planDay"></span>
-                        </div>
-                        <div class="plan-readings-subtitle" x-show="getPlanDayReadings(planDay)">
-                            <span x-text="getPlanDayReadings(planDay)?.chronological"></span>
-                            <span x-show="getPlanDayReadings(planDay)?.psalms"> · </span>
-                            <span x-text="getPlanDayReadings(planDay)?.psalms"></span>
-                            <span x-show="getPlanDayReadings(planDay)?.proverbs"> · </span>
-                            <span x-text="getPlanDayReadings(planDay)?.proverbs"></span>
-                        </div>
-                    </div>
-                    <button @click="markPlanDayAndContinue()" class="btn-complete-day">
-                        <span x-text="isDayCompleted(planDay) ? 'Next Day →' : 'Complete & Next →'"></span>
-                    </button>
                 </div>
 
                 <div x-show="!loading && !error && verses.length > 0" class="verses" :class="{ 'selection-mode': noteEditMode }">

@@ -4664,6 +4664,9 @@ body {
     padding: 0.5rem 1rem;
     background: var(--color-primary-bg, #f0f7ff);
     border-bottom: 1px solid var(--color-primary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .plan-return-bar .return-hint {
