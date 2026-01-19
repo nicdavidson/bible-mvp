@@ -4120,12 +4120,48 @@ body {
     border-color: #dc2626;
 }
 
+.plan-complete-banner {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.plan-complete-banner .complete-icon {
+    font-size: 1.5rem;
+}
+
+.plan-complete-banner .complete-text {
+    font-weight: 600;
+}
+
+.plan-complete-badge {
+    background: #10b981;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 .plan-progress-bar {
     height: 8px;
     background: var(--color-bg);
     border-radius: 4px;
     overflow: hidden;
     margin-bottom: 0.5rem;
+}
+
+.plan-progress-bar.complete .plan-progress-fill {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
 }
 
 .plan-progress-fill {
@@ -4517,6 +4553,41 @@ body {
     color: white;
 }
 
+.btn-date-jan1 {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.date-option-main {
+    font-weight: 600;
+}
+
+.date-option-hint {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-weight: 400;
+}
+
+.btn-date-option:hover .date-option-hint {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.catch-up-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.catch-up-options .btn-primary,
+.catch-up-options .btn-secondary {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 0.9375rem;
+}
+
 .custom-date-picker {
     display: flex;
     flex-direction: column;
@@ -4636,7 +4707,7 @@ body {
     justify-content: space-between;
     gap: 1rem;
     padding: 0.75rem 1rem;
-    background: var(--color-bg-alt);
+    background: var(--color-bg);
     border-bottom: 1px solid var(--color-border);
     position: sticky;
     top: 0;
@@ -4711,11 +4782,12 @@ body {
 /* Combined section headers in plan reading */
 .combined-section-header {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 0 0.75rem;
-    margin-top: 1.5rem;
-    border-top: 2px solid var(--color-border);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 1.25rem 0 1rem;
+    margin-top: 2rem;
+    border-top: 3px solid var(--color-border);
 }
 
 .combined-section-header:first-child,
@@ -4725,12 +4797,13 @@ body {
     padding-top: 0.5rem;
 }
 
+/* Section labels (Main Reading, Psalms, Proverbs) */
 .combined-section-header .section-label {
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 0.25rem 0.5rem;
+    letter-spacing: 0.1em;
+    padding: 0.3rem 0.6rem;
     border-radius: 4px;
     background: var(--color-primary);
     color: white;
@@ -4748,10 +4821,24 @@ body {
     background: #8b5cf6;
 }
 
+/* Book/Chapter reference - bigger and bolder */
 .combined-section-header .section-ref {
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 1.5rem;
+    font-weight: 700;
     color: var(--color-text);
+    line-height: 1.2;
+}
+
+/* Chapter-only headers (when not starting a new section) */
+.combined-section-header.chapter-only {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 2px solid var(--color-border);
+}
+
+.combined-section-header.chapter-only .section-ref {
+    font-size: 1.25rem;
+    font-weight: 600;
 }
 
 /* Verse wrapper for proper Alpine.js templating */

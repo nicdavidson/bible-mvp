@@ -1066,6 +1066,14 @@ async def get_devotionals_offline(source: Optional[str] = None):
         conn.close()
 
 
+# Route for reading plan URLs (e.g., /plan/chronological-year/45)
+# Must be registered before the catch-all book/chapter routes
+@app.get("/plan/{plan_id}/{day}")
+async def serve_app_with_plan(plan_id: str, day: int):
+    """Serve main app for reading plan URLs - JS handles the routing."""
+    return FileResponse(frontend_path / "index.html")
+
+
 # Catch-all route for clean URLs (e.g., /John/3/16)
 # Must be registered last to not override other routes
 @app.get("/{book}/{chapter}")

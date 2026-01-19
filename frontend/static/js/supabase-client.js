@@ -359,6 +359,211 @@ function onAuthStateChange(callback) {
     });
 }
 
+// ========== Reading Plan Functions ==========
+
+// Fetch user's subscribed reading plans
+async function fetchUserReadingPlans() {
+    const user = await getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabaseClient
+        .from('user_reading_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return data.map(plan => ({
+        id: plan.id,
+        planId: plan.plan_id,
+        startDate: plan.start_date,
+        isActive: plan.is_active,
+        createdAt: plan.created_at
+    }));
+}
+
+// Subscribe to a reading plan
+async function subscribeToReadingPlan(planId, startDate) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabaseClient
+        .from('user_reading_plans')
+        .upsert({
+            user_id: user.id,
+            plan_id: planId,
+            start_date: startDate,
+            is_active: true
+        }, { onConflict: 'user_id,plan_id' })
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    return {
+        id: data.id,
+        planId: data.plan_id,
+        startDate: data.start_date,
+        isActive: data.is_active
+    };
+}
+
+// Unsubscribe from a reading plan (soft delete - sets is_active to false)
+async function unsubscribeFromReadingPlan(planId) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabaseClient
+        .from('user_reading_plans')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+        .eq('plan_id', planId);
+
+    if (error) throw error;
+}
+
+// Fetch progress for a specific plan
+async function fetchPlanProgress(userPlanId) {
+    const user = await getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabaseClient
+        .from('reading_plan_progress')
+        .select('day_number, completed_at')
+        .eq('user_plan_id', userPlanId);
+
+    if (error) throw error;
+
+    return data.map(p => p.day_number);
+}
+
+// Fetch all progress for all user's plans
+async function fetchAllPlanProgress() {
+    const user = await getUser();
+    if (!user) return {};
+
+    // First get user's plan IDs
+    const { data: plans, error: plansError } = await supabaseClient
+        .from('user_reading_plans')
+        .select('id, plan_id')
+        .eq('user_id', user.id);
+
+    if (plansError) throw plansError;
+
+    // Create mapping of plan_id -> user_plan_id
+    const planIdMap = {};
+    for (const plan of plans) {
+        planIdMap[plan.plan_id] = plan.id;
+    }
+
+    // Fetch all progress
+    const { data: progress, error: progressError } = await supabaseClient
+        .from('reading_plan_progress')
+        .select('user_plan_id, day_number')
+        .in('user_plan_id', plans.map(p => p.id));
+
+    if (progressError) throw progressError;
+
+    // Group by plan_id
+    const result = {};
+    for (const plan of plans) {
+        result[plan.plan_id] = {
+            userPlanId: plan.id,
+            completedDays: []
+        };
+    }
+    for (const p of progress) {
+        // Find which plan_id this belongs to
+        for (const [planId, userPlanId] of Object.entries(planIdMap)) {
+            if (userPlanId === p.user_plan_id) {
+                result[planId].completedDays.push(p.day_number);
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
+// Mark a day as complete
+async function markDayComplete(userPlanId, dayNumber) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabaseClient
+        .from('reading_plan_progress')
+        .upsert({
+            user_plan_id: userPlanId,
+            day_number: dayNumber
+        }, { onConflict: 'user_plan_id,day_number' });
+
+    if (error) throw error;
+}
+
+// Unmark a day as complete
+async function unmarkDayComplete(userPlanId, dayNumber) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabaseClient
+        .from('reading_plan_progress')
+        .delete()
+        .eq('user_plan_id', userPlanId)
+        .eq('day_number', dayNumber);
+
+    if (error) throw error;
+}
+
+// Bulk mark multiple days as complete (for catch-up feature)
+async function bulkMarkDaysComplete(userPlanId, dayNumbers) {
+    const user = await getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    if (!dayNumbers || dayNumbers.length === 0) return;
+
+    const records = dayNumbers.map(day => ({
+        user_plan_id: userPlanId,
+        day_number: day
+    }));
+
+    const { error } = await supabaseClient
+        .from('reading_plan_progress')
+        .upsert(records, { onConflict: 'user_plan_id,day_number' });
+
+    if (error) throw error;
+}
+
+// Sync local plan progress to Supabase (for migration from localStorage)
+async function syncLocalPlanProgress(planId, startDate, completedDays) {
+    const user = await getUser();
+    if (!user) return { synced: false };
+
+    try {
+        // First ensure the plan subscription exists
+        const planData = await subscribeToReadingPlan(planId, startDate);
+
+        // Then sync all completed days
+        if (completedDays && completedDays.length > 0) {
+            const records = completedDays.map(day => ({
+                user_plan_id: planData.id,
+                day_number: day
+            }));
+
+            const { error } = await supabaseClient
+                .from('reading_plan_progress')
+                .upsert(records, { onConflict: 'user_plan_id,day_number' });
+
+            if (error) throw error;
+        }
+
+        return { synced: true, userPlanId: planData.id };
+    } catch (err) {
+        console.error('Failed to sync plan progress:', err);
+        return { synced: false, error: err.message };
+    }
+}
+
 // Export for use in app.js
 window.SupabaseAuth = {
     getUser,
@@ -381,5 +586,15 @@ window.SupabaseAuth = {
     removeTagFromNote,
     fetchNoteTagIds,
     fetchAllNoteTags,
-    setNoteTagIds
+    setNoteTagIds,
+    // Reading plan functions
+    fetchUserReadingPlans,
+    subscribeToReadingPlan,
+    unsubscribeFromReadingPlan,
+    fetchPlanProgress,
+    fetchAllPlanProgress,
+    markDayComplete,
+    unmarkDayComplete,
+    bulkMarkDaysComplete,
+    syncLocalPlanProgress
 };

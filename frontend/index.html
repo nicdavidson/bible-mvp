@@ -212,7 +212,7 @@
                     <template x-for="(verse, verseIdx) in verses" :key="'v-' + verseIdx">
                         <div class="verse-wrapper" :class="{ 'has-section-header': verse._chapterStart && combinedPlanReading }">
                             <!-- Section/Chapter header for combined plan reading -->
-                            <div x-show="verse._chapterStart && combinedPlanReading" class="combined-section-header" :class="'section-' + verse._sectionType">
+                            <div x-show="verse._chapterStart && combinedPlanReading" class="combined-section-header" :class="['section-' + verse._sectionType, verse._sectionLabel ? 'has-section-label' : 'chapter-only']">
                                 <span class="section-label" x-text="verse._sectionLabel" x-show="verse._sectionLabel"></span>
                                 <span class="section-ref" x-text="verse._chapterRef"></span>
                             </div>
@@ -321,8 +321,8 @@
                             <span class="empty-state-hint">Try another passage or check back later</span>
                         </div>
                     </template>
-                    <!-- Normal mode: Grouped by source with collapsible sections -->
-                    <template x-if="!combinedPlanReading">
+                    <!-- Normal mode OR verse selected in combined mode: Grouped by source with collapsible sections -->
+                    <template x-if="!combinedPlanReading || highlightedVerses.length > 0">
                         <div>
                             <template x-for="(group, source) in getGroupedCommentary()" :key="'comm-group-' + source">
                                 <div class="commentary-group">
@@ -354,8 +354,8 @@
                         </div>
                     </template>
 
-                    <!-- Combined plan reading mode: Grouped by chapter, then by source -->
-                    <template x-if="combinedPlanReading">
+                    <!-- Combined plan reading mode (no verse selected): Grouped by chapter, then by source -->
+                    <template x-if="combinedPlanReading && highlightedVerses.length === 0">
                         <div>
                             <template x-for="chapterKey in getCommentaryChapterKeys()" :key="'ch-' + chapterKey">
                                 <div class="commentary-chapter-group">
@@ -1283,7 +1283,7 @@
                 </template>
 
                 <!-- Start date picker modal -->
-                <template x-if="showPlanStartPicker">
+                <template x-if="showPlanStartPicker && !showCatchUpPrompt">
                     <div class="plan-start-picker">
                         <h3>When would you like to start?</h3>
                         <p class="picker-description">Choose a start date for your reading plan. For annual plans, many prefer starting January 1st.</p>
@@ -1291,8 +1291,9 @@
                             <button @click="planStartDate = new Date().toISOString().split('T')[0]; confirmStartPlan()" class="btn-date-option">
                                 Today
                             </button>
-                            <button @click="planStartDate = new Date().getFullYear() + '-01-01'; confirmStartPlan()" class="btn-date-option">
-                                January 1st, <span x-text="new Date().getFullYear()"></span>
+                            <button @click="selectJanuaryFirst()" class="btn-date-option btn-date-jan1">
+                                <span class="date-option-main">January 1st, <span x-text="new Date().getFullYear()"></span></span>
+                                <span class="date-option-hint">Set start date to beginning of year</span>
                             </button>
                         </div>
                         <div class="custom-date-picker">
@@ -1301,7 +1302,32 @@
                         </div>
                         <div class="date-picker-actions">
                             <button @click="cancelStartPlan()" class="btn-secondary">Cancel</button>
-                            <button @click="confirmStartPlan()" class="btn-primary" :disabled="!planStartDate">Start Plan</button>
+                            <button @click="checkForCatchUp()" class="btn-primary" :disabled="!planStartDate">Start Plan</button>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Catch-up confirmation modal -->
+                <template x-if="showCatchUpPrompt">
+                    <div class="plan-start-picker">
+                        <h3>Catch up on past days?</h3>
+                        <p class="picker-description">
+                            Your start date is <strong x-text="formatStartDate(planStartDate)"></strong>, which was
+                            <strong x-text="getDaysElapsed()"></strong> days ago.
+                        </p>
+                        <p class="picker-description">
+                            Would you like to mark all days up to today as completed?
+                        </p>
+                        <div class="catch-up-options">
+                            <button @click="confirmStartPlanWithCatchUp(true)" class="btn-primary">
+                                Yes, mark <span x-text="getDaysElapsed()"></span> days complete
+                            </button>
+                            <button @click="confirmStartPlanWithCatchUp(false)" class="btn-secondary">
+                                No, start fresh from day 1
+                            </button>
+                        </div>
+                        <div class="date-picker-actions">
+                            <button @click="showCatchUpPrompt = false" class="btn-secondary">Back</button>
                         </div>
                     </div>
                 </template>
@@ -1309,13 +1335,20 @@
                 <!-- Active plan view -->
                 <template x-if="!planLoading && currentPlan">
                     <div class="plan-active">
+                        <!-- Completion celebration banner -->
+                        <div class="plan-complete-banner" x-show="isPlanComplete()" x-transition>
+                            <span class="complete-icon">🎉</span>
+                            <span class="complete-text">Congratulations! You've completed the reading plan!</span>
+                        </div>
+
                         <!-- Plan header with progress -->
                         <div class="plan-header-info">
                             <div class="plan-name-row">
                                 <h3 x-text="currentPlan.name"></h3>
+                                <span class="plan-complete-badge" x-show="isPlanComplete()">Complete</span>
                                 <button @click="resetPlan(currentPlan.id)" class="btn-reset-plan" title="Reset plan">Reset</button>
                             </div>
-                            <div class="plan-progress-bar">
+                            <div class="plan-progress-bar" :class="{ 'complete': isPlanComplete() }">
                                 <div class="plan-progress-fill" :style="'width: ' + getPlanProgressPercent() + '%'"></div>
                             </div>
                             <div class="plan-progress-text">

@@ -15,7 +15,7 @@
 - [x] Cross-references (41,649 entries) with hover previews
 - [x] Commentary display (4,124 entries - Matthew Henry, 65/66 books - Song of Solomon missing from API)
 - [x] Dark mode
-- [x] Notes (localStorage)
+- [x] Notes (localStorage + Supabase sync)
 - [x] Book-only reference defaults to chapter 1
 - [x] Hebrew interlinear for entire OT (304,400 words from STEPBible)
 - [x] Greek interlinear for entire NT (122,286 words from STEPBible)
@@ -35,6 +35,12 @@
 - [x] Enhanced search (live debounced search, keyboard navigation, grouped results)
 - [x] Strong's number search with word info card (e.g., G26 shows ἀγάπη with definition)
 - [x] Search scope filters (OT/NT/current book/commentary)
+- [x] **Reading Plans** with chronological Bible reading
+- [x] **Combined "Read All Together" mode** for daily readings
+- [x] **URL persistence for reading plans** (/plan/{planId}/{day})
+- [x] **Supabase sync for reading plan progress** (user_reading_plans + reading_plan_progress tables)
+- [x] **Note tags with colors** (Supabase sync)
+- [x] **Plan completion indicator** with celebration banner
 
 ## High Priority
 
@@ -56,6 +62,7 @@
 - [x] PWA manifest + install prompt - DONE
 - [x] Smart offline caching with IndexedDB - DONE (auto-caches browsed chapters)
 - [x] Offline data manager UI - DONE (download books/lexicon for offline use)
+- [x] Reading plans with progress tracking - DONE
 
 ## Medium Priority
 
@@ -70,8 +77,8 @@
 
 ### Notes System
 - [x] IndexedDB storage layer (for offline data) - DONE
+- [x] Note tags/categories - DONE (with Supabase sync)
 - [ ] Migrate notes from localStorage to IndexedDB
-- [ ] Note tags/categories
 - [ ] Highlight colors
 - [ ] Export notes
 
@@ -79,6 +86,15 @@
 - [x] Book/chapter picker dropdown - DONE
 - [ ] Reading history
 - [ ] Bookmarks
+
+### Reading Plans
+- [x] Chronological Bible reading plan - DONE (365 days)
+- [x] Combined "Read All Together" mode - DONE
+- [x] URL state persistence - DONE
+- [x] Supabase sync for progress - DONE
+- [x] Completion indicator - DONE
+- [ ] Additional reading plans (canonical, M'Cheyne, etc.)
+- [ ] User-created custom reading plans
 
 ## Lower Priority
 
@@ -95,6 +111,11 @@
 - [ ] Add tests
 - [ ] Error handling improvements
 - [x] Loading states/skeletons - DONE
+
+### Database Scaling (Future)
+- [ ] Consider adding `user_id` to `reading_plan_progress` table for faster RLS queries at scale
+- [ ] Add index on `reading_plan_progress.day_number` if querying "who completed day X" becomes needed
+- [ ] Consider JSONB array for completed days if row count becomes a concern (365 rows per user per plan)
 
 ## Word-by-Word Alignment (MOSTLY COMPLETE)
 
@@ -154,4 +175,4 @@
 
 ---
 
-Last updated: 2026-01-18
+Last updated: 2026-01-19

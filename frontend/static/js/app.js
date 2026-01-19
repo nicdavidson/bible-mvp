@@ -275,7 +275,8 @@ function bibleApp() {
         showReadingPlan: false,
         readingPlans: [],  // Available plans
         currentPlan: null,  // Active plan with full data
-        planProgress: {},  // { planId: { startDate, completedDays: [1,2,3...] } }
+        planProgress: {},  // { planId: { startDate, completedDays: [1,2,3...], userPlanId?: number } }
+        planProgressSynced: false,  // Whether plan progress has been synced from Supabase
         planLoading: false,
         planDay: 1,  // Currently viewing day
         planReadingMode: false,  // True when reading a plan (shows all passages together)
@@ -284,6 +285,9 @@ function bibleApp() {
         planReadingSections: [],  // Section info for combined reading: [{label, reference, startIndex}]
         planReadingChapters: [],  // Chapters being read in combined mode: [{book, chapter}]
         wasInPlanReading: false,  // True when user navigated away from plan reading (for "return" button)
+        combinedCrossRefs: [],  // Store all cross-refs for combined reading (to restore after verse deselect)
+        combinedCommentary: [],  // Store all commentary for combined reading (to restore after verse deselect)
+        combinedNotes: [],  // Store notes for combined reading chapters
 
         // Commentary grouping state
         expandedCommentarySources: {},  // { source: boolean }
@@ -362,26 +366,42 @@ function bibleApp() {
             await this.loadNotes();
             await this.loadTags();
 
-            // Check URL for initial reference - support both /Book/Chapter:Verse and ?ref= formats
-            const pathRef = this.parsePathReference();
-            if (pathRef) {
-                this.referenceInput = pathRef;
-                await this.loadPassage();
+            // Check URL for initial reference - support plan URLs, path-based refs, and ?ref= formats
+            const planURL = this.parsePlanURL();
+            if (planURL) {
+                // Restore reading plan state from URL
+                await this.restorePlanFromURL(planURL.planId, planURL.day);
             } else {
-                const urlParams = new URLSearchParams(window.location.search);
-                const ref = urlParams.get('ref');
-                if (ref) {
-                    this.referenceInput = ref;
+                const pathRef = this.parsePathReference();
+                if (pathRef) {
+                    this.referenceInput = pathRef;
                     await this.loadPassage();
+                } else {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const ref = urlParams.get('ref');
+                    if (ref) {
+                        this.referenceInput = ref;
+                        await this.loadPassage();
+                    }
                 }
             }
 
             // Handle browser back/forward
             window.addEventListener('popstate', () => {
-                const pathRef = this.parsePathReference();
-                if (pathRef) {
-                    this.referenceInput = pathRef;
-                    this.loadPassage();
+                const planURL = this.parsePlanURL();
+                if (planURL) {
+                    this.restorePlanFromURL(planURL.planId, planURL.day);
+                } else {
+                    const pathRef = this.parsePathReference();
+                    if (pathRef) {
+                        // Exit plan reading mode if navigating to a regular passage
+                        if (this.combinedPlanReading) {
+                            this.combinedPlanReading = false;
+                            this.planReadingMode = false;
+                        }
+                        this.referenceInput = pathRef;
+                        this.loadPassage();
+                    }
                 }
             });
 
@@ -529,6 +549,19 @@ function bibleApp() {
                 const chapter = match[2];
                 const verse = match[3];
                 return verse ? `${book} ${chapter}:${verse}` : `${book} ${chapter}`;
+            }
+            return null;
+        },
+
+        // Parse plan URL (e.g., /plan/chronological/45)
+        parsePlanURL() {
+            const path = window.location.pathname;
+            const match = path.match(/^\/plan\/([^\/]+)\/(\d+)$/);
+            if (match) {
+                return {
+                    planId: decodeURIComponent(match[1]),
+                    day: parseInt(match[2])
+                };
             }
             return null;
         },
@@ -1031,10 +1064,14 @@ function bibleApp() {
                     el.classList.remove('selected');
                 });
 
-                // In combined mode, clear the temporary book/chapter context
+                // In combined mode, restore the full combined data
                 if (this.combinedPlanReading) {
                     this.currentBook = null;
                     this.currentChapter = null;
+                    this.currentReference = null;
+                    // Restore combined cross-refs and commentary
+                    this.crossRefs = this.combinedCrossRefs;
+                    this.commentary = this.combinedCommentary;
                 } else if (this.currentBook && this.currentChapter) {
                     // Update reference display to chapter level
                     this.currentReference = `${this.currentBook} ${this.currentChapter}`;
@@ -1061,8 +1098,12 @@ function bibleApp() {
                     this.currentChapter = verse._chapter;
                     this.currentReference = `${verse._book} ${verse._chapter}:${verseNum}`;
                     this.referenceInput = this.currentReference;
+
+                    // Load cross-refs and commentary for just this verse
+                    await this.loadCrossRefs();
+                    await this.loadCommentary();
                 }
-                return; // Don't reload cross-refs/commentary in combined mode
+                return;
             }
 
             // Update reference display
@@ -1613,16 +1654,24 @@ function bibleApp() {
                     const user = await window.SupabaseAuth.getUser();
                     this.authUser = user;
 
+                    // If already signed in, load plan progress from Supabase
+                    if (user) {
+                        this.loadPlanProgressFromSupabase();
+                    }
+
                     // Listen for auth changes
                     window.SupabaseAuth.onAuthStateChange((event, user) => {
                         this.authUser = user;
                         if (event === 'SIGNED_IN') {
                             this.loadNotes();
                             this.loadTags();
+                            this.loadPlanProgressFromSupabase();
                             this.showToast('Signed in successfully', 'success');
                         } else if (event === 'SIGNED_OUT') {
                             this.loadNotes();
                             this.loadTags();
+                            // Clear synced status when signed out
+                            this.planProgressSynced = false;
                         }
                     });
                 }
@@ -2202,8 +2251,15 @@ function bibleApp() {
             return this.highlightedVerses.includes(verseNum);
         },
 
-        // Update URL with clean path format (/Book/Chapter/Verse)
+        // Update URL with clean path format (/Book/Chapter/Verse or /plan/PlanId/Day)
         updateURL() {
+            // If in combined plan reading mode, use plan URL format
+            if (this.combinedPlanReading && this.currentPlan) {
+                const path = `/plan/${this.currentPlan.id}/${this.planDay}`;
+                window.history.pushState({}, '', path);
+                return;
+            }
+
             if (!this.currentBook || !this.currentChapter) return;
 
             const bookSlug = this.currentBook.replace(/\s+/g, '-');
@@ -2758,6 +2814,62 @@ function bibleApp() {
             }
         },
 
+        // Load plan progress from Supabase (called after auth is initialized)
+        async loadPlanProgressFromSupabase() {
+            if (!this.authUser || !window.SupabaseAuth?.fetchUserReadingPlans) return;
+
+            try {
+                // First, sync any local-only progress to Supabase
+                await this.syncLocalPlanProgressToSupabase();
+
+                // Fetch plans and progress from Supabase
+                const plans = await window.SupabaseAuth.fetchUserReadingPlans();
+                const progressData = await window.SupabaseAuth.fetchAllPlanProgress();
+
+                // Merge with local data (Supabase takes precedence)
+                for (const plan of plans) {
+                    const progress = progressData[plan.planId];
+                    this.planProgress[plan.planId] = {
+                        startDate: plan.startDate,
+                        completedDays: progress?.completedDays || [],
+                        userPlanId: plan.id,
+                        synced: true
+                    };
+                }
+
+                this.planProgressSynced = true;
+                this.savePlanProgress();
+            } catch (err) {
+                console.warn('Failed to load plan progress from Supabase:', err);
+            }
+        },
+
+        // Sync local-only plan progress to Supabase
+        async syncLocalPlanProgressToSupabase() {
+            if (!this.authUser || !window.SupabaseAuth?.syncLocalPlanProgress) return;
+
+            for (const [planId, data] of Object.entries(this.planProgress)) {
+                // Skip if already synced
+                if (data.userPlanId || data.synced) continue;
+
+                if (data.startDate) {
+                    try {
+                        const result = await window.SupabaseAuth.syncLocalPlanProgress(
+                            planId,
+                            data.startDate,
+                            data.completedDays || []
+                        );
+                        if (result.synced) {
+                            this.planProgress[planId].userPlanId = result.userPlanId;
+                            this.planProgress[planId].synced = true;
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to sync plan ${planId}:`, err);
+                    }
+                }
+            }
+        },
+
         savePlanProgress() {
             try {
                 localStorage.setItem('readingPlanProgress', JSON.stringify(this.planProgress));
@@ -2820,9 +2932,31 @@ function bibleApp() {
             }
         },
 
+        // Restore reading plan state from URL (used on page load and popstate)
+        async restorePlanFromURL(planId, day) {
+            try {
+                // Load the plan data
+                const response = await fetch(`/api/reading-plans/${planId}`);
+                if (response.ok) {
+                    this.currentPlan = await response.json();
+                    this.planDay = Math.max(1, Math.min(day, this.currentPlan.duration_days));
+                    // Start reading the plan
+                    await this.startPlanReading();
+                } else {
+                    console.error('Plan not found:', planId);
+                    // Fallback to home
+                    window.history.replaceState({}, '', '/');
+                }
+            } catch (err) {
+                console.error('Failed to restore plan from URL:', err);
+                window.history.replaceState({}, '', '/');
+            }
+        },
+
         // Show start date picker before starting plan
         planStartDate: '',  // For the date picker input
         showPlanStartPicker: false,
+        showCatchUpPrompt: false,  // For the catch-up confirmation
         pendingPlanId: null,
 
         promptStartPlan(planId) {
@@ -2833,13 +2967,28 @@ function bibleApp() {
             this.showPlanStartPicker = true;
         },
 
-        confirmStartPlan() {
+        async confirmStartPlan() {
             if (!this.pendingPlanId || !this.planStartDate) return;
 
             this.planProgress[this.pendingPlanId] = {
                 startDate: this.planStartDate,
                 completedDays: []
             };
+
+            // Sync to Supabase if logged in
+            if (this.authUser && window.SupabaseAuth?.subscribeToReadingPlan) {
+                try {
+                    const result = await window.SupabaseAuth.subscribeToReadingPlan(
+                        this.pendingPlanId,
+                        this.planStartDate
+                    );
+                    this.planProgress[this.pendingPlanId].userPlanId = result.id;
+                    this.planProgress[this.pendingPlanId].synced = true;
+                } catch (err) {
+                    console.warn('Failed to sync plan to Supabase:', err);
+                }
+            }
+
             this.savePlanProgress();
             this.loadPlan(this.pendingPlanId);
             this.showPlanStartPicker = false;
@@ -2848,24 +2997,137 @@ function bibleApp() {
 
         cancelStartPlan() {
             this.showPlanStartPicker = false;
+            this.showCatchUpPrompt = false;
             this.pendingPlanId = null;
         },
 
-        startPlan(planId) {
-            // For backwards compatibility, start with today
+        selectJanuaryFirst() {
+            this.planStartDate = new Date().getFullYear() + '-01-01';
+            this.checkForCatchUp();
+        },
+
+        checkForCatchUp() {
+            if (!this.planStartDate) return;
+
+            const startDate = new Date(this.planStartDate + 'T00:00:00');
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            this.planProgress[planId] = {
-                startDate: today.toISOString().split('T')[0],
+            const daysDiff = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+
+            // If the start date is in the past (more than 0 days ago), show catch-up prompt
+            if (daysDiff > 0) {
+                this.showCatchUpPrompt = true;
+            } else {
+                // Start date is today or in the future, just proceed
+                this.confirmStartPlan();
+            }
+        },
+
+        getDaysElapsed() {
+            if (!this.planStartDate) return 0;
+            const startDate = new Date(this.planStartDate + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+        },
+
+        formatStartDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr + 'T00:00:00');
+            return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        },
+
+        async confirmStartPlanWithCatchUp(shouldCatchUp) {
+            if (!this.pendingPlanId || !this.planStartDate) return;
+
+            const daysElapsed = this.getDaysElapsed();
+
+            // Create initial progress
+            this.planProgress[this.pendingPlanId] = {
+                startDate: this.planStartDate,
                 completedDays: []
             };
+
+            // Sync to Supabase if logged in
+            if (this.authUser && window.SupabaseAuth?.subscribeToReadingPlan) {
+                try {
+                    const result = await window.SupabaseAuth.subscribeToReadingPlan(
+                        this.pendingPlanId,
+                        this.planStartDate
+                    );
+                    this.planProgress[this.pendingPlanId].userPlanId = result.id;
+                    this.planProgress[this.pendingPlanId].synced = true;
+                } catch (err) {
+                    console.warn('Failed to sync plan to Supabase:', err);
+                }
+            }
+
+            // If catching up, mark all past days as complete
+            if (shouldCatchUp && daysElapsed > 0) {
+                const completedDays = [];
+                for (let i = 1; i <= daysElapsed; i++) {
+                    completedDays.push(i);
+                }
+                this.planProgress[this.pendingPlanId].completedDays = completedDays;
+
+                // Bulk sync to Supabase if logged in
+                if (this.authUser && window.SupabaseAuth?.bulkMarkDaysComplete) {
+                    try {
+                        const userPlanId = this.planProgress[this.pendingPlanId].userPlanId;
+                        if (userPlanId) {
+                            await window.SupabaseAuth.bulkMarkDaysComplete(userPlanId, completedDays);
+                        }
+                    } catch (err) {
+                        console.warn('Failed to bulk sync catch-up days to Supabase:', err);
+                    }
+                }
+            }
+
+            this.savePlanProgress();
+            this.loadPlan(this.pendingPlanId);
+            this.showPlanStartPicker = false;
+            this.showCatchUpPrompt = false;
+            this.pendingPlanId = null;
+        },
+
+        async startPlan(planId) {
+            // For backwards compatibility, start with today
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const startDate = today.toISOString().split('T')[0];
+
+            this.planProgress[planId] = {
+                startDate: startDate,
+                completedDays: []
+            };
+
+            // Sync to Supabase if logged in
+            if (this.authUser && window.SupabaseAuth?.subscribeToReadingPlan) {
+                try {
+                    const result = await window.SupabaseAuth.subscribeToReadingPlan(planId, startDate);
+                    this.planProgress[planId].userPlanId = result.id;
+                    this.planProgress[planId].synced = true;
+                } catch (err) {
+                    console.warn('Failed to sync plan to Supabase:', err);
+                }
+            }
+
             this.savePlanProgress();
             this.loadPlan(planId);
         },
 
-        resetPlan(planId) {
+        async resetPlan(planId) {
             if (confirm('Reset this plan? All progress will be lost.')) {
+                // Unsubscribe from Supabase if logged in
+                if (this.authUser && window.SupabaseAuth?.unsubscribeFromReadingPlan) {
+                    try {
+                        await window.SupabaseAuth.unsubscribeFromReadingPlan(planId);
+                    } catch (err) {
+                        console.warn('Failed to unsubscribe from plan in Supabase:', err);
+                    }
+                }
+
                 delete this.planProgress[planId];
                 this.savePlanProgress();
                 this.currentPlan = null;
@@ -2895,7 +3157,7 @@ function bibleApp() {
             return this.planProgress[planId]?.completedDays?.includes(day) || false;
         },
 
-        toggleDayComplete(day) {
+        async toggleDayComplete(day) {
             if (!this.currentPlan) return;
             const planId = this.currentPlan.id;
 
@@ -2907,12 +3169,28 @@ function bibleApp() {
             }
 
             const idx = this.planProgress[planId].completedDays.indexOf(day);
-            if (idx === -1) {
+            const isCompleting = idx === -1;
+
+            if (isCompleting) {
                 this.planProgress[planId].completedDays.push(day);
             } else {
                 this.planProgress[planId].completedDays.splice(idx, 1);
             }
             this.savePlanProgress();
+
+            // Sync to Supabase if logged in
+            const userPlanId = this.planProgress[planId].userPlanId;
+            if (this.authUser && userPlanId && window.SupabaseAuth) {
+                try {
+                    if (isCompleting) {
+                        await window.SupabaseAuth.markDayComplete(userPlanId, day);
+                    } else {
+                        await window.SupabaseAuth.unmarkDayComplete(userPlanId, day);
+                    }
+                } catch (err) {
+                    console.warn('Failed to sync day completion to Supabase:', err);
+                }
+            }
         },
 
         getCompletedDaysCount() {
@@ -2925,6 +3203,11 @@ function bibleApp() {
             if (!this.currentPlan) return 0;
             const completed = this.getCompletedDaysCount();
             return Math.round((completed / this.currentPlan.duration_days) * 100);
+        },
+
+        isPlanComplete() {
+            if (!this.currentPlan) return false;
+            return this.getCompletedDaysCount() >= this.currentPlan.duration_days;
         },
 
         goToPlanDay(day) {
@@ -2941,9 +3224,123 @@ function bibleApp() {
 
         // Normalize book names (e.g., "Psalm" -> "Psalms")
         normalizeBookName(book) {
+            // Handle common abbreviations and variations
             const normalizations = {
                 'Psalm': 'Psalms',
-                'Song of Solomon': 'Song of Songs'
+                'Song of Solomon': 'Song of Songs',
+                // Chronicles abbreviations
+                '1 Chron': '1 Chronicles',
+                '1 Chron.': '1 Chronicles',
+                '1 Chr': '1 Chronicles',
+                '1 Chr.': '1 Chronicles',
+                '2 Chron': '2 Chronicles',
+                '2 Chron.': '2 Chronicles',
+                '2 Chr': '2 Chronicles',
+                '2 Chr.': '2 Chronicles',
+                // Samuel abbreviations
+                '1 Sam': '1 Samuel',
+                '1 Sam.': '1 Samuel',
+                '2 Sam': '2 Samuel',
+                '2 Sam.': '2 Samuel',
+                // Kings abbreviations
+                '1 Kgs': '1 Kings',
+                '1 Kgs.': '1 Kings',
+                '2 Kgs': '2 Kings',
+                '2 Kgs.': '2 Kings',
+                // Other common abbreviations
+                'Gen': 'Genesis',
+                'Gen.': 'Genesis',
+                'Exod': 'Exodus',
+                'Exod.': 'Exodus',
+                'Ex': 'Exodus',
+                'Ex.': 'Exodus',
+                'Lev': 'Leviticus',
+                'Lev.': 'Leviticus',
+                'Num': 'Numbers',
+                'Num.': 'Numbers',
+                'Deut': 'Deuteronomy',
+                'Deut.': 'Deuteronomy',
+                'Josh': 'Joshua',
+                'Josh.': 'Joshua',
+                'Judg': 'Judges',
+                'Judg.': 'Judges',
+                'Neh': 'Nehemiah',
+                'Neh.': 'Nehemiah',
+                'Esth': 'Esther',
+                'Esth.': 'Esther',
+                'Prov': 'Proverbs',
+                'Prov.': 'Proverbs',
+                'Eccl': 'Ecclesiastes',
+                'Eccl.': 'Ecclesiastes',
+                'Isa': 'Isaiah',
+                'Isa.': 'Isaiah',
+                'Jer': 'Jeremiah',
+                'Jer.': 'Jeremiah',
+                'Lam': 'Lamentations',
+                'Lam.': 'Lamentations',
+                'Ezek': 'Ezekiel',
+                'Ezek.': 'Ezekiel',
+                'Dan': 'Daniel',
+                'Dan.': 'Daniel',
+                'Hos': 'Hosea',
+                'Hos.': 'Hosea',
+                'Obad': 'Obadiah',
+                'Obad.': 'Obadiah',
+                'Mic': 'Micah',
+                'Mic.': 'Micah',
+                'Nah': 'Nahum',
+                'Nah.': 'Nahum',
+                'Hab': 'Habakkuk',
+                'Hab.': 'Habakkuk',
+                'Zeph': 'Zephaniah',
+                'Zeph.': 'Zephaniah',
+                'Hag': 'Haggai',
+                'Hag.': 'Haggai',
+                'Zech': 'Zechariah',
+                'Zech.': 'Zechariah',
+                'Mal': 'Malachi',
+                'Mal.': 'Malachi',
+                'Matt': 'Matthew',
+                'Matt.': 'Matthew',
+                'Rom': 'Romans',
+                'Rom.': 'Romans',
+                '1 Cor': '1 Corinthians',
+                '1 Cor.': '1 Corinthians',
+                '2 Cor': '2 Corinthians',
+                '2 Cor.': '2 Corinthians',
+                'Gal': 'Galatians',
+                'Gal.': 'Galatians',
+                'Eph': 'Ephesians',
+                'Eph.': 'Ephesians',
+                'Phil': 'Philippians',
+                'Phil.': 'Philippians',
+                'Col': 'Colossians',
+                'Col.': 'Colossians',
+                '1 Thess': '1 Thessalonians',
+                '1 Thess.': '1 Thessalonians',
+                '2 Thess': '2 Thessalonians',
+                '2 Thess.': '2 Thessalonians',
+                '1 Tim': '1 Timothy',
+                '1 Tim.': '1 Timothy',
+                '2 Tim': '2 Timothy',
+                '2 Tim.': '2 Timothy',
+                'Tit': 'Titus',
+                'Tit.': 'Titus',
+                'Phlm': 'Philemon',
+                'Phlm.': 'Philemon',
+                'Heb': 'Hebrews',
+                'Heb.': 'Hebrews',
+                'Jas': 'James',
+                'Jas.': 'James',
+                '1 Pet': '1 Peter',
+                '1 Pet.': '1 Peter',
+                '2 Pet': '2 Peter',
+                '2 Pet.': '2 Peter',
+                '1 John': '1 John',
+                '2 John': '2 John',
+                '3 John': '3 John',
+                'Rev': 'Revelation',
+                'Rev.': 'Revelation'
             };
             return normalizations[book] || book;
         },
@@ -2960,8 +3357,19 @@ function bibleApp() {
         },
 
         // Parse a reading reference that might be a chapter range (e.g., "Genesis 1-3")
+        // or semicolon-separated references (e.g., "2 Samuel 5; 1 Chron. 11-12")
         parseReadingReference(ref) {
-            // Normalize the reference first
+            // First, split on semicolons for multiple separate references
+            if (ref.includes(';')) {
+                const parts = ref.split(';').map(p => p.trim()).filter(p => p);
+                let allRefs = [];
+                for (const part of parts) {
+                    allRefs = allRefs.concat(this.parseReadingReference(part));
+                }
+                return allRefs;
+            }
+
+            // Normalize the reference (handles abbreviations like "1 Chron." -> "1 Chronicles")
             ref = this.normalizeReference(ref);
 
             // Match chapter ranges like "Genesis 1-3" or "Job 1-3"
@@ -3096,6 +3504,7 @@ function bibleApp() {
             this.currentReference = `${this.currentPlan.name} - Day ${this.planDay}`;
             this.highlightedVerses = [];
             this.crossRefs = allCrossRefs;
+            this.combinedCrossRefs = allCrossRefs;  // Store for restoration after verse deselect
             this.commentary = [];
             this.loading = false;
 
@@ -3128,6 +3537,7 @@ function bibleApp() {
                 }
             }
             this.commentary = allCommentary;
+            this.combinedCommentary = allCommentary;  // Store for restoration after verse deselect
 
             // Load interlinear data for all chapters
             this.interlinearData = {};
@@ -3158,6 +3568,9 @@ function bibleApp() {
             this.$nextTick(() => {
                 this.observeVerses();
             });
+
+            // Update URL to reflect plan reading state
+            this.updateURL();
         },
 
         exitPlanReadingMode() {
