@@ -732,7 +732,7 @@ def parse_reference(reference: str) -> Optional[tuple]:
 def get_cross_references(conn, book: str, chapter: int, verse_start: int, verse_end: int) -> list:
     """Get cross-references for a passage."""
     cursor = conn.execute("""
-        SELECT target_book, target_chapter, target_verse, relationship_type
+        SELECT source_verse, target_book, target_chapter, target_verse, relationship_type
         FROM cross_references
         WHERE source_book = ? AND source_chapter = ?
               AND source_verse BETWEEN ? AND ?

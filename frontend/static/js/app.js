@@ -1157,17 +1157,38 @@ function bibleApp() {
         },
 
         // Check if verse has interlinear data
-        hasInterlinear(verseNum) {
+        hasInterlinear(verseNum, verseIdx) {
+            if (this.combinedPlanReading && verseIdx !== undefined) {
+                const verse = this.verses[verseIdx];
+                if (verse && verse._book && verse._chapter) {
+                    const key = `${verse._book}|${verse._chapter}|${verseNum}`;
+                    return !!this.interlinearData[key];
+                }
+            }
             return !!this.interlinearData[verseNum];
         },
 
         // Get interlinear words for a verse
-        getInterlinearWords(verseNum) {
+        getInterlinearWords(verseNum, verseIdx) {
+            if (this.combinedPlanReading && verseIdx !== undefined) {
+                const verse = this.verses[verseIdx];
+                if (verse && verse._book && verse._chapter) {
+                    const key = `${verse._book}|${verse._chapter}|${verseNum}`;
+                    return this.interlinearData[key]?.words || [];
+                }
+            }
             return this.interlinearData[verseNum]?.words || [];
         },
 
         // Get language for interlinear display
-        getInterlinearLanguage(verseNum) {
+        getInterlinearLanguage(verseNum, verseIdx) {
+            if (this.combinedPlanReading && verseIdx !== undefined) {
+                const verse = this.verses[verseIdx];
+                if (verse && verse._book && verse._chapter) {
+                    const key = `${verse._book}|${verse._chapter}|${verseNum}`;
+                    return this.interlinearData[key]?.language || 'unknown';
+                }
+            }
             return this.interlinearData[verseNum]?.language || 'unknown';
         },
 
@@ -3097,6 +3118,31 @@ function bibleApp() {
                 }
             }
             this.commentary = allCommentary;
+
+            // Load interlinear data for all chapters
+            this.interlinearData = {};
+            for (const chapterInfo of uniqueChapters) {
+                try {
+                    const interlinearResponse = await fetch(
+                        `/api/passage/${encodeURIComponent(chapterInfo.ref)}/interlinear?translation=${this.translation}`
+                    );
+                    if (interlinearResponse.ok) {
+                        const interlinearData = await interlinearResponse.json();
+                        if (interlinearData.has_interlinear && interlinearData.verses) {
+                            // Store with compound key: book|chapter|verse
+                            for (const [verseNum, words] of Object.entries(interlinearData.verses)) {
+                                const key = `${chapterInfo.book}|${chapterInfo.chapter}|${verseNum}`;
+                                this.interlinearData[key] = {
+                                    language: interlinearData.language,
+                                    words: words
+                                };
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Failed to load interlinear for ${chapterInfo.ref}:`, err);
+                }
+            }
 
             // Setup scroll-based verse tracking
             this.$nextTick(() => {

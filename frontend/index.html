@@ -214,7 +214,7 @@
                                 :id="'verse-' + verse.verse"
                                 :class="{
                                     'verse-highlighted': isVerseHighlighted(verse.verse),
-                                    'has-interlinear': showInterlinear && hasInterlinear(verse.verse),
+                                    'has-interlinear': showInterlinear && hasInterlinear(verse.verse, verseIdx),
                                     'verse-selected-for-note': noteEditMode && isVerseSelectedForNote(verse.verse)
                                 }"
                                 @click="handleVerseBoxClick($event, verse.verse, verseIdx)"
@@ -231,8 +231,8 @@
                                 x-html="formatVerseText(verse.text)"
                             ></span>
                             <!-- Interlinear display -->
-                            <div x-show="showInterlinear && hasInterlinear(verse.verse)" class="interlinear-row" :class="getInterlinearLanguage(verse.verse)">
-                                <template x-for="(word, wordIdx) in getInterlinearWords(verse.verse)" :key="'iw-' + verse.verse + '-' + wordIdx">
+                            <div x-show="showInterlinear && hasInterlinear(verse.verse, verseIdx)" class="interlinear-row" :class="getInterlinearLanguage(verse.verse, verseIdx)">
+                                <template x-for="(word, wordIdx) in getInterlinearWords(verse.verse, verseIdx)" :key="'iw-' + verseIdx + '-' + wordIdx">
                                     <span
                                         class="interlinear-word"
                                         @click.stop="handleInterlinearWordClick(word, $event)"
