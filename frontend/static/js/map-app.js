@@ -65,6 +65,7 @@ function crossRefApp() {
         // Path chain panel
         showPathChain: false,
         pathChainNodes: [],  // ordered array of node objects from the highlighted path
+        pathChainEdges: [],  // votes for edge between node[i] and node[i+1]
         chainCopied: false,
         // History & navigation
         history: [],        // [{ref: 'John.3.16', label: 'Jn 3:16', query: 'John 3:16'}]
@@ -533,8 +534,6 @@ function crossRefApp() {
                             this.graph.pathTarget = christNode;
                             this.graph._pathCache.hovNode = null; // force recompute
                             this.graph._draw();
-                            // Auto-open chain view after path settles
-                            this.$nextTick(() => this.openPathChain());
                         }
                     });
                 }
@@ -571,6 +570,15 @@ function crossRefApp() {
             const ordered = this.graph._pathCache.orderedPath || [];
             if (ordered.length < 2) return;
             this.pathChainNodes = ordered;
+            // Look up edge votes between consecutive nodes
+            this.pathChainEdges = [];
+            for (let i = 0; i < ordered.length - 1; i++) {
+                const a = ordered[i], b = ordered[i + 1];
+                const edge = this.graph.edges.find(e =>
+                    (e.source === a && e.target === b) || (e.source === b && e.target === a)
+                );
+                this.pathChainEdges.push(edge ? edge.votes : 0);
+            }
             this.showPathChain = true;
         },
 
