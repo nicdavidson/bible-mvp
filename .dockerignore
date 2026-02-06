@@ -3,3 +3,18 @@ fly.toml
 __pycache__/
 .envrc
 .venv/
+
+# Source data (large, only needed for building the DB locally)
+data/clear-bible/
+data/speaker-quotations/
+data/alignment/
+data/sources/
+data/sources.tar.zst
+data/__MACOSX/
+data/*.xml
+data/*.csv
+data/*.zip
+
+# Keep data/bible.db (the built DB ships with the image)
+# Keep data/cross_references.txt (small, 8MB)
+# Keep data/db-manifest.json (build metadata)

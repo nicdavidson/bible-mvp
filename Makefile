@@ -1,4 +1,4 @@
-.PHONY: setup build build-full dev clean list help cache-stats bundle-sources setup-sources
+.PHONY: setup build build-full dev clean list help cache-stats bundle-sources setup-sources deploy deploy-code
 
 # Default target
 help:
@@ -12,6 +12,10 @@ help:
 	@echo "  make dev            Start local dev server"
 	@echo "  make list           Show database build status"
 	@echo "  make clean          Remove local database"
+	@echo ""
+	@echo "Deployment:"
+	@echo "  make deploy         Build DB + deploy to Fly.io (code + DB)"
+	@echo "  make deploy-code    Deploy code only (no DB rebuild)"
 	@echo ""
 	@echo "Source Data Caching:"
 	@echo "  make cache-stats    Show what's cached locally"
@@ -98,3 +102,18 @@ setup-sources:
 	@echo "Unpacking..."
 	@cd data && zstd -d sources.tar.zst -c | tar xf -
 	@echo "Done! Source data ready. Run 'make build' to build the database."
+
+# Full deploy: rebuild DB, then deploy to Fly (code + fresh DB)
+deploy: build
+	@echo ""
+	@echo "Generating manifest..."
+	@. .venv/bin/activate 2>/dev/null || true; python scripts/build_db.py --manifest
+	@echo ""
+	@echo "Deploying to Fly.io..."
+	fly deploy
+	@echo ""
+	@echo "Deploy complete! Entrypoint will sync DB to volume on startup."
+
+# Code-only deploy (skip DB rebuild, use whatever DB is on the volume)
+deploy-code:
+	fly deploy

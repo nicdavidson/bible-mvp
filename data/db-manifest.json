@@ -1,0 +1,63 @@
+{
+  "version": "2026.02.06",
+  "sha256": "348f6a72a5985414f4952ceb53c715c012698cea2fb66e289b5e5d1cc392fc8f",
+  "size": 353386496,
+  "built": "2026-02-06T00:21:00.449648",
+  "imports": {
+    "schema": {
+      "version": "1.0",
+      "row_count": 20,
+      "completed_at": "2026-02-06T00:10:34.100500"
+    },
+    "bsb": {
+      "version": "1.0",
+      "row_count": 553492,
+      "completed_at": "2026-02-06T00:10:50.348207"
+    },
+    "full_bibles": {
+      "version": "1.1",
+      "row_count": 31102,
+      "completed_at": "2026-02-06T00:10:52.297206"
+    },
+    "web": {
+      "version": "1.0",
+      "row_count": 29684,
+      "completed_at": "2026-02-06T00:10:54.478896"
+    },
+    "interlinear": {
+      "version": "1.0",
+      "row_count": 425441,
+      "completed_at": "2026-02-06T00:11:01.004056"
+    },
+    "strongs": {
+      "version": "1.0",
+      "row_count": 14197,
+      "completed_at": "2026-02-06T00:11:01.177777"
+    },
+    "cross_refs": {
+      "version": "1.0",
+      "row_count": 41649,
+      "completed_at": "2026-02-06T00:11:01.799220"
+    },
+    "commentary_mh": {
+      "version": "1.0",
+      "row_count": 519,
+      "completed_at": "2026-02-06T00:16:17.076342"
+    },
+    "commentary_jg": {
+      "version": "1.0",
+      "row_count": 2397,
+      "completed_at": "2026-02-06T00:18:29.833600"
+    },
+    "speakers": {
+      "version": "1.0",
+      "row_count": 6981,
+      "completed_at": "2026-02-06T00:18:30.435895"
+    },
+    "spurgeon": {
+      "version": "1.0",
+      "row_count": 732,
+      "completed_at": "2026-02-06T00:21:00.148234"
+    }
+  }
+}

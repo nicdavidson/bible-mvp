@@ -9,10 +9,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
+# Note: .dockerignore excludes source data (~1.8GB) but includes
+# the pre-built bible.db (~350MB) so it ships with every deploy.
 COPY . .
 
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Run the application using the command from Procfile
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Entrypoint syncs the DB from image to persistent volume, then starts uvicorn
+CMD ["sh", "scripts/entrypoint.sh"]
