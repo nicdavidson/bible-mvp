@@ -4,9 +4,9 @@
  * Integrates with IndexedDB via postMessage for smart offline storage.
  */
 
-const CACHE_NAME = 'biblemvp-v7';
-const STATIC_CACHE = 'biblemvp-static-v7';
-const CONTENT_CACHE = 'biblemvp-content-v7';
+const CACHE_NAME = 'biblemvp-v8';
+const STATIC_CACHE = 'biblemvp-static-v8';
+const CONTENT_CACHE = 'biblemvp-content-v8';
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
@@ -31,7 +31,7 @@ const CACHEABLE_API_PATTERNS = [
 
 // Install event - cache static assets
 self.addEventListener('install', event => {
-    console.log('[SW] Installing service worker v7...');
+    console.log('[SW] Installing service worker v8...');
     event.waitUntil(
         caches.open(STATIC_CACHE)
             .then(cache => cache.addAll(STATIC_ASSETS))
@@ -44,7 +44,7 @@ self.addEventListener('install', event => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', event => {
-    console.log('[SW] Activating service worker v7...');
+    console.log('[SW] Activating service worker v8...');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
