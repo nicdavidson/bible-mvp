@@ -8,14 +8,19 @@ Public Domain - Charles Spurgeon died in 1892.
 Usage:
     python scripts/import_spurgeon.py
 """
+import os
 import sqlite3
+import sys
 import urllib.request
 import time
 import re
 from pathlib import Path
 from html.parser import HTMLParser
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+sys.path.insert(0, str(Path(__file__).parent))
+from source_cache import cached_fetch_html as _cached_fetch_html
+
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 CCEL_BASE = "https://ccel.org/ccel/spurgeon"
 
 # Days per month (non-leap year - Feb 29 is handled specially)
@@ -93,8 +98,10 @@ class DevotionalParser(HTMLParser):
             self.current_text += data
 
 
-def fetch_html(url: str, timeout: int = 30) -> str | None:
-    """Fetch HTML from URL."""
+def fetch_html(url: str, timeout: int = 30, cache_key: str = None) -> str | None:
+    """Fetch HTML from URL, with optional local caching."""
+    if cache_key:
+        return _cached_fetch_html(cache_key, url, timeout)
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'BibleMVP/1.0'})
         with urllib.request.urlopen(req, timeout=timeout) as response:
@@ -161,8 +168,16 @@ def parse_devotional_simple(html: str) -> dict:
 
 
 def create_table(conn):
-    """Create devotionals table if it doesn't exist."""
+    """Create devotionals table, dropping old schema if needed."""
     cursor = conn.cursor()
+    # Drop old schema if it exists with incompatible columns
+    try:
+        cols = [row[1] for row in cursor.execute('PRAGMA table_info(devotionals)').fetchall()]
+        if cols and 'month' not in cols:
+            cursor.execute("DROP TABLE IF EXISTS devotionals")
+            conn.commit()
+    except Exception:
+        pass
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS devotionals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -212,9 +227,10 @@ def import_spurgeon():
         for day in range(1, days + 1):
             for time_of_day, suffix in [("morning", "am"), ("evening", "pm")]:
                 # Build URL: morneve.d0101am.html
-                url = f"{CCEL_BASE}/morneve.d{month:02d}{day:02d}{suffix}.html"
+                page_name = f"d{month:02d}{day:02d}{suffix}"
+                url = f"{CCEL_BASE}/morneve.{page_name}.html"
 
-                html = fetch_html(url)
+                html = fetch_html(url, cache_key=f"spurgeon/{page_name}.html")
                 if not html:
                     errors += 1
                     continue
@@ -255,7 +271,7 @@ def import_spurgeon():
     print("\n  Checking February 29 (leap year)...")
     for time_of_day, suffix in [("morning", "am"), ("evening", "pm")]:
         url = f"{CCEL_BASE}/morneve.d0229{suffix}.html"
-        html = fetch_html(url)
+        html = fetch_html(url, cache_key=f"spurgeon/d0229{suffix}.html")
         if html:
             parsed = parse_devotional_simple(html)
             if parsed["content"] and len(parsed["content"]) >= 50:

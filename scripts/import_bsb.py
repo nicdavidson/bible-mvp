@@ -6,15 +6,22 @@ Data source: https://github.com/Clear-Bible/Alignments
 License: CC-BY 4.0
 """
 
+import os
 import sqlite3
 import json
 import csv
 from pathlib import Path
 from collections import defaultdict
 
-# Paths
-DATA_DIR = Path(__file__).parent.parent / "data" / "clear-bible"
-DB_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+# Paths - Clear-Bible/Alignments repo structure
+CLEAR_BIBLE_DIR = Path(__file__).parent.parent / "data" / "clear-bible"
+# Source texts (Hebrew WLCM + Greek SBLGNT)
+SOURCES_DIR = CLEAR_BIBLE_DIR / "data" / "sources"
+# BSB target text
+BSB_TARGETS_DIR = CLEAR_BIBLE_DIR / "data" / "eng" / "targets" / "BSB"
+# BSB alignment data
+BSB_ALIGNMENTS_DIR = CLEAR_BIBLE_DIR / "data" / "eng" / "alignments" / "BSB"
+DB_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 
 # Book ID to name mapping (Clear-Bible uses 2-digit book codes)
 BOOK_ID_TO_NAME = {
@@ -74,7 +81,7 @@ def load_source_data():
     source_data = {}
 
     # Load Hebrew (OT)
-    wlcm_path = DATA_DIR / "WLCM.tsv"
+    wlcm_path = SOURCES_DIR / "WLCM.tsv"
     if wlcm_path.exists():
         print(f"Loading Hebrew source data from {wlcm_path}...")
         with open(wlcm_path, 'r', encoding='utf-8') as f:
@@ -92,7 +99,7 @@ def load_source_data():
         print(f"  Loaded {len(source_data)} Hebrew words")
 
     # Load Greek (NT)
-    sblgnt_path = DATA_DIR / "SBLGNT.tsv"
+    sblgnt_path = SOURCES_DIR / "SBLGNT.tsv"
     if sblgnt_path.exists():
         print(f"Loading Greek source data from {sblgnt_path}...")
         greek_count = 0
@@ -119,7 +126,7 @@ def load_bsb_text():
     verses = defaultdict(list)  # (book, chapter, verse) -> [(word_pos, word, skip_space, exclude, is_punct)]
 
     for filename in ['ot_BSB.tsv', 'nt_BSB.tsv']:
-        filepath = DATA_DIR / filename
+        filepath = BSB_TARGETS_DIR / filename
         if not filepath.exists():
             print(f"Warning: {filepath} not found")
             continue
@@ -157,7 +164,7 @@ def load_alignments():
     alignments = {}  # target_word_id -> [source_word_ids]
 
     for filename in ['WLCM-BSB-manual.json', 'SBLGNT-BSB-manual.json']:
-        filepath = DATA_DIR / filename
+        filepath = BSB_ALIGNMENTS_DIR / filename
         if not filepath.exists():
             print(f"Warning: {filepath} not found")
             continue
@@ -221,6 +228,22 @@ def import_bsb():
     # Get book order mapping
     cursor.execute("SELECT name, book_order FROM books")
     book_orders = {row['name']: row['book_order'] for row in cursor.fetchall()}
+
+    # Create english_word_alignments table if it doesn't exist
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS english_word_alignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            translation_id TEXT NOT NULL,
+            book TEXT NOT NULL,
+            chapter INTEGER NOT NULL,
+            verse INTEGER NOT NULL,
+            english_word_position INTEGER NOT NULL,
+            english_word TEXT NOT NULL,
+            original_word_position INTEGER,
+            confidence REAL DEFAULT 1.0,
+            UNIQUE(translation_id, book, chapter, verse, english_word_position)
+        )
+    """)
 
     # Clear existing BSB data
     print("\nClearing existing BSB data...")

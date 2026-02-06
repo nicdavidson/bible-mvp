@@ -9,11 +9,12 @@ Data source: STEPBible-Data (CC BY 4.0)
 https://github.com/STEPBible/STEPBible-Data
 """
 
+import os
 import sqlite3
 import re
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DB_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 DATA_DIR = Path(__file__).parent.parent / "data" / "alignment"
 
 # Map STEPBible book abbreviations to our book names

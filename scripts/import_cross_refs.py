@@ -12,11 +12,12 @@ The data format is tab-separated:
 Usage:
     python scripts/import_cross_refs.py
 """
+import os
 import sqlite3
 import re
 from pathlib import Path
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 CROSS_REFS_FILE = Path(__file__).parent.parent / "data" / "cross_references.txt"
 
 # Book abbreviation mapping (OpenBible uses different abbreviations)

@@ -17,6 +17,7 @@ Usage:
 Example:
     python scripts/import_commentary.py matthew-henry
 """
+import os
 import json
 import sqlite3
 import urllib.request
@@ -24,7 +25,10 @@ import sys
 import time
 from pathlib import Path
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+sys.path.insert(0, str(Path(__file__).parent))
+from source_cache import cached_fetch_json
+
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 API_BASE = "https://bible.helloao.org/api/c"
 
 # Book ID to name mapping (HelloAO uses 3-letter codes)
@@ -83,10 +87,17 @@ def import_commentary(commentary_id: str, limit_books: int | None = None):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
+    # Clear existing entries for this commentary to avoid duplicates
+    source_name = get_source_name(commentary_id)
+    cursor.execute("DELETE FROM commentary_entries WHERE source = ?", (source_name,))
+    conn.commit()
+    print(f"Cleared existing {source_name} entries")
+
     # Get list of books
     books_url = f"{API_BASE}/{commentary_id}/books.json"
-    print(f"\nFetching book list from {books_url}")
-    books_data = fetch_json(books_url)
+    cache_key = f"commentary-{commentary_id}/books.json"
+    print(f"\nFetching book list...")
+    books_data = cached_fetch_json(cache_key, books_url)
 
     if not books_data:
         print("ERROR: Failed to fetch books list")
@@ -113,7 +124,8 @@ def import_commentary(commentary_id: str, limit_books: int | None = None):
         # Fetch each chapter
         for chapter_num in range(1, num_chapters + 1):
             chapter_url = f"{API_BASE}/{commentary_id}/{book_id}/{chapter_num}.json"
-            chapter_data = fetch_json(chapter_url)
+            chapter_cache_key = f"commentary-{commentary_id}/{book_id}/{chapter_num}.json"
+            chapter_data = cached_fetch_json(chapter_cache_key, chapter_url)
 
             if not chapter_data:
                 continue

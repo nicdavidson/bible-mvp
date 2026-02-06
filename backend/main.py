@@ -27,6 +27,16 @@ app.mount("/static", StaticFiles(directory=frontend_path / "static"), name="stat
 async def startup():
     """Initialize database on startup."""
     init_db()
+    # Create indexes needed for bidirectional cross-reference lookups
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_crossref_target
+            ON cross_references(target_book, target_chapter, target_verse)
+        """)
+        conn.commit()
+    finally:
+        conn.close()
 
 
 @app.get("/")
@@ -60,13 +70,10 @@ async def get_passage(
 
         # Always fetch the full chapter
         cursor = conn.execute("""
-            SELECT v.id, v.book, v.chapter, v.verse, v.text,
-                   GROUP_CONCAT(w.id) as word_ids
+            SELECT v.id, v.book, v.chapter, v.verse, v.text
             FROM verses v
-            LEFT JOIN words w ON w.verse_id = v.id
             WHERE v.book = ? AND v.chapter = ?
                   AND v.translation_id = ?
-            GROUP BY v.id
             ORDER BY v.verse
         """, (book, chapter, translation))
 
@@ -92,6 +99,47 @@ async def get_passage(
             "cross_references": cross_refs,
             "highlighted_verses": highlighted_verses,
             "speaker_verses": speaker_verses
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/passage/{reference}/parallel")
+async def get_parallel_passage(
+    reference: str,
+    translations: str = Query(default="BSB,KJV,WEB", description="Comma-separated translation IDs")
+):
+    """
+    Get verse(s) for multiple translations in parallel.
+    Returns all requested translations for the same passage.
+    """
+    conn = get_db_connection()
+    try:
+        parsed = parse_reference(reference)
+        if not parsed:
+            raise HTTPException(status_code=400, detail=f"Invalid reference: {reference}")
+
+        book, chapter, verse_start, verse_end, has_verse = parsed
+
+        translation_list = [t.strip() for t in translations.split(",") if t.strip()]
+        if not translation_list:
+            raise HTTPException(status_code=400, detail="No translations specified")
+
+        result_translations = {}
+        for tid in translation_list:
+            cursor = conn.execute("""
+                SELECT v.verse, v.text
+                FROM verses v
+                WHERE v.book = ? AND v.chapter = ? AND v.translation_id = ?
+                ORDER BY v.verse
+            """, (book, chapter, tid))
+            result_translations[tid] = [dict(row) for row in cursor.fetchall()]
+
+        return {
+            "reference": f"{book} {chapter}",
+            "book": book,
+            "chapter": chapter,
+            "translations": result_translations
         }
     finally:
         conn.close()
@@ -271,58 +319,67 @@ async def search(
             scope = "bible"
 
         # Build FTS query - handle phrase search with quotes
+        # Sanitize FTS5 special characters to prevent OperationalError
         fts_query = q
         if '"' in q:
-            # FTS5 handles quoted phrases natively
-            pass
+            # FTS5 handles quoted phrases natively, but ensure balanced quotes
+            if q.count('"') % 2 != 0:
+                fts_query = q.replace('"', '')
         else:
+            # Strip FTS5 special operators that could cause syntax errors
+            import re as _re
+            sanitized = _re.sub(r'[*(){}^~]', '', q)
             # Add wildcard for partial matching on last word
-            words = q.split()
+            words = sanitized.split()
             if words:
                 words[-1] = words[-1] + '*'
                 fts_query = ' '.join(words)
 
-        if scope in ("all", "bible"):
-            if book_filter:
+        try:
+            if scope in ("all", "bible"):
+                if book_filter:
+                    cursor = conn.execute("""
+                        SELECT 'verse' as type, book, chapter, verse,
+                               snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
+                        FROM verses_fts
+                        WHERE verses_fts MATCH ? AND book = ?
+                        ORDER BY rank
+                        LIMIT 50
+                    """, (fts_query, book_filter))
+                elif testament_filter:
+                    placeholders = ','.join('?' * len(testament_filter))
+                    cursor = conn.execute(f"""
+                        SELECT 'verse' as type, book, chapter, verse,
+                               snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
+                        FROM verses_fts
+                        WHERE verses_fts MATCH ? AND book IN ({placeholders})
+                        ORDER BY rank
+                        LIMIT 50
+                    """, (fts_query, *testament_filter))
+                else:
+                    cursor = conn.execute("""
+                        SELECT 'verse' as type, book, chapter, verse,
+                               snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
+                        FROM verses_fts
+                        WHERE verses_fts MATCH ?
+                        ORDER BY rank
+                        LIMIT 50
+                    """, (fts_query,))
+                results.extend([dict(r) for r in cursor.fetchall()])
+
+            if scope in ("all", "commentary"):
                 cursor = conn.execute("""
-                    SELECT 'verse' as type, book, chapter, verse,
-                           snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
-                    FROM verses_fts
-                    WHERE verses_fts MATCH ? AND book = ?
-                    ORDER BY rank
-                    LIMIT 50
-                """, (fts_query, book_filter))
-            elif testament_filter:
-                placeholders = ','.join('?' * len(testament_filter))
-                cursor = conn.execute(f"""
-                    SELECT 'verse' as type, book, chapter, verse,
-                           snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
-                    FROM verses_fts
-                    WHERE verses_fts MATCH ? AND book IN ({placeholders})
-                    ORDER BY rank
-                    LIMIT 50
-                """, (fts_query, *testament_filter))
-            else:
-                cursor = conn.execute("""
-                    SELECT 'verse' as type, book, chapter, verse,
-                           snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
-                    FROM verses_fts
-                    WHERE verses_fts MATCH ?
+                    SELECT 'commentary' as type, source, book, chapter,
+                           snippet(commentary_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
+                    FROM commentary_fts
+                    WHERE commentary_fts MATCH ?
                     ORDER BY rank
                     LIMIT 50
                 """, (fts_query,))
-            results.extend([dict(r) for r in cursor.fetchall()])
-
-        if scope in ("all", "commentary"):
-            cursor = conn.execute("""
-                SELECT 'commentary' as type, source, book, chapter,
-                       snippet(commentary_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
-                FROM commentary_fts
-                WHERE commentary_fts MATCH ?
-                ORDER BY rank
-                LIMIT 50
-            """, (fts_query,))
-            results.extend([dict(r) for r in cursor.fetchall()])
+                results.extend([dict(r) for r in cursor.fetchall()])
+        except sqlite3.OperationalError:
+            # Malformed FTS query - return empty results rather than 500
+            pass
 
         return {"query": q, "scope": scope, "results": results}
     finally:
@@ -522,14 +579,30 @@ async def get_passage_interlinear(
             "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
             "Haggai", "Zechariah", "Malachi"
         ]
+        NT_BOOKS = [
+            "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+            "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+            "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+            "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
+            "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+            "Jude", "Revelation"
+        ]
         if not language and verses_data:
-            language = 'hebrew' if book in OT_BOOKS else 'greek' if book == 'Matthew' else None
+            language = 'hebrew' if book in OT_BOOKS else 'greek' if book in NT_BOOKS else None
+
+        # Determine source text based on language
+        source_text = None
+        if language == 'hebrew':
+            source_text = 'Westminster Leningrad Codex'
+        elif language == 'greek':
+            source_text = 'SBL Greek New Testament'
 
         return {
             "reference": reference,
             "book": book,
             "chapter": chapter,
             "language": language,
+            "source_text": source_text,
             "verses": verses_data,
             "has_interlinear": len(verses_data) > 0
         }
@@ -559,8 +632,13 @@ async def get_devotional(
         parts = date.split("-")
         if len(parts) != 2:
             raise HTTPException(status_code=400, detail="Date must be in MM-DD format")
-        month = int(parts[0])
-        day = int(parts[1])
+        try:
+            month = int(parts[0])
+            day = int(parts[1])
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Date must be in MM-DD format with numeric values")
+        if not (1 <= month <= 12 and 1 <= day <= 31):
+            raise HTTPException(status_code=400, detail="Invalid month or day")
 
     conn = get_db_connection()
     try:
@@ -637,6 +715,10 @@ async def get_reading_plans():
 async def get_reading_plan(plan_id: str):
     """Get full reading plan with all days."""
     import json
+    import re as _re
+    # Sanitize plan_id to prevent path traversal
+    if not _re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
+        raise HTTPException(status_code=400, detail="Invalid plan ID")
     data_path = Path(__file__).parent.parent / "data"
     plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
 
@@ -651,6 +733,10 @@ async def get_reading_plan(plan_id: str):
 async def get_reading_plan_day(plan_id: str, day: int):
     """Get a specific day's reading from a plan."""
     import json
+    import re as _re
+    # Sanitize plan_id to prevent path traversal
+    if not _re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
+        raise HTTPException(status_code=400, detail="Invalid plan ID")
     data_path = Path(__file__).parent.parent / "data"
     plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
 
@@ -686,44 +772,110 @@ def parse_reference(reference: str) -> Optional[tuple]:
 
     # Book name abbreviations
     abbrevs = {
-        "gen": "Genesis", "ex": "Exodus", "lev": "Leviticus", "num": "Numbers",
-        "deut": "Deuteronomy", "josh": "Joshua", "judg": "Judges", "ruth": "Ruth",
-        "1sam": "1 Samuel", "2sam": "2 Samuel", "1kgs": "1 Kings", "2kgs": "2 Kings",
-        "1chr": "1 Chronicles", "2chr": "2 Chronicles", "ezra": "Ezra", "neh": "Nehemiah",
-        "esth": "Esther", "job": "Job", "ps": "Psalms", "prov": "Proverbs",
-        "eccl": "Ecclesiastes", "song": "Song of Solomon", "isa": "Isaiah",
-        "jer": "Jeremiah", "lam": "Lamentations", "ezek": "Ezekiel", "dan": "Daniel",
-        "hos": "Hosea", "joel": "Joel", "amos": "Amos", "obad": "Obadiah",
-        "jonah": "Jonah", "mic": "Micah", "nah": "Nahum", "hab": "Habakkuk",
-        "zeph": "Zephaniah", "hag": "Haggai", "zech": "Zechariah", "mal": "Malachi",
-        "matt": "Matthew", "mk": "Mark", "lk": "Luke", "jn": "John",
-        "acts": "Acts", "rom": "Romans", "1cor": "1 Corinthians", "2cor": "2 Corinthians",
-        "gal": "Galatians", "eph": "Ephesians", "phil": "Philippians", "col": "Colossians",
-        "1thess": "1 Thessalonians", "2thess": "2 Thessalonians",
-        "1tim": "1 Timothy", "2tim": "2 Timothy", "titus": "Titus", "phlm": "Philemon",
-        "heb": "Hebrews", "jas": "James", "1pet": "1 Peter", "2pet": "2 Peter",
-        "1jn": "1 John", "2jn": "2 John", "3jn": "3 John", "jude": "Jude", "rev": "Revelation"
+        "gen": "Genesis", "ge": "Genesis", "ex": "Exodus", "exod": "Exodus",
+        "lev": "Leviticus", "le": "Leviticus",
+        "num": "Numbers", "nu": "Numbers",
+        "deut": "Deuteronomy", "de": "Deuteronomy", "dt": "Deuteronomy",
+        "josh": "Joshua", "jos": "Joshua",
+        "judg": "Judges", "jdg": "Judges",
+        "ruth": "Ruth", "ru": "Ruth",
+        "1sam": "1 Samuel", "1sa": "1 Samuel", "2sam": "2 Samuel", "2sa": "2 Samuel",
+        "1kgs": "1 Kings", "1ki": "1 Kings", "2kgs": "2 Kings", "2ki": "2 Kings",
+        "1chr": "1 Chronicles", "1ch": "1 Chronicles", "2chr": "2 Chronicles", "2ch": "2 Chronicles",
+        "ezra": "Ezra", "ezr": "Ezra",
+        "neh": "Nehemiah", "ne": "Nehemiah",
+        "esth": "Esther", "est": "Esther",
+        "job": "Job",
+        "ps": "Psalms", "psa": "Psalms", "psalm": "Psalms", "psalms": "Psalms",
+        "prov": "Proverbs", "pro": "Proverbs", "pr": "Proverbs",
+        "eccl": "Ecclesiastes", "ecc": "Ecclesiastes", "eccles": "Ecclesiastes",
+        "song": "Song of Solomon", "songofsolomon": "Song of Solomon",
+        "songofsongs": "Song of Solomon", "sos": "Song of Solomon", "ss": "Song of Solomon",
+        "isa": "Isaiah", "is": "Isaiah",
+        "jer": "Jeremiah", "je": "Jeremiah",
+        "lam": "Lamentations", "la": "Lamentations",
+        "ezek": "Ezekiel", "eze": "Ezekiel",
+        "dan": "Daniel", "da": "Daniel",
+        "hos": "Hosea", "ho": "Hosea",
+        "joel": "Joel", "joe": "Joel",
+        "amos": "Amos", "am": "Amos",
+        "obad": "Obadiah", "ob": "Obadiah",
+        "jonah": "Jonah", "jon": "Jonah",
+        "mic": "Micah", "mi": "Micah",
+        "nah": "Nahum", "na": "Nahum",
+        "hab": "Habakkuk",
+        "zeph": "Zephaniah", "zep": "Zephaniah",
+        "hag": "Haggai",
+        "zech": "Zechariah", "zec": "Zechariah",
+        "mal": "Malachi",
+        "matt": "Matthew", "mat": "Matthew", "mt": "Matthew",
+        "mk": "Mark", "mar": "Mark",
+        "lk": "Luke", "lu": "Luke", "luk": "Luke",
+        "jn": "John", "joh": "John",
+        "acts": "Acts", "act": "Acts", "ac": "Acts",
+        "rom": "Romans", "ro": "Romans",
+        "1cor": "1 Corinthians", "1co": "1 Corinthians",
+        "2cor": "2 Corinthians", "2co": "2 Corinthians",
+        "gal": "Galatians", "ga": "Galatians",
+        "eph": "Ephesians",
+        "phil": "Philippians", "php": "Philippians",
+        "col": "Colossians",
+        "1thess": "1 Thessalonians", "1thes": "1 Thessalonians", "1th": "1 Thessalonians",
+        "2thess": "2 Thessalonians", "2thes": "2 Thessalonians", "2th": "2 Thessalonians",
+        "1tim": "1 Timothy", "1ti": "1 Timothy",
+        "2tim": "2 Timothy", "2ti": "2 Timothy",
+        "titus": "Titus", "tit": "Titus",
+        "phlm": "Philemon", "phm": "Philemon", "philem": "Philemon",
+        "heb": "Hebrews",
+        "jas": "James", "jam": "James",
+        "1pet": "1 Peter", "1pe": "1 Peter",
+        "2pet": "2 Peter", "2pe": "2 Peter",
+        "1jn": "1 John", "1joh": "1 John", "1jo": "1 John",
+        "2jn": "2 John", "2joh": "2 John", "2jo": "2 John",
+        "3jn": "3 John", "3joh": "3 John", "3jo": "3 John",
+        "jude": "Jude", "jud": "Jude",
+        "rev": "Revelation", "re": "Revelation",
     }
 
-    # Pattern: Book Chapter:Verse(-Verse)? or just Book (defaults to ch 1)
-    pattern = r'^(\d?\s*\w+)(?:\s+(\d+))?(?::(\d+)(?:-(\d+))?)?$'
+    # Also map full canonical book names (case-insensitive) for direct lookup
+    canonical_books = [
+        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+        "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+        "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
+        "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+        "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+        "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+        "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
+        "Haggai", "Zechariah", "Malachi",
+        "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+        "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+        "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+        "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
+        "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+        "Jude", "Revelation"
+    ]
+    canonical_map = {b.lower(): b for b in canonical_books}
+    # Add common alternative names
+    canonical_map["song of songs"] = "Song of Solomon"
+    canonical_map["psalm"] = "Psalms"
+
+    # Pattern: supports multi-word book names (e.g., "Song of Solomon 8:1")
+    # Splits on the last occurrence of a number sequence that looks like chapter
+    pattern = r'^(.+?)\s+(\d+)(?::(\d+)(?:-(\d+))?)?$'
     match = re.match(pattern, reference.strip(), re.IGNORECASE)
 
     if not match:
-        return None
-
-    # If no chapter specified, default to chapter 1
-    if match.group(2) is None:
-        book_raw = match.group(1)
+        # No chapter - try as book name only (defaults to ch 1)
+        book_raw = reference.strip()
         book_key = book_raw.lower().replace(" ", "")
-        book = abbrevs.get(book_key, book_raw.title())
+        book = abbrevs.get(book_key) or canonical_map.get(book_raw.lower()) or book_raw.title()
         return (book, 1, 1, 999, False)
 
     book_raw, chapter, verse_start, verse_end = match.groups()
 
-    # Normalize book name
+    # Normalize book name: try abbreviation, then canonical name, then title case
     book_key = book_raw.lower().replace(" ", "")
-    book = abbrevs.get(book_key, book_raw.title())
+    book = abbrevs.get(book_key) or canonical_map.get(book_raw.lower()) or book_raw.title()
 
     chapter = int(chapter)
     has_verse = verse_start is not None
@@ -734,14 +886,31 @@ def parse_reference(reference: str) -> Optional[tuple]:
 
 
 def get_cross_references(conn, book: str, chapter: int, verse_start: int, verse_end: int) -> list:
-    """Get cross-references for a passage."""
+    """Get cross-references for a passage (bidirectional)."""
+
     cursor = conn.execute("""
-        SELECT source_verse, target_book, target_chapter, target_verse, relationship_type
-        FROM cross_references
-        WHERE source_book = ? AND source_chapter = ?
-              AND source_verse BETWEEN ? AND ?
+        SELECT source_verse, target_book, target_chapter, target_verse,
+               MAX(book_order) as target_book_order, MAX(votes) as votes,
+               relationship_type
+        FROM (
+            SELECT source_verse, target_book, target_chapter, target_verse,
+                   b.book_order, votes, relationship_type
+            FROM cross_references cr
+            JOIN books b ON b.name = cr.target_book
+            WHERE source_book = ? AND source_chapter = ?
+                  AND source_verse BETWEEN ? AND ?
+            UNION ALL
+            SELECT target_verse, source_book, source_chapter, source_verse,
+                   b.book_order, votes, relationship_type
+            FROM cross_references cr
+            JOIN books b ON b.name = cr.source_book
+            WHERE cr.target_book = ? AND cr.target_chapter = ?
+                  AND cr.target_verse BETWEEN ? AND ?
+        )
+        GROUP BY source_verse, target_book, target_chapter, target_verse
         ORDER BY target_book_order, target_chapter, target_verse
-    """, (book, chapter, verse_start, verse_end))
+    """, (book, chapter, verse_start, verse_end,
+          book, chapter, verse_start, verse_end))
 
     return [dict(r) for r in cursor.fetchall()]
 

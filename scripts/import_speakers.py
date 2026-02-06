@@ -9,6 +9,7 @@ This creates a verse-level mapping of which verses contain spoken words
 from God (OT) or Jesus (NT), for red-letter Bible display.
 """
 
+import os
 import sqlite3
 import json
 from pathlib import Path
@@ -16,7 +17,7 @@ from collections import defaultdict
 
 # Paths
 DATA_DIR = Path(__file__).parent.parent / "data" / "speaker-quotations"
-DB_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DB_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 
 # Book name normalization (Clear-Bible uses abbreviated names)
 BOOK_ABBREV_TO_NAME = {
@@ -99,7 +100,7 @@ def create_table(conn):
 
 def import_speakers(conn):
     """Import speaker data from the Clear-Bible JSON file."""
-    json_path = DATA_DIR / "SpeakerProjections-clear.json"
+    json_path = DATA_DIR / "json" / "SpeakerProjections-clear.json"
 
     if not json_path.exists():
         print(f"Error: {json_path} not found")

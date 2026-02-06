@@ -72,3 +72,9 @@ data/__MACOSX/
 # Clear-Bible alignment data (large source files)
 data/clear-bible/
 data/speaker-quotations/
+
+# Cached source data from network imports
+data/sources/
+
+# Source data bundle
+data/sources.tar.zst

@@ -2,6 +2,7 @@
 Database initialization and connection management for BibleMVP.
 Uses SQLite with FTS5 for full-text search.
 """
+import os
 import sqlite3
 from pathlib import Path
 import logging
@@ -10,7 +11,7 @@ import re
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 
 
 def get_db_connection() -> sqlite3.Connection:
@@ -322,7 +323,8 @@ CREATE TABLE IF NOT EXISTS cross_references (
     target_chapter INTEGER NOT NULL,
     target_verse INTEGER NOT NULL,
     target_book_order INTEGER NOT NULL,
-    relationship_type TEXT
+    relationship_type TEXT,
+    votes INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_crossref_source
@@ -331,14 +333,19 @@ ON cross_references(source_book, source_chapter, source_verse);
 -- Devotionals
 CREATE TABLE IF NOT EXISTS devotionals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT NOT NULL,  -- MM-DD format
     source TEXT NOT NULL,
+    month INTEGER NOT NULL,
+    day INTEGER NOT NULL,
+    time_of_day TEXT NOT NULL,
     title TEXT,
+    verse_ref TEXT,
     content TEXT NOT NULL,
-    scripture_refs TEXT  -- JSON array of references
+    searchable_text TEXT,
+    UNIQUE(source, month, day, time_of_day)
 );
 
-CREATE INDEX IF NOT EXISTS idx_devotional_date ON devotionals(date);
+CREATE INDEX IF NOT EXISTS idx_devotionals_date ON devotionals(month, day);
+CREATE INDEX IF NOT EXISTS idx_devotionals_source ON devotionals(source);
 
 -- User notes (stored locally but schema here for reference)
 -- In practice, this will be in IndexedDB on the frontend

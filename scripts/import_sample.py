@@ -3,6 +3,7 @@
 Import sample Bible data for development/testing.
 Uses bible-api.com for a few key passages.
 """
+import os
 import json
 import sqlite3
 import urllib.request
@@ -12,7 +13,7 @@ import sys
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 
 BOOK_ORDER = {
     "Genesis": 1, "Exodus": 2, "Leviticus": 3, "Numbers": 4, "Deuteronomy": 5,

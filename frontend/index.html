@@ -17,7 +17,7 @@
     <script src="/static/js/supabase-client.js"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
-<body x-data="bibleApp()" x-init="init()" :class="{ 'dark': darkMode }">
+<body x-data="bibleApp()" x-init="init()" :class="{ 'dark': currentTheme === 'dark', 'parchment': currentTheme === 'parchment' }">
     <!-- Toast notification for caching feedback -->
     <div id="cache-toast" class="cache-toast" style="display: none;">
         <span class="toast-icon">&#10003;</span>
@@ -39,6 +39,10 @@
                 <button @click="navigateTo('reader')" class="side-menu-item" :class="{ 'active': currentView === 'reader' }">
                     <span class="side-menu-icon">📖</span>
                     <span>Get in the Word</span>
+                </button>
+                <button @click="showSideMenu = false; enterImmersiveMode()" class="side-menu-item" x-show="currentReference">
+                    <span class="side-menu-icon">⛶</span>
+                    <span>Immersive Reading</span>
                 </button>
                 <button @click="openTodaysReading()" class="side-menu-item" x-show="currentPlan">
                     <span class="side-menu-icon">📅</span>
@@ -126,11 +130,17 @@
                         </template>
                     </ul>
                 </div>
-                <select x-model="translation" class="select-translation" title="Bible Translation">
+                <select x-model="translation" class="select-translation" title="Bible Translation" x-show="!parallelMode">
                     <option value="BSB">BSB - Berean Standard</option>
                     <option value="WEB">WEB - World English</option>
                     <option value="KJV">KJV - King James</option>
                 </select>
+                <button class="btn-parallel"
+                        :class="{ active: parallelMode }"
+                        @click="toggleParallelMode()"
+                        title="Compare translations side by side">
+                    Parallel
+                </button>
                 <button @click="loadPassage" class="btn-go">Go</button>
             </div>
 
@@ -185,6 +195,12 @@
                 <span class="status-dot"></span>
                 <span class="offline-label" x-text="isOnline ? '' : 'Offline'"></span>
             </div>
+            <button @click="ttsPlaying ? ttsStop() : ttsPlay()" class="btn-icon" :title="ttsPlaying ? 'Stop reading' : 'Read aloud'" x-show="currentReference && 'speechSynthesis' in window">
+                <span x-text="ttsPlaying ? '⏹' : '▶'"></span>
+            </button>
+            <button @click="enterImmersiveMode()" class="btn-icon" title="Immersive reading (F)" x-show="currentReference">
+                <span class="immersive-enter-icon">⛶</span>
+            </button>
             <button @click="openSearch()" class="btn-icon" title="Search (/)">
                 🔍
             </button>
@@ -192,7 +208,7 @@
     </header>
 
     <!-- Main Content -->
-    <main class="main-content">
+    <main class="main-content" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
         <!-- Bible Text Panel -->
         <section class="panel panel-text">
             <div class="panel-header">
@@ -202,6 +218,7 @@
                         <input type="checkbox" x-model="showInterlinear">
                         <span class="toggle-label-text">Original Language</span>
                     </label>
+                    <span class="source-text-label" x-show="showInterlinear && interlinearSourceText" x-text="'Source: ' + interlinearSourceText"></span>
                     <div class="reading-progress" x-show="highlightedVerses.length > 0 && verses.length > 0">
                         <div class="progress-bar" :style="'width: ' + getReadingProgress() + '%'"></div>
                         <span class="progress-text" x-text="highlightedVerses[0] + '/' + verses.length"></span>
@@ -213,6 +230,26 @@
                     <button @click="nextVerse" class="btn-nav" title="Next verse" :disabled="!canGoNextVerse()">V →</button>
                     <button @click="nextChapter" class="btn-nav" title="Next chapter">Ch →</button>
                 </div>
+            </div>
+
+            <!-- TTS Controls Bar -->
+            <div x-show="ttsPlaying || ttsPaused" class="tts-controls-bar" x-cloak>
+                <button @click="ttsSkipBack()" class="btn-tts" title="Previous verse">⏮</button>
+                <button @click="ttsPaused ? ttsPlay() : ttsPause()" class="btn-tts btn-tts-play" :title="ttsPaused ? 'Resume' : 'Pause'">
+                    <span x-text="ttsPaused ? '▶' : '⏸'"></span>
+                </button>
+                <button @click="ttsSkipForward()" class="btn-tts" title="Next verse">⏭</button>
+                <span class="tts-verse-indicator" x-text="'v.' + ttsCurrentVerse"></span>
+                <label class="tts-speed" title="Reading speed">
+                    <span class="tts-speed-label" x-text="ttsRate + 'x'"></span>
+                    <input type="range" min="0.5" max="2.5" step="0.25" :value="ttsRate" @input="ttsSetRate($event.target.value)" class="tts-rate-slider">
+                </label>
+                <select x-show="ttsAvailableVoices.length > 1" @change="ttsSetVoice($event.target.value)" class="tts-voice-select" title="Voice">
+                    <template x-for="voice in ttsAvailableVoices" :key="voice.name">
+                        <option :value="voice.name" x-text="voice.name.replace(/Microsoft |Google |Apple /g, '')" :selected="voice.name === ttsVoice"></option>
+                    </template>
+                </select>
+                <button @click="ttsStop()" class="btn-tts btn-tts-stop" title="Stop">⏹</button>
             </div>
 
             <!-- "Return to Plan" bar (shown when navigated away from plan reading) - sticky below header -->
@@ -251,6 +288,12 @@
                 </div>
             </div>
 
+            <!-- Source text mismatch warning -->
+            <div class="source-text-warning" x-show="showInterlinear && interlinearSourceText && translation !== 'BSB' && !sourceTextWarningDismissed">
+                <span class="source-text-warning-text" x-text="'Note: The original language text shown is aligned to the BSB translation (Critical Text). The ' + translation + ' may use a different manuscript tradition.'"></span>
+                <button @click="dismissSourceTextWarning()" class="source-text-warning-close" title="Dismiss">&times;</button>
+            </div>
+
             <div class="panel-body">
                 <div x-show="loading" class="loading">
                     <div class="loading-spinner"></div>
@@ -279,7 +322,49 @@
                     </div>
                 </div>
 
-                <div x-show="!loading && !error && verses.length > 0" class="verses" :class="{ 'selection-mode': noteEditMode }">
+                <!-- Share mode toolbar -->
+                <div class="share-mode-bar" x-show="verses.length > 0 && currentReference">
+                    <button @click="toggleShareMode()" class="btn-share-toggle" :class="{ active: shareMode }">
+                        <span x-show="!shareMode">Share</span>
+                        <span x-show="shareMode">Cancel</span>
+                    </button>
+                    <span x-show="shareMode && shareSelectedVerses.length === 0" class="share-hint">Tap verses to select</span>
+                    <span x-show="shareMode && shareSelectedVerses.length > 0" class="share-hint" x-text="shareSelectedVerses.length + ' verse' + (shareSelectedVerses.length === 1 ? '' : 's') + ' selected'"></span>
+                    <button x-show="shareMode && shareSelectedVerses.length > 0" @click="openShareModal()" class="btn-share-action">Share Selected</button>
+                </div>
+
+                <!-- Parallel Translation View -->
+                <div x-show="!loading && !error && parallelMode && Object.keys(parallelData).length > 0" class="parallel-view">
+                    <div class="parallel-translation-toggles">
+                        <template x-for="tid in ['BSB', 'KJV', 'WEB']" :key="'toggle-' + tid">
+                            <label class="parallel-toggle-label">
+                                <input type="checkbox"
+                                       :checked="parallelTranslations.includes(tid)"
+                                       @change="toggleParallelTranslation(tid)">
+                                <span x-text="tid"></span>
+                            </label>
+                        </template>
+                    </div>
+                    <div class="parallel-header">
+                        <div class="parallel-verse-num-header"></div>
+                        <template x-for="tid in parallelTranslations" :key="'header-' + tid">
+                            <div class="parallel-col-header" x-text="tid"></div>
+                        </template>
+                    </div>
+                    <template x-for="(verse, idx) in (parallelData[parallelTranslations[0]] || [])" :key="'pv-' + idx">
+                        <div class="parallel-verse-row">
+                            <div class="parallel-verse-num" x-text="verse.verse"></div>
+                            <template x-for="tid in parallelTranslations" :key="tid + '-' + verse.verse">
+                                <div class="parallel-cell" :data-translation="tid">
+                                    <span class="parallel-cell-label" x-text="tid"></span>
+                                    <p x-text="(parallelData[tid] || []).find(v => v.verse === verse.verse)?.text || '\u2014'"></p>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <div x-show="!loading && !error && verses.length > 0 && !parallelMode" class="verses" :class="{ 'selection-mode': noteEditMode || shareMode }">
                     <template x-for="(verse, verseIdx) in verses" :key="'v-' + verseIdx">
                         <div class="verse-wrapper" :class="{ 'has-section-header': verse._chapterStart && combinedPlanReading }">
                             <!-- Section/Chapter header for combined plan reading -->
@@ -292,10 +377,12 @@
                                 :id="'verse-' + verse.verse"
                                 :class="{
                                     'verse-highlighted': isVerseHighlighted(verse.verse),
+                                    'verse-speaking': ttsCurrentVerse === verse.verse,
                                     'has-interlinear': showInterlinear && hasInterlinear(verse.verse, verseIdx),
-                                    'verse-selected-for-note': noteEditMode && isVerseSelectedForNote(verse.verse)
+                                    'verse-selected-for-note': noteEditMode && isVerseSelectedForNote(verse.verse),
+                                    'verse-selected-for-share': shareMode && shareSelectedVerses.includes(verse.verse)
                                 }"
-                                @click="handleVerseBoxClick($event, verse.verse, verseIdx)"
+                                @click="shareMode ? toggleShareVerse(verse.verse) : handleVerseBoxClick($event, verse.verse, verseIdx)"
                             >
                             <!-- Tag indicator dots -->
                             <span class="verse-tag-dots" x-show="getVerseTagColors(verse.verse).length > 0">
@@ -324,14 +411,16 @@
                                     </span>
                                 </template>
                             </div>
-                            <button
-                                class="btn-copy"
-                                @click.stop="copyVerse(verse)"
-                                :title="copyFeedback === verse.verse ? 'Copied!' : 'Copy verse'"
-                            >
-                                <span x-show="copyFeedback !== verse.verse">📋</span>
-                                <span x-show="copyFeedback === verse.verse">✓</span>
-                            </button>
+                            <div class="verse-actions" x-show="!shareMode">
+                                <button
+                                    class="btn-copy"
+                                    @click.stop="copyVerse(verse)"
+                                    :title="copyFeedback === verse.verse ? 'Copied!' : 'Copy verse'"
+                                >
+                                    <span x-show="copyFeedback !== verse.verse">📋</span>
+                                    <span x-show="copyFeedback === verse.verse">✓</span>
+                                </button>
+                            </div>
                             </div>
                         </div>
                     </template>
@@ -340,7 +429,16 @@
         </section>
 
         <!-- Resources Panel -->
-        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded }">
+        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed }">
+            <!-- Sidebar toggle button (tablet/desktop only) -->
+            <button
+                class="btn-sidebar-toggle"
+                @click="toggleSidebar()"
+                :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+            >
+                <span x-text="sidebarCollapsed ? '&#x00BB;' : '&#x00AB;'"></span>
+            </button>
             <div class="panel-tabs">
                 <button
                     class="tab-drag-handle"
@@ -356,20 +454,35 @@
                     aria-label="Close panel"
                 >×</button>
                 <button
-                    @click="activeTab = 'commentary'; resourcesPanelExpanded = true"
+                    @click="activeTab = 'commentary'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'commentary', 'has-content': commentary.length > 0 }"
                     class="tab-btn"
-                >Commentary<span x-show="commentary.length > 0" class="tab-indicator">●</span></button>
+                >Commentary<span x-show="commentary.length > 0" class="tab-indicator">&#x25CF;</span></button>
                 <button
-                    @click="activeTab = 'notes'; resourcesPanelExpanded = true"
+                    @click="activeTab = 'notes'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'notes', 'has-content': getRelevantNotes().length > 0 }"
                     class="tab-btn"
                 >Notes<span x-show="getRelevantNotes().length > 0" class="tab-indicator" x-text="'(' + getRelevantNotes().length + ')'"></span></button>
                 <button
-                    @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true"
+                    @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'crossrefs', 'has-content': crossRefs.length > 0 }"
                     class="tab-btn"
                 >Cross-Refs<span x-show="crossRefs.length > 0" class="tab-indicator" x-text="'(' + crossRefs.length + ')'"></span></button>
+            </div>
+            <!-- Collapsed sidebar icons (tablet/desktop only) -->
+            <div class="sidebar-collapsed-icons">
+                <button @click="activeTab = 'commentary'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'commentary' }" title="Commentary">
+                    <span class="collapsed-icon-label">C</span>
+                    <span class="collapsed-icon-dot" x-show="commentary.length > 0"></span>
+                </button>
+                <button @click="activeTab = 'notes'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'notes' }" title="Notes">
+                    <span class="collapsed-icon-label">N</span>
+                    <span class="collapsed-icon-dot" x-show="getRelevantNotes().length > 0"></span>
+                </button>
+                <button @click="activeTab = 'crossrefs'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'crossrefs' }" title="Cross-Refs">
+                    <span class="collapsed-icon-label">X</span>
+                    <span class="collapsed-icon-dot" x-show="crossRefs.length > 0"></span>
+                </button>
             </div>
             <div class="panel-body">
                 <!-- Commentary Tab -->
@@ -651,8 +764,16 @@
                             <span class="empty-state-hint">This verse has no linked references</span>
                         </div>
                     </template>
+                    <!-- Sort & Filter controls -->
+                    <div class="crossref-controls" x-show="crossRefs.length > 0">
+                        <div class="crossref-sort-btns">
+                            <button class="crossref-sort-btn" :class="{ active: crossRefSort === 'biblical' }" @click="crossRefSort = 'biblical'">Biblical Order</button>
+                            <button class="crossref-sort-btn" :class="{ active: crossRefSort === 'relevance' }" @click="crossRefSort = 'relevance'">Relevance</button>
+                        </div>
+                        <input type="text" class="crossref-filter-input" placeholder="Filter by book..." x-model="crossRefFilter" @input="crossRefFilter = $event.target.value">
+                    </div>
                     <ul class="crossref-list">
-                        <template x-for="(ref, idx) in crossRefs" :key="'xref-' + idx">
+                        <template x-for="(ref, idx) in getFilteredCrossRefs()" :key="'xref-' + idx">
                             <li class="crossref-item"
                                 @mouseenter="previewVerse(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, $event)"
                                 @mouseleave="hidePreview()"
@@ -663,9 +784,13 @@
                                     @click.prevent="loadReference(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse)"
                                     x-text="ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse"
                                 ></a>
+                                <span class="crossref-votes" x-show="crossRefSort === 'relevance' && ref.votes" x-text="ref.votes"></span>
                             </li>
                         </template>
                     </ul>
+                    <div class="crossref-filter-count" x-show="crossRefFilter && crossRefs.length > 0">
+                        <span x-text="getFilteredCrossRefs().length + ' of ' + crossRefs.length + ' references'"></span>
+                    </div>
                 </div>
 
             </div>
@@ -740,6 +865,61 @@
             </div>
         </aside>
     </main>
+
+    <!-- Immersive Reading Mode -->
+    <div class="immersive-overlay" x-show="immersiveMode" x-cloak
+         x-ref="immersiveOverlay"
+         x-effect="if (immersiveMode && currentChapter) { $nextTick(() => { $refs.immersiveOverlay && ($refs.immersiveOverlay.scrollTop = 0) }) }"
+         @keydown.escape.window="immersiveMode && exitImmersiveMode()">
+
+        <!-- Top controls bar (hidden by default, shown on tap) -->
+        <div class="immersive-controls-top"
+             x-show="immersiveControlsVisible"
+             x-transition.opacity.duration.200ms>
+            <button @click.stop="exitImmersiveMode()" class="immersive-btn immersive-exit-btn" title="Exit (Esc)">
+                <span class="immersive-exit-icon">&times;</span> Exit
+            </button>
+            <span class="immersive-reference" x-text="currentBook + ' ' + currentChapter"></span>
+            <span class="immersive-translation" x-text="translation"></span>
+        </div>
+
+        <!-- Main reading area -->
+        <div class="immersive-content"
+             @click="toggleImmersiveControls()"
+             @touchstart="immersiveTouchStart($event)"
+             @touchend="immersiveTouchEnd($event)">
+            <div class="immersive-book-title" x-text="currentBook"></div>
+            <div class="immersive-chapter-num" x-text="'Chapter ' + currentChapter"></div>
+            <div class="immersive-verses">
+                <template x-for="verse in verses" :key="verse.verse">
+                    <p class="immersive-verse">
+                        <sup class="immersive-verse-num" x-text="verse.verse"></sup>
+                        <span class="immersive-verse-text"
+                              :class="{ 'red-letter': isRedLetterVerse(verse.verse) }"
+                              x-text="verse.text"></span>
+                    </p>
+                </template>
+            </div>
+            <div class="immersive-chapter-end">&#8226; &#8226; &#8226;</div>
+        </div>
+
+        <!-- Bottom navigation (hidden by default) -->
+        <div class="immersive-controls-bottom"
+             x-show="immersiveControlsVisible"
+             x-transition.opacity.duration.200ms>
+            <button @click.stop="previousChapter()" class="immersive-nav-btn">
+                &larr; Previous
+            </button>
+            <button @click.stop="nextChapter()" class="immersive-nav-btn">
+                Next &rarr;
+            </button>
+        </div>
+
+        <!-- Swipe hint (shown briefly on first entry) -->
+        <div class="immersive-swipe-hint" x-show="immersiveMode && !immersiveHintShown">
+            Tap to show controls &middot; Swipe or arrow keys to navigate
+        </div>
+    </div>
 
     <!-- Search Modal -->
     <div class="modal-overlay" x-show="showSearch" x-transition @click.self="showSearch = false">
@@ -1007,13 +1187,35 @@
                         <h4>Appearance</h4>
                         <div class="setting-row">
                             <div class="setting-info">
-                                <div class="setting-label">Dark Mode</div>
-                                <div class="setting-description">Use dark theme for comfortable reading</div>
+                                <div class="setting-label">Theme</div>
+                                <div class="setting-description">Choose your reading experience</div>
                             </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" x-model="darkMode" @change="saveDarkMode()">
-                                <span class="toggle-slider"></span>
-                            </label>
+                            <div class="theme-selector">
+                                <button
+                                    @click="setTheme('light')"
+                                    class="theme-option"
+                                    :class="{ active: currentTheme === 'light' }"
+                                    title="Light">
+                                    <span class="theme-preview theme-preview-light"></span>
+                                    <span class="theme-option-label">Light</span>
+                                </button>
+                                <button
+                                    @click="setTheme('dark')"
+                                    class="theme-option"
+                                    :class="{ active: currentTheme === 'dark' }"
+                                    title="Dark">
+                                    <span class="theme-preview theme-preview-dark"></span>
+                                    <span class="theme-option-label">Dark</span>
+                                </button>
+                                <button
+                                    @click="setTheme('parchment')"
+                                    class="theme-option"
+                                    :class="{ active: currentTheme === 'parchment' }"
+                                    title="Parchment">
+                                    <span class="theme-preview theme-preview-parchment"></span>
+                                    <span class="theme-option-label">Classic</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1403,6 +1605,68 @@
         </div>
     </div>
 
+    <!-- Share Verse Modal -->
+    <div class="modal-overlay" x-show="showShareModal" x-transition @click.self="showShareModal = false">
+        <div class="modal share-modal">
+            <div class="modal-header">
+                <h2>Share Verse</h2>
+                <button @click="showShareModal = false" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Preview text -->
+                <div class="share-preview-text">
+                    <p class="share-verse-text" x-text="'\"' + getShareVerseText() + '\"'"></p>
+                    <p class="share-verse-ref" x-text="'— ' + getShareReference() + ' (' + translation + ')'"></p>
+                </div>
+
+                <!-- Share actions -->
+                <div class="share-actions">
+                    <button @click="copyShareText()" class="btn-share-option">
+                        <span class="share-option-icon">📋</span>
+                        <span>Copy Text</span>
+                    </button>
+                    <button @click="copyShareLink()" class="btn-share-option">
+                        <span class="share-option-icon">🔗</span>
+                        <span>Copy Link</span>
+                    </button>
+                    <button x-show="navigator.share" @click="nativeShare()" class="btn-share-option">
+                        <span class="share-option-icon">&#x1F4E4;</span>
+                        <span>Share</span>
+                    </button>
+                </div>
+
+                <!-- Image generation -->
+                <div class="share-image-section">
+                    <h4>Create Image</h4>
+                    <div class="share-bg-picker">
+                        <template x-for="(bg, idx) in shareBackgrounds" :key="'bg-' + idx">
+                            <button
+                                class="share-bg-swatch"
+                                :class="{ selected: shareBackgroundIndex === idx }"
+                                :style="'background: linear-gradient(135deg, ' + bg.colors[0] + ', ' + bg.colors[1] + ')'"
+                                @click="selectShareBackground(idx)"
+                                :title="bg.name"
+                            ></button>
+                        </template>
+                    </div>
+                    <div class="share-canvas-wrapper">
+                        <canvas id="share-canvas" width="1080" height="1080"></canvas>
+                    </div>
+                    <div class="share-image-actions">
+                        <button @click="downloadShareImage()" class="btn-share-option">
+                            <span class="share-option-icon">&#x2B07;</span>
+                            <span>Download Image</span>
+                        </button>
+                        <button x-show="navigator.share && navigator.canShare" @click="shareImage()" class="btn-share-option">
+                            <span class="share-option-icon">&#x1F4E4;</span>
+                            <span>Share Image</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Share Jesus Modal -->
     <div class="modal-overlay" x-show="showShareJesus" x-transition @click.self="showShareJesus = false">
         <div class="modal share-jesus-modal">
@@ -1418,6 +1682,7 @@
                         and ask "What does this say to you?" The Holy Spirit does the work through God's Word.
                         Your job is simply to be obedient and share.
                     </p>
+                    <p class="share-jesus-attribution">Based on <em>Share Jesus Without Fear</em> by William Fay</p>
                 </div>
 
                 <div class="share-jesus-section">

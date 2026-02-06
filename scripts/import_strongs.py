@@ -8,35 +8,43 @@ Usage:
 
 This creates the lexicon entries for Greek (G) and Hebrew (H) Strong's numbers.
 """
+import os
 import json
 import sqlite3
+import sys
 import urllib.request
 from pathlib import Path
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+sys.path.insert(0, str(Path(__file__).parent))
+from source_cache import cached_fetch
+
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 
 # Public domain Strong's data sources
 STRONGS_GREEK_URL = "https://raw.githubusercontent.com/openscriptures/strongs/master/greek/strongs-greek-dictionary.js"
 STRONGS_HEBREW_URL = "https://raw.githubusercontent.com/openscriptures/strongs/master/hebrew/strongs-hebrew-dictionary.js"
 
 
-def download_json(url):
+def download_json(url, cache_key=None):
     """Download and parse JSON from URL (handles .js files with comments)."""
-    print(f"Downloading from {url}...")
-    with urllib.request.urlopen(url) as response:
-        data = response.read().decode('utf-8')
-        # Remove JavaScript comment header if present
-        # Find the start of the actual JSON object
-        json_start = data.find('{')
-        if json_start == -1:
-            raise ValueError("No JSON object found in file")
-        data = data[json_start:]
-        # Remove JavaScript module.exports suffix if present
-        # Find the last closing brace of the JSON object
-        json_end = data.rfind('}')
-        if json_end != -1:
-            data = data[:json_end + 1]
-        return json.loads(data)
+    print(f"Loading {cache_key or url}...")
+    if cache_key:
+        data = cached_fetch(cache_key, url)
+    else:
+        with urllib.request.urlopen(url) as response:
+            data = response.read().decode('utf-8')
+    if data is None:
+        raise ValueError(f"Failed to fetch {url}")
+    # Remove JavaScript comment header if present
+    json_start = data.find('{')
+    if json_start == -1:
+        raise ValueError("No JSON object found in file")
+    data = data[json_start:]
+    # Remove JavaScript module.exports suffix if present
+    json_end = data.rfind('}')
+    if json_end != -1:
+        data = data[:json_end + 1]
+    return json.loads(data)
 
 
 def import_lexicon(conn, data, language):
@@ -97,13 +105,13 @@ def main():
     try:
         # Download and import Greek
         print("\nImporting Greek lexicon...")
-        greek_data = download_json(STRONGS_GREEK_URL)
+        greek_data = download_json(STRONGS_GREEK_URL, cache_key="strongs/strongs-greek-dictionary.js")
         greek_count = import_lexicon(conn, greek_data, 'greek')
         print(f"  Imported {greek_count} Greek entries")
 
         # Download and import Hebrew
         print("\nImporting Hebrew lexicon...")
-        hebrew_data = download_json(STRONGS_HEBREW_URL)
+        hebrew_data = download_json(STRONGS_HEBREW_URL, cache_key="strongs/strongs-hebrew-dictionary.js")
         hebrew_count = import_lexicon(conn, hebrew_data, 'hebrew')
         print(f"  Imported {hebrew_count} Hebrew entries")
 

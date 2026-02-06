@@ -9,6 +9,7 @@ Sources:
 Usage:
     python scripts/import_interlinear.py
 """
+import os
 import csv
 import re
 import sqlite3
@@ -16,7 +17,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 # OSIS namespace for Hebrew XML

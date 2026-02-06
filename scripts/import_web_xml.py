@@ -6,6 +6,7 @@ Source: https://github.com/seven1m/open-bibles
 Usage:
     python scripts/import_web_xml.py
 """
+import os
 import sqlite3
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -14,8 +15,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
+from source_cache import cached_fetch
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 WEB_XML_URL = "https://raw.githubusercontent.com/seven1m/open-bibles/master/eng-web.usfx.xml"
 
 BOOK_ORDER = {
@@ -59,13 +62,12 @@ BOOK_ID_MAP = {
 
 
 def download_xml():
-    """Download WEB XML file."""
-    print(f"Downloading WEB XML from GitHub...")
-    print(f"URL: {WEB_XML_URL}")
-
-    req = urllib.request.Request(WEB_XML_URL, headers={'User-Agent': 'BibleMVP/1.0'})
-    with urllib.request.urlopen(req, timeout=120) as response:
-        return response.read().decode('utf-8')
+    """Download WEB XML file (cached locally after first download)."""
+    print(f"Loading WEB XML...")
+    data = cached_fetch("web/eng-web.usfx.xml", WEB_XML_URL, timeout=120)
+    if data is None:
+        raise RuntimeError(f"Failed to fetch WEB XML from {WEB_XML_URL}")
+    return data
 
 
 def get_text_content(element):

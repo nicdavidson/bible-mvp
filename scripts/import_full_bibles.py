@@ -9,6 +9,7 @@ Sources:
 Usage:
     python scripts/import_full_bibles.py
 """
+import os
 import json
 import sqlite3
 import urllib.request
@@ -17,8 +18,10 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
+from source_cache import cached_fetch_json
 
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 
 # Book order mapping
 BOOK_ORDER = {
@@ -63,7 +66,7 @@ def fetch_kjv_book(book_name: str) -> dict | None:
     # The repo uses no spaces in filenames: "1Samuel.json", "SongofSolomon.json"
     url_name = book_name.replace(" ", "")
     url = f"{KJV_BASE_URL}/{url_name}.json"
-    return fetch_json(url)
+    return cached_fetch_json(f"kjv/{url_name}.json", url)
 
 
 def import_kjv(conn: sqlite3.Connection) -> int:
@@ -263,6 +266,12 @@ def normalize_book_name(name: str) -> str:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--kjv-only", action="store_true", help="Only import KJV")
+    parser.add_argument("--web-only", action="store_true", help="Only import WEB")
+    args = parser.parse_args()
+
     print("BibleMVP - Full Bible Import")
     print("=" * 50)
 
@@ -273,18 +282,23 @@ def main():
     conn = sqlite3.connect(DATABASE_PATH)
 
     try:
-        # Import KJV
-        kjv_count = import_kjv(conn)
-        print(f"\nKJV Total: {kjv_count} verses")
+        kjv_count = 0
+        web_count = 0
 
-        # Import WEB
-        web_count = import_web(conn)
-        print(f"\nWEB Total: {web_count} verses")
+        if not args.web_only:
+            kjv_count = import_kjv(conn)
+            print(f"\nKJV Total: {kjv_count} verses")
+
+        if not args.kjv_only:
+            web_count = import_web(conn)
+            print(f"\nWEB Total: {web_count} verses")
 
         print("\n" + "=" * 50)
         print(f"IMPORT COMPLETE")
-        print(f"  KJV: {kjv_count} verses")
-        print(f"  WEB: {web_count} verses")
+        if kjv_count:
+            print(f"  KJV: {kjv_count} verses")
+        if web_count:
+            print(f"  WEB: {web_count} verses")
         print(f"  Total: {kjv_count + web_count} verses")
         print("=" * 50)
 

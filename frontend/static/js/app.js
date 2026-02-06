@@ -226,6 +226,8 @@ function bibleApp() {
         highlightedVerses: [],
         commentary: [],
         crossRefs: [],
+        crossRefSort: 'biblical',  // 'biblical' or 'relevance'
+        crossRefFilter: '',        // book name filter
         notes: [],
         currentNote: '',
         selectedWord: null,
@@ -234,6 +236,7 @@ function bibleApp() {
         loadingCommentary: false,
         error: null,
         darkMode: false,
+        currentTheme: 'light',
         activeTab: 'commentary',
         showSearch: false,
         searchQuery: '',
@@ -274,9 +277,22 @@ function bibleApp() {
         // Mobile resources panel state
         resourcesPanelExpanded: false,
 
+        // Sidebar collapse state (tablet/desktop)
+        sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+
         // Interlinear data
         interlinearData: {},  // verse number -> words array
         showInterlinear: false,
+        interlinearLanguage: '',  // 'hebrew' or 'greek'
+        interlinearSourceText: '',  // Source text label (e.g., "Westminster Leningrad Codex")
+        sourceTextWarningDismissed: localStorage.getItem('sourceTextWarningDismissed') === 'true',
+
+        // Verse sharing state
+        shareMode: false,
+        shareSelectedVerses: [],
+        showShareModal: false,
+        shareBackgroundIndex: 0,
+        shareImagePreview: null,
 
         // Side menu state
         showSideMenu: false,
@@ -289,6 +305,13 @@ function bibleApp() {
         showFeedback: false,
         showShareJesus: false,
         settingsTab: 'general',
+
+        // Immersive reading mode
+        immersiveMode: false,
+        immersiveControlsVisible: false,
+        immersiveControlsTimeout: null,
+        immersiveTouchStartX: 0,
+        immersiveHintShown: false,
 
         // Single Verse View (reusable component)
         singleVerseMode: false,
@@ -426,13 +449,39 @@ function bibleApp() {
         feedbackSuccess: false,
         feedbackError: null,
 
+        // Parallel translation state
+        parallelMode: false,
+        parallelTranslations: ['BSB', 'KJV', 'WEB'],
+        parallelData: {},
+
+        // Text-to-Speech state
+        ttsPlaying: false,
+        ttsPaused: false,
+        ttsCurrentVerse: null,  // Verse number currently being spoken
+        ttsRate: parseFloat(localStorage.getItem('ttsRate') || '1.0'),
+        ttsVoice: localStorage.getItem('ttsVoice') || '',
+        ttsAvailableVoices: [],
+        _ttsUtterance: null,
+        _ttsVerseQueue: [],
+        _ttsQueueIndex: 0,
+
         // Initialize
         async init() {
             // Detect touch device
             this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
             // Load preferences from localStorage
-            this.darkMode = localStorage.getItem('darkMode') === 'true';
+            // Load theme (supports legacy darkMode boolean and new theme system)
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                this.currentTheme = savedTheme;
+                this.darkMode = savedTheme === 'dark';
+            } else {
+                // Legacy migration: convert old darkMode boolean to new theme system
+                this.darkMode = localStorage.getItem('darkMode') === 'true';
+                this.currentTheme = this.darkMode ? 'dark' : 'light';
+                localStorage.setItem('theme', this.currentTheme);
+            }
             this.defaultTranslation = localStorage.getItem('defaultTranslation') || 'BSB';
             this.translation = this.defaultTranslation;
             this.defaultShowInterlinear = localStorage.getItem('defaultShowInterlinear') === 'true';
@@ -468,6 +517,9 @@ function bibleApp() {
                 this.isOnline = false;
                 this.showToast('You are offline - cached content available', 'info');
             });
+
+            // Initialize TTS voices
+            this.initTTS();
 
             // Load offline stats
             await this.updateOfflineStats();
@@ -625,9 +677,18 @@ function bibleApp() {
                         this.openSearch();
                         break;
                     case 'Escape':
-                        this.showSearch = false;
-                        this.showSettings = false;
-                        this.selectedWord = null;
+                        if (this.immersiveMode) {
+                            this.exitImmersiveMode();
+                        } else {
+                            this.showSearch = false;
+                            this.showSettings = false;
+                            this.selectedWord = null;
+                        }
+                        break;
+                    case 'f':
+                        if (this.currentReference && !this.immersiveMode) {
+                            this.enterImmersiveMode();
+                        }
                         break;
                     case 'd':
                         this.toggleDarkMode();
@@ -645,6 +706,16 @@ function bibleApp() {
                     case 'g':
                         e.preventDefault();
                         this.$refs.referenceInput?.focus();
+                        break;
+                    case ' ':
+                        // Space = play/pause TTS
+                        if (this.ttsPlaying) {
+                            e.preventDefault();
+                            this.ttsPaused ? this.ttsPlay() : this.ttsPause();
+                        } else if (this.currentReference) {
+                            e.preventDefault();
+                            this.ttsPlay();
+                        }
                         break;
                 }
             });
@@ -790,9 +861,59 @@ function bibleApp() {
         async loadPassage() {
             if (!this.referenceInput.trim()) return;
 
+            // Stop TTS when navigating to new passage
+            if (this.ttsPlaying) this.ttsStop();
+
             this.loading = true;
             this.error = null;
             this.selectedWord = null;
+
+            // Parse book/chapter from input BEFORE fetch so offline fallback has correct values
+            const refMatch = this.referenceInput.match(/^(.+?)\s+(\d+)/);
+            const inputBook = refMatch ? refMatch[1] : this.referenceInput;
+            const inputChapter = refMatch ? parseInt(refMatch[2]) : 1;
+
+            // If forced offline, skip fetch entirely and go straight to IndexedDB
+            if (this.forcedOffline) {
+                await this._loadFromCache(inputBook, inputChapter);
+                return;
+            }
+
+            // Cache-first: if auto-cache is on and we have cached data, show it instantly
+            // then refresh from API in the background
+            if (this.autoCacheEnabled && window.offlineStorage) {
+                try {
+                    const cached = await window.offlineStorage.getChapterVerses(
+                        this.translation, inputBook, inputChapter
+                    );
+                    if (cached && cached.length > 0) {
+                        // Show cached data immediately
+                        this.verses = cached.map(v => ({ verse: v.verse, text: v.text }));
+                        this.currentReference = `${inputBook} ${inputChapter}`;
+                        this.parseCurrentReference();
+                        this.crossRefs = [];
+                        this.highlightedVerses = [];
+                        this.speakerVerses = [];
+                        this.updateURL(true);
+                        this.observeVerses();
+                        this.loading = false;
+
+                        // Load cached commentary/interlinear/cross-refs
+                        await this.loadCommentary();
+                        await this.loadInterlinearData();
+                        try {
+                            const cachedRefs = await window.offlineStorage.getChapterCrossRefs(inputBook, inputChapter);
+                            if (cachedRefs?.length > 0) this.crossRefs = cachedRefs;
+                        } catch (e) { /* silent */ }
+
+                        // Background refresh from API (fire-and-forget)
+                        this._backgroundRefresh(inputBook, inputChapter);
+                        return;
+                    }
+                } catch (e) {
+                    // Cache check failed, fall through to normal fetch
+                }
+            }
 
             try {
                 const response = await fetch(
@@ -800,8 +921,9 @@ function bibleApp() {
                 );
 
                 if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.detail || 'Failed to load passage');
+                    let detail = 'Failed to load passage';
+                    try { const data = await response.json(); detail = data.detail || detail; } catch {}
+                    throw new Error(detail);
                 }
 
                 const data = await response.json();
@@ -814,13 +936,13 @@ function bibleApp() {
                 // Parse reference for navigation
                 this.parseCurrentReference();
 
-                // Update URL with clean path format
-                this.updateURL();
+                // Update URL with clean path format (new chapter = new history entry)
+                this.updateURL(true);
 
                 // Load commentary
                 await this.loadCommentary();
 
-                // Load interlinear data if available (OT books or Matthew)
+                // Load interlinear data if available
                 if (OT_BOOKS.includes(this.currentBook) || NT_BOOKS.includes(this.currentBook)) {
                     await this.loadInterlinearData();
                 } else {
@@ -840,11 +962,95 @@ function bibleApp() {
                 // Setup scroll-based verse tracking
                 this.observeVerses();
 
+                // Load parallel data if parallel mode is active
+                if (this.parallelMode) {
+                    this.loadParallelPassage();
+                }
+
+                // Auto-cache: save to IndexedDB for offline use
+                if (this.autoCacheEnabled && window.offlineStorage && this.currentBook && this.currentChapter) {
+                    this._autoCacheCurrentChapter();
+                }
+
             } catch (err) {
-                this.error = err.message;
+                // Network failed — try IndexedDB fallback
+                await this._loadFromCache(inputBook, inputChapter, err.message);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        // Load passage from IndexedDB cache (used by offline fallback and forced offline mode)
+        async _loadFromCache(book, chapter, errorMsg = null) {
+            if (!window.offlineStorage) {
+                this.error = errorMsg || 'Offline storage not available';
+                this.verses = [];
+                this.loading = false;
+                return;
+            }
+            try {
+                const cached = await window.offlineStorage.getChapterVerses(
+                    this.translation, book, chapter
+                );
+                if (cached && cached.length > 0) {
+                    this.verses = cached.map(v => ({ verse: v.verse, text: v.text }));
+                    this.currentReference = `${book} ${chapter}`;
+                    this.parseCurrentReference();
+                    this.crossRefs = [];
+                    this.highlightedVerses = [];
+                    this.speakerVerses = [];
+                    this.updateURL(true);
+                    this.observeVerses();
+
+                    // Load cached cross-refs
+                    try {
+                        const cachedRefs = await window.offlineStorage.getChapterCrossRefs(book, chapter);
+                        if (cachedRefs?.length > 0) this.crossRefs = cachedRefs;
+                    } catch (e) { /* silent */ }
+
+                    // Load cached commentary and interlinear
+                    await this.loadCommentary();
+                    await this.loadInterlinearData();
+
+                    this.error = null;
+                    this.showToast('Loaded from offline cache', 'info');
+                } else {
+                    this.error = `${book} ${chapter} is not cached for offline use. Read it while online first, or download from Settings.`;
+                    this.verses = [];
+                }
+            } catch (cacheErr) {
+                console.error('IndexedDB fallback failed:', cacheErr);
+                this.error = errorMsg || 'Failed to load from cache';
                 this.verses = [];
             } finally {
                 this.loading = false;
+            }
+        },
+
+        // Background refresh: fetch fresh data from API and update cache (does not update UI unless data changed significantly)
+        async _backgroundRefresh(book, chapter) {
+            try {
+                const ref = `${book} ${chapter}`;
+                const response = await fetch(
+                    `/api/passage/${encodeURIComponent(ref)}?translation=${this.translation}`
+                );
+                if (!response.ok) return;
+                const data = await response.json();
+
+                // Update cross-refs and speaker data silently (these aren't cached initially)
+                if (data.cross_references?.length > 0) {
+                    this.crossRefs = data.cross_references;
+                }
+                if (data.speaker_verses?.length > 0) {
+                    this.speakerVerses = data.speaker_verses;
+                }
+
+                // Re-cache the fresh data
+                if (window.offlineStorage) {
+                    this._autoCacheCurrentChapter();
+                }
+            } catch (err) {
+                // Silent — background refresh is best-effort
             }
         },
 
@@ -862,6 +1068,44 @@ function bibleApp() {
             await this.loadPassage();
         },
 
+        // Toggle parallel translation mode
+        toggleParallelMode() {
+            this.parallelMode = !this.parallelMode;
+            if (this.parallelMode) {
+                this.loadParallelPassage();
+            }
+        },
+
+        // Load parallel passage data for all selected translations
+        async loadParallelPassage() {
+            if (!this.currentBook || !this.currentChapter) return;
+            const ref = `${this.currentBook} ${this.currentChapter}`;
+            try {
+                const response = await fetch(
+                    `/api/passage/${encodeURIComponent(ref)}/parallel?translations=${this.parallelTranslations.join(',')}`
+                );
+                if (response.ok) {
+                    const data = await response.json();
+                    this.parallelData = data.translations;
+                }
+            } catch (err) {
+                console.error('Failed to load parallel passage:', err);
+            }
+        },
+
+        // Toggle a translation in parallel view
+        toggleParallelTranslation(translationId) {
+            const idx = this.parallelTranslations.indexOf(translationId);
+            if (idx > -1) {
+                if (this.parallelTranslations.length > 1) {
+                    this.parallelTranslations.splice(idx, 1);
+                }
+            } else {
+                this.parallelTranslations.push(translationId);
+            }
+            this.loadParallelPassage();
+        },
+
         // Load commentary for current chapter (always full chapter for browsing)
         async loadCommentary() {
             if (!this.currentBook || !this.currentChapter) {
@@ -871,7 +1115,11 @@ function bibleApp() {
 
             this.loadingCommentary = true;
             try {
-                // Always request full chapter commentary for chapter-wide browsing
+                // When forced offline, go straight to cache
+                if (this.forcedOffline) {
+                    throw new Error('offline');
+                }
+
                 const chapterRef = `${this.currentBook} ${this.currentChapter}`;
                 const response = await fetch(
                     `/api/passage/${encodeURIComponent(chapterRef)}/commentary`
@@ -880,13 +1128,53 @@ function bibleApp() {
                 if (response.ok) {
                     const data = await response.json();
                     this.commentary = data.entries || [];
+                } else {
+                    this.commentary = [];
                 }
             } catch (err) {
-                console.error('Failed to load commentary:', err);
+                // Network failed or forced offline — try IndexedDB cache
+                if (window.offlineStorage && this.currentBook && this.currentChapter) {
+                    try {
+                        const cached = await window.offlineStorage.getChapterCommentary(
+                            this.currentBook, this.currentChapter
+                        );
+                        if (cached && cached.length > 0) {
+                            this.commentary = cached;
+                            return;
+                        }
+                    } catch (cacheErr) {
+                        console.debug('Commentary cache fallback failed:', cacheErr);
+                    }
+                }
                 this.commentary = [];
             } finally {
                 this.loadingCommentary = false;
             }
+        },
+
+        // Get sorted and filtered cross-references
+        getFilteredCrossRefs() {
+            let refs = [...this.crossRefs];
+
+            // Filter by book name
+            if (this.crossRefFilter) {
+                const filter = this.crossRefFilter.toLowerCase();
+                refs = refs.filter(r => r.target_book.toLowerCase().includes(filter));
+            }
+
+            // Sort
+            if (this.crossRefSort === 'relevance') {
+                refs.sort((a, b) => (b.votes || 0) - (a.votes || 0));
+            }
+            // 'biblical' is the default order from API (target_book_order, chapter, verse)
+
+            return refs;
+        },
+
+        // Get unique book names from current cross-refs (for filter suggestions)
+        getCrossRefBooks() {
+            const books = new Set(this.crossRefs.map(r => r.target_book));
+            return [...books].sort();
         },
 
         // Check if a commentary entry applies to the active verse
@@ -923,6 +1211,7 @@ function bibleApp() {
 
         // Navigate to previous chapter
         previousChapter() {
+            if (this.loading) return;
             if (this.currentChapter > 1) {
                 // Go to previous chapter in same book
                 this.referenceInput = `${this.currentBook} ${this.currentChapter - 1}`;
@@ -941,6 +1230,7 @@ function bibleApp() {
 
         // Navigate to next chapter
         nextChapter() {
+            if (this.loading) return;
             const maxChapter = BOOK_CHAPTERS[this.currentBook] || 1;
             if (this.currentChapter < maxChapter) {
                 // Go to next chapter in same book
@@ -1006,7 +1296,7 @@ function bibleApp() {
             this.updateURL();
 
             // Load cross-refs for the new verse
-            this.loadCrossRefs(verseNum);
+            this.loadCrossRefsForVerse(verseNum);
 
             // Commentary already loaded for full chapter - just update active verse display
             // (no reload needed since we have all chapter commentary)
@@ -1021,7 +1311,7 @@ function bibleApp() {
         },
 
         // Load cross-references for a specific verse
-        async loadCrossRefs(verseNum) {
+        async loadCrossRefsForVerse(verseNum) {
             try {
                 const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
                 const response = await fetch(
@@ -1032,6 +1322,20 @@ function bibleApp() {
                     this.crossRefs = data.cross_references || [];
                 }
             } catch (err) {
+                // Network failed — try IndexedDB cache
+                if (window.offlineStorage && this.currentBook && this.currentChapter) {
+                    try {
+                        const cached = await window.offlineStorage.getChapterCrossRefs(
+                            this.currentBook, this.currentChapter, verseNum, verseNum
+                        );
+                        if (cached && cached.length > 0) {
+                            this.crossRefs = cached;
+                            return;
+                        }
+                    } catch (cacheErr) {
+                        console.error('Cross-refs cache fallback failed:', cacheErr);
+                    }
+                }
                 console.error('Failed to load cross-refs:', err);
             }
         },
@@ -1240,8 +1544,24 @@ function bibleApp() {
                 if (response.ok) {
                     const data = await response.json();
                     this.crossRefs = data.cross_references || [];
+                } else {
+                    this.crossRefs = [];
                 }
             } catch (err) {
+                // Network failed — try IndexedDB cache
+                if (window.offlineStorage && this.currentBook && this.currentChapter) {
+                    try {
+                        const cached = await window.offlineStorage.getChapterCrossRefs(
+                            this.currentBook, this.currentChapter
+                        );
+                        if (cached && cached.length > 0) {
+                            this.crossRefs = cached;
+                            return;
+                        }
+                    } catch (cacheErr) {
+                        console.error('Cross-refs cache fallback failed:', cacheErr);
+                    }
+                }
                 console.error('Failed to load cross-refs:', err);
                 this.crossRefs = [];
             }
@@ -1295,6 +1615,11 @@ function bibleApp() {
             this.interlinearData = {};
 
             try {
+                // When forced offline, go straight to cache
+                if (this.forcedOffline) {
+                    throw new Error('offline');
+                }
+
                 const ref = `${this.currentBook} ${this.currentChapter}`;
                 const response = await fetch(
                     `/api/passage/${encodeURIComponent(ref)}/interlinear?translation=${this.translation}`
@@ -1303,19 +1628,45 @@ function bibleApp() {
                 if (response.ok) {
                     const data = await response.json();
                     if (data.has_interlinear && data.verses) {
-                        // Store language for the chapter
                         this.interlinearLanguage = data.language;
-                        // Convert verses object to our format
+                        this.interlinearSourceText = data.source_text || '';
                         for (const [verseNum, words] of Object.entries(data.verses)) {
                             this.interlinearData[parseInt(verseNum)] = {
                                 language: data.language,
                                 words: words
                             };
                         }
+                    } else {
+                        this.interlinearSourceText = '';
                     }
                 }
             } catch (err) {
-                console.error('Failed to load interlinear data:', err);
+                // Network failed or forced offline — try IndexedDB cache
+                if (window.offlineStorage && this.currentBook && this.currentChapter) {
+                    try {
+                        const cached = await window.offlineStorage.getChapterInterlinear(
+                            this.currentBook, this.currentChapter
+                        );
+                        if (cached && cached.length > 0) {
+                            const lang = OT_BOOKS.includes(this.currentBook) ? 'hebrew' : 'greek';
+                            this.interlinearLanguage = lang;
+                            const byVerse = {};
+                            for (const word of cached) {
+                                if (!byVerse[word.verse]) byVerse[word.verse] = [];
+                                byVerse[word.verse].push(word);
+                            }
+                            for (const [verseNum, words] of Object.entries(byVerse)) {
+                                this.interlinearData[parseInt(verseNum)] = {
+                                    language: lang,
+                                    words: words
+                                };
+                            }
+                            return;
+                        }
+                    } catch (cacheErr) {
+                        console.debug('Interlinear cache fallback failed:', cacheErr);
+                    }
+                }
             }
         },
 
@@ -1427,6 +1778,7 @@ function bibleApp() {
                         translation: this.translation
                     });
                     const response = await fetch(`/api/word-alignment?${params}`);
+                    if (!response.ok) throw new Error('Word alignment not available');
                     const data = await response.json();
 
                     if (data.found && data.alignment) {
@@ -1582,15 +1934,33 @@ function bibleApp() {
             }
         },
 
-        // Toggle dark mode
+        // Toggle sidebar collapsed state (tablet/desktop)
+        toggleSidebar() {
+            this.sidebarCollapsed = !this.sidebarCollapsed;
+            localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed);
+        },
+
+        // Toggle dark mode (keyboard shortcut 'D' cycles through themes)
         toggleDarkMode() {
-            this.darkMode = !this.darkMode;
+            const themes = ['light', 'dark', 'parchment'];
+            const currentIdx = themes.indexOf(this.currentTheme);
+            const nextIdx = (currentIdx + 1) % themes.length;
+            this.setTheme(themes[nextIdx]);
+        },
+
+        // Set theme ('light', 'dark', or 'parchment')
+        setTheme(theme) {
+            this.currentTheme = theme;
+            this.darkMode = theme === 'dark';
+            localStorage.setItem('theme', theme);
             localStorage.setItem('darkMode', this.darkMode);
         },
 
-        // Save dark mode preference (from settings)
+        // Save dark mode preference (legacy, kept for compatibility)
         saveDarkMode() {
+            this.currentTheme = this.darkMode ? 'dark' : 'light';
             localStorage.setItem('darkMode', this.darkMode);
+            localStorage.setItem('theme', this.currentTheme);
         },
 
         // Save default translation preference
@@ -1613,6 +1983,54 @@ function bibleApp() {
         // Check if verse has divine speech (for red letter display)
         isRedLetterVerse(verseNum) {
             return this.showRedLetter && this.speakerVerses.includes(verseNum);
+        },
+
+        // Immersive reading mode
+        enterImmersiveMode() {
+            if (!this.currentReference) return;
+            this.immersiveMode = true;
+            this.immersiveControlsVisible = false;
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            // Show hint briefly on first entry
+            if (!this.immersiveHintShown) {
+                this.immersiveHintShown = true;
+                setTimeout(() => {
+                    const hint = document.querySelector('.immersive-swipe-hint');
+                    if (hint) hint.classList.add('fade-out');
+                }, 3000);
+            }
+        },
+
+        exitImmersiveMode() {
+            this.immersiveMode = false;
+            clearTimeout(this.immersiveControlsTimeout);
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            }
+        },
+
+        toggleImmersiveControls() {
+            this.immersiveControlsVisible = !this.immersiveControlsVisible;
+            clearTimeout(this.immersiveControlsTimeout);
+            if (this.immersiveControlsVisible) {
+                this.immersiveControlsTimeout = setTimeout(() => {
+                    this.immersiveControlsVisible = false;
+                }, 4000);
+            }
+        },
+
+        immersiveTouchStart(e) {
+            this.immersiveTouchStartX = e.changedTouches[0].screenX;
+        },
+
+        immersiveTouchEnd(e) {
+            const diff = e.changedTouches[0].screenX - this.immersiveTouchStartX;
+            if (Math.abs(diff) > 80) {
+                if (diff > 0) this.previousChapter();
+                else this.nextChapter();
+            }
         },
 
         // Save auto-cache preference
@@ -1644,6 +2062,185 @@ function bibleApp() {
         // Get book genre
         getBookGenre(book) {
             return getBookGenre(book);
+        },
+
+        // ========== Text-to-Speech (Audio Read-Along) ==========
+
+        initTTS() {
+            if (!('speechSynthesis' in window)) return;
+
+            const loadVoices = () => {
+                const voices = speechSynthesis.getVoices();
+                // Prefer English voices
+                this.ttsAvailableVoices = voices.filter(v => v.lang.startsWith('en'));
+                if (this.ttsAvailableVoices.length === 0) this.ttsAvailableVoices = voices;
+
+                // Restore saved voice preference
+                if (this.ttsVoice) {
+                    const match = this.ttsAvailableVoices.find(v => v.name === this.ttsVoice);
+                    if (!match) this.ttsVoice = '';
+                }
+            };
+
+            loadVoices();
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = loadVoices;
+            }
+        },
+
+        ttsGetVerseTexts() {
+            // Build ordered array of {verseNum, text} from current passage
+            if (!this.verses || this.verses.length === 0) return [];
+            return this.verses.map(v => ({
+                verseNum: v.verse,
+                text: v.text.replace(/<[^>]*>/g, '') // strip any HTML
+            }));
+        },
+
+        ttsPlay(startVerse = null) {
+            if (!('speechSynthesis' in window)) {
+                this.showToast('Text-to-speech not supported in this browser', 'error');
+                return;
+            }
+
+            // If paused, resume from current verse
+            if (this.ttsPaused) {
+                this.ttsPaused = false;
+                this.ttsPlaying = true;
+                this._ttsNextVerse();
+                return;
+            }
+
+            // Stop any existing speech
+            speechSynthesis.cancel();
+
+            // Build queue
+            this._ttsVerseQueue = this.ttsGetVerseTexts();
+            if (this._ttsVerseQueue.length === 0) return;
+
+            // Find start index
+            if (startVerse) {
+                this._ttsQueueIndex = this._ttsVerseQueue.findIndex(v => v.verseNum === startVerse);
+                if (this._ttsQueueIndex < 0) this._ttsQueueIndex = 0;
+            } else {
+                this._ttsQueueIndex = 0;
+            }
+
+            this.ttsPlaying = true;
+            this.ttsPaused = false;
+            this._ttsNextVerse();
+        },
+
+        _ttsNextVerse() {
+            if (this._ttsQueueIndex >= this._ttsVerseQueue.length) {
+                this.ttsStop();
+                return;
+            }
+
+            const verse = this._ttsVerseQueue[this._ttsQueueIndex];
+            this.ttsCurrentVerse = verse.verseNum;
+
+            // Scroll the verse into view
+            const verseEl = document.getElementById(`verse-${verse.verseNum}`);
+            if (verseEl) {
+                verseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            const utterance = new SpeechSynthesisUtterance(verse.text);
+            utterance.rate = this.ttsRate;
+
+            // Set voice
+            if (this.ttsVoice) {
+                const voice = this.ttsAvailableVoices.find(v => v.name === this.ttsVoice);
+                if (voice) utterance.voice = voice;
+            }
+
+            utterance.onend = () => {
+                // Don't advance if we were paused (cancel triggers onend in some browsers)
+                if (this.ttsPaused) return;
+                this._ttsQueueIndex++;
+                if (this.ttsPlaying) {
+                    this._ttsNextVerse();
+                }
+            };
+
+            utterance.onerror = (e) => {
+                if (e.error !== 'canceled') {
+                    console.warn('TTS error:', e.error);
+                    this._ttsQueueIndex++;
+                    if (this.ttsPlaying) this._ttsNextVerse();
+                }
+            };
+
+            this._ttsUtterance = utterance;
+            speechSynthesis.speak(utterance);
+        },
+
+        ttsPause() {
+            if (this.ttsPlaying && !this.ttsPaused) {
+                // speechSynthesis.pause() is unreliable in Chrome/Chromium
+                // Instead, cancel and track position so we can resume from same verse
+                speechSynthesis.cancel();
+                this.ttsPaused = true;
+                this.ttsPlaying = true;  // still "playing" (paused state)
+            }
+        },
+
+        ttsStop() {
+            speechSynthesis.cancel();
+            this.ttsPlaying = false;
+            this.ttsPaused = false;
+            this.ttsCurrentVerse = null;
+            this._ttsUtterance = null;
+            this._ttsVerseQueue = [];
+            this._ttsQueueIndex = 0;
+        },
+
+        ttsSetRate(rate) {
+            this.ttsRate = parseFloat(rate);
+            localStorage.setItem('ttsRate', this.ttsRate);
+
+            // If currently playing, restart current verse with new rate
+            if (this.ttsPlaying) {
+                const currentVerse = this.ttsCurrentVerse;
+                speechSynthesis.cancel();
+                this.ttsPaused = false;
+                // Find current verse index and restart from there
+                this._ttsQueueIndex = this._ttsVerseQueue.findIndex(v => v.verseNum === currentVerse);
+                if (this._ttsQueueIndex < 0) this._ttsQueueIndex = 0;
+                this._ttsNextVerse();
+            }
+        },
+
+        ttsSetVoice(voiceName) {
+            this.ttsVoice = voiceName;
+            localStorage.setItem('ttsVoice', voiceName);
+
+            // If currently playing, restart with new voice
+            if (this.ttsPlaying) {
+                const currentVerse = this.ttsCurrentVerse;
+                speechSynthesis.cancel();
+                this.ttsPaused = false;
+                this._ttsQueueIndex = this._ttsVerseQueue.findIndex(v => v.verseNum === currentVerse);
+                if (this._ttsQueueIndex < 0) this._ttsQueueIndex = 0;
+                this._ttsNextVerse();
+            }
+        },
+
+        ttsSkipForward() {
+            if (!this.ttsPlaying) return;
+            speechSynthesis.cancel();
+            this.ttsPaused = false;
+            this._ttsQueueIndex++;
+            this._ttsNextVerse();
+        },
+
+        ttsSkipBack() {
+            if (!this.ttsPlaying) return;
+            speechSynthesis.cancel();
+            this.ttsPaused = false;
+            this._ttsQueueIndex = Math.max(0, this._ttsQueueIndex - 1);
+            this._ttsNextVerse();
         },
 
         // Open settings modal, optionally to a specific tab
@@ -1853,6 +2450,9 @@ function bibleApp() {
                     // Fallback to opening the reading plan modal
                     this.openReadingPlan();
                 }
+            } else {
+                // No active plan - open the reading plan picker
+                this.openReadingPlan();
             }
         },
 
@@ -2091,6 +2691,10 @@ function bibleApp() {
             this.searchWordInfo = null;
             this.searchPerformed = false;
             this.selectedResultIndex = -1;
+            if (this.searchDebounceTimer) {
+                clearTimeout(this.searchDebounceTimer);
+                this.searchDebounceTimer = null;
+            }
             this.$nextTick(() => this.$refs.searchInput?.focus());
         },
 
@@ -2700,7 +3304,9 @@ function bibleApp() {
         },
 
         // Update URL with clean path format (/Book/Chapter/Verse or /plan/PlanId/Day)
-        updateURL() {
+        // usePush=true creates a new history entry (for chapter navigation);
+        // usePush=false uses replaceState (for verse selection within same chapter)
+        updateURL(usePush = false) {
             // If in combined plan reading mode, use plan URL format
             if (this.combinedPlanReading && this.currentPlan) {
                 const path = `/plan/${this.currentPlan.id}/${this.planDay}`;
@@ -2716,7 +3322,11 @@ function bibleApp() {
                 ? `/${bookSlug}/${this.currentChapter}/${verse}`
                 : `/${bookSlug}/${this.currentChapter}`;
 
-            window.history.pushState({}, '', path);
+            if (usePush) {
+                window.history.pushState({}, '', path);
+            } else {
+                window.history.replaceState({}, '', path);
+            }
         },
 
         // Copy verse to clipboard
@@ -2734,11 +3344,234 @@ function bibleApp() {
             }
         },
 
+        // Dismiss source text warning
+        dismissSourceTextWarning() {
+            this.sourceTextWarningDismissed = true;
+            localStorage.setItem('sourceTextWarningDismissed', 'true');
+        },
+
         // Get reading progress percentage
         getReadingProgress() {
             if (!this.verses.length || !this.highlightedVerses.length) return 0;
             const currentVerse = this.highlightedVerses[0];
-            return Math.round((currentVerse / this.verses.length) * 100);
+            const maxVerse = Math.max(...this.verses.map(v => v.verse));
+            return Math.round((currentVerse / maxVerse) * 100);
+        },
+
+        // ========== VERSE SHARING METHODS ==========
+
+        shareBackgrounds: [
+            { name: 'Sunset', colors: ['#667eea', '#764ba2'] },
+            { name: 'Ocean', colors: ['#2193b0', '#6dd5ed'] },
+            { name: 'Dark', colors: ['#1a1a2e', '#16213e'] },
+            { name: 'Light', colors: ['#f5f7fa', '#c3cfe2'] },
+        ],
+
+        toggleShareMode() {
+            this.shareMode = !this.shareMode;
+            this.shareSelectedVerses = [];
+        },
+
+        toggleShareVerse(verseNum) {
+            const idx = this.shareSelectedVerses.indexOf(verseNum);
+            if (idx > -1) this.shareSelectedVerses.splice(idx, 1);
+            else this.shareSelectedVerses.push(verseNum);
+            this.shareSelectedVerses.sort((a, b) => a - b);
+        },
+
+        getShareVerseText() {
+            if (this.shareSelectedVerses.length === 0) return '';
+            return this.shareSelectedVerses.map(vn => {
+                const verse = this.verses.find(v => v.verse === vn);
+                return verse ? verse.text : '';
+            }).filter(Boolean).join(' ');
+        },
+
+        getShareReference() {
+            if (this.shareSelectedVerses.length === 0) return '';
+            const first = this.shareSelectedVerses[0];
+            const last = this.shareSelectedVerses[this.shareSelectedVerses.length - 1];
+            if (first === last) {
+                return `${this.currentBook} ${this.currentChapter}:${first}`;
+            }
+            return `${this.currentBook} ${this.currentChapter}:${first}-${last}`;
+        },
+
+        getShareLink() {
+            if (this.shareSelectedVerses.length === 0) return '';
+            const first = this.shareSelectedVerses[0];
+            const last = this.shareSelectedVerses[this.shareSelectedVerses.length - 1];
+            const bookPath = this.currentBook.replace(/\s+/g, '-');
+            if (first === last) {
+                return `${window.location.origin}/${bookPath}/${this.currentChapter}/${first}`;
+            }
+            return `${window.location.origin}/${bookPath}/${this.currentChapter}/${first}-${last}`;
+        },
+
+        openShareModal() {
+            if (this.shareSelectedVerses.length === 0) return;
+            this.showShareModal = true;
+            this.shareImagePreview = null;
+            this.$nextTick(() => this.generateVerseImagePreview());
+        },
+
+        async copyShareText() {
+            const text = `"${this.getShareVerseText()}" — ${this.getShareReference()} (${this.translation})`;
+            try {
+                await navigator.clipboard.writeText(text);
+                this.showToast('Verse text copied', 'success');
+            } catch (err) {
+                console.error('Failed to copy:', err);
+            }
+        },
+
+        async copyShareLink() {
+            try {
+                await navigator.clipboard.writeText(this.getShareLink());
+                this.showToast('Link copied', 'success');
+            } catch (err) {
+                console.error('Failed to copy link:', err);
+            }
+        },
+
+        async nativeShare() {
+            if (!navigator.share) return;
+            try {
+                await navigator.share({
+                    title: this.getShareReference(),
+                    text: `"${this.getShareVerseText()}" — ${this.getShareReference()}`,
+                    url: this.getShareLink()
+                });
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Share failed:', err);
+                }
+            }
+        },
+
+        generateVerseImagePreview() {
+            const canvas = document.getElementById('share-canvas');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const bg = this.shareBackgrounds[this.shareBackgroundIndex];
+            const isDark = this.shareBackgroundIndex >= 2; // Dark and Light (Light uses dark text)
+            const isLight = this.shareBackgroundIndex === 3;
+
+            canvas.width = 1080;
+            canvas.height = 1080;
+
+            // Draw gradient background
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, bg.colors[0]);
+            gradient.addColorStop(1, bg.colors[1]);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Text color
+            const textColor = isLight ? '#1a1a2e' : '#ffffff';
+            const subtextColor = isLight ? '#4a5568' : 'rgba(255,255,255,0.8)';
+            const brandColor = isLight ? '#6b7280' : 'rgba(255,255,255,0.5)';
+
+            // Word wrap helper
+            function wrapText(ctx, text, maxWidth) {
+                const words = text.split(' ');
+                const lines = [];
+                let currentLine = '';
+                for (const word of words) {
+                    const testLine = currentLine ? currentLine + ' ' + word : word;
+                    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                if (currentLine) lines.push(currentLine);
+                return lines;
+            }
+
+            const verseText = this.getShareVerseText();
+            const reference = this.getShareReference() + ' (' + this.translation + ')';
+            const padding = 80;
+            const maxWidth = canvas.width - padding * 2;
+
+            // Determine font size based on text length
+            let fontSize = 42;
+            if (verseText.length > 400) fontSize = 30;
+            else if (verseText.length > 250) fontSize = 34;
+            else if (verseText.length > 150) fontSize = 38;
+
+            // Draw verse text
+            ctx.font = `${fontSize}px Georgia, "Times New Roman", serif`;
+            ctx.fillStyle = textColor;
+            ctx.textAlign = 'center';
+
+            const lines = wrapText(ctx, `"${verseText}"`, maxWidth);
+            const lineHeight = fontSize * 1.5;
+            const totalTextHeight = lines.length * lineHeight;
+            const startY = (canvas.height - totalTextHeight) / 2 - 30;
+
+            lines.forEach((line, i) => {
+                ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
+            });
+
+            // Draw reference
+            ctx.font = `28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+            ctx.fillStyle = subtextColor;
+            ctx.fillText(reference, canvas.width / 2, startY + totalTextHeight + 40);
+
+            // Draw branding
+            ctx.font = `18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+            ctx.fillStyle = brandColor;
+            ctx.fillText('In the Word', canvas.width / 2, canvas.height - 40);
+
+            this.shareImagePreview = canvas.toDataURL('image/png');
+        },
+
+        selectShareBackground(index) {
+            this.shareBackgroundIndex = index;
+            this.generateVerseImagePreview();
+        },
+
+        async downloadShareImage() {
+            const canvas = document.getElementById('share-canvas');
+            if (!canvas) return;
+
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${this.getShareReference().replace(/[\s:]/g, '-')}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                this.showToast('Image downloaded', 'success');
+            }, 'image/png');
+        },
+
+        async shareImage() {
+            if (!navigator.share || !navigator.canShare) return;
+            const canvas = document.getElementById('share-canvas');
+            if (!canvas) return;
+
+            canvas.toBlob(async (blob) => {
+                const file = new File([blob], 'verse.png', { type: 'image/png' });
+                if (navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: this.getShareReference(),
+                            text: this.getShareReference()
+                        });
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            console.error('Share image failed:', err);
+                        }
+                    }
+                }
+            }, 'image/png');
         },
 
         // ========== OFFLINE METHODS ==========
@@ -2798,6 +3631,43 @@ function bibleApp() {
         toggleAutoCache() {
             this.autoCacheEnabled = !this.autoCacheEnabled;
             localStorage.setItem('autoCacheEnabled', this.autoCacheEnabled);
+        },
+
+        // Auto-cache the current chapter data to IndexedDB (fire-and-forget)
+        async _autoCacheCurrentChapter() {
+            const os = window.offlineStorage;
+            const book = this.currentBook;
+            const ch = this.currentChapter;
+            const trans = this.translation;
+            try {
+                // Save verses
+                if (this.verses?.length > 0) {
+                    await os.saveChapterVerses(trans, book, ch, this.verses);
+                }
+                // Save cross-refs
+                if (this.crossRefs?.length > 0) {
+                    await os.saveChapterCrossRefs(book, ch, this.crossRefs);
+                }
+                // Save commentary
+                if (this.commentary?.length > 0) {
+                    await os.saveChapterCommentary(book, ch, this.commentary);
+                }
+                // Save interlinear
+                if (Object.keys(this.interlinearData).length > 0) {
+                    const words = [];
+                    for (const [verseNum, data] of Object.entries(this.interlinearData)) {
+                        for (const w of data.words || []) {
+                            words.push({ ...w, verse: parseInt(verseNum) });
+                        }
+                    }
+                    if (words.length > 0) {
+                        await os.saveChapterInterlinear(book, ch, words);
+                    }
+                }
+            } catch (err) {
+                // Silent failure — auto-cache is best-effort
+                console.debug('Auto-cache failed:', err);
+            }
         },
 
         // Start downloading selected offline content
@@ -2889,9 +3759,9 @@ function bibleApp() {
                             await window.offlineStorage.saveChapterInterlinear(book, ch, data.interlinear);
                         }
 
-                        // Save cross-refs
-                        if (data.cross_refs?.length > 0) {
-                            await window.offlineStorage.saveChapterCrossRefs(book, ch, data.cross_refs);
+                        // Save cross-refs (API returns camelCase "crossRefs")
+                        if (data.crossRefs?.length > 0) {
+                            await window.offlineStorage.saveChapterCrossRefs(book, ch, data.crossRefs);
                         }
 
                         // Save commentary
@@ -3045,6 +3915,9 @@ function bibleApp() {
                     // Small delay
                     await new Promise(r => setTimeout(r, 50));
                 }
+
+                // Update stats after each book so the UI shows progress
+                await this.updateOfflineStats();
             }
         },
 
@@ -3066,8 +3939,15 @@ function bibleApp() {
                             const entries = source
                                 ? data.entries.filter(e => e.source === source)
                                 : data.entries;
+                            // Group entries by chapter for efficient saving
+                            const byChapter = {};
                             for (const entry of entries) {
-                                await window.offlineStorage.saveCommentary(entry.book, entry.chapter, [entry]);
+                                const ch = entry.chapter || 1;
+                                if (!byChapter[ch]) byChapter[ch] = [];
+                                byChapter[ch].push(entry);
+                            }
+                            for (const [ch, chEntries] of Object.entries(byChapter)) {
+                                await window.offlineStorage.saveChapterCommentary(book, parseInt(ch), chEntries);
                             }
                         }
                     }
@@ -3079,8 +3959,12 @@ function bibleApp() {
                 const taskProgress = (booksDownloaded / books.length) * (100 / totalTasks);
                 this.downloadProgress.percent = Math.round(basePercent + taskProgress);
 
+                // Update stats every 5 books so the UI shows progress
+                if (booksDownloaded % 5 === 0) await this.updateOfflineStats();
+
                 await new Promise(r => setTimeout(r, 50));
             }
+            await this.updateOfflineStats();
         },
 
         // Download all devotionals
@@ -3092,9 +3976,10 @@ function bibleApp() {
                 const response = await fetch(`/api/offline/devotionals?source=${encodeURIComponent(source)}`);
                 if (response.ok) {
                     const data = await response.json();
-                    if (window.offlineStorage && data.entries?.length > 0) {
-                        // Store devotionals in IndexedDB
-                        // For now, store in localStorage as a simple approach
+                    if (data.entries?.length > 0) {
+                        // Store devotionals in localStorage — devotional entries are small
+                        // enough that localStorage is appropriate, and IndexedDB doesn't
+                        // have a dedicated devotionals store
                         localStorage.setItem(`devotional_${source}`, JSON.stringify(data.entries));
                         this.downloadProgress.status = `Saved ${data.count} entries`;
                     }
@@ -3140,8 +4025,12 @@ function bibleApp() {
                 const taskProgress = (booksDownloaded / books.length) * (100 / totalTasks);
                 this.downloadProgress.percent = Math.round(basePercent + taskProgress);
 
+                // Update stats every 5 books so the UI shows progress
+                if (booksDownloaded % 5 === 0) await this.updateOfflineStats();
+
                 await new Promise(r => setTimeout(r, 50));
             }
+            await this.updateOfflineStats();
         },
 
         // Refresh (re-download) all cached content
@@ -3673,7 +4562,7 @@ function bibleApp() {
             // Handle common abbreviations and variations
             const normalizations = {
                 'Psalm': 'Psalms',
-                'Song of Solomon': 'Song of Songs',
+                'Song of Songs': 'Song of Solomon',
                 // Chronicles abbreviations
                 '1 Chron': '1 Chronicles',
                 '1 Chron.': '1 Chronicles',
@@ -3793,8 +4682,8 @@ function bibleApp() {
 
         // Normalize a full reference (book + chapter/verse)
         normalizeReference(ref) {
-            // Match book name at the start
-            const match = ref.match(/^([A-Za-z\s]+?)(\s+\d.*)$/);
+            // Match book name at the start (including numbered books like "1 Chron.")
+            const match = ref.match(/^(\d?\s*[A-Za-z][A-Za-z.\s]*?)(\s+\d.*)$/);
             if (match) {
                 const book = this.normalizeBookName(match[1].trim());
                 return book + match[2];
@@ -4066,7 +4955,8 @@ function bibleApp() {
 
         formatPlanDate(planId) {
             if (!this.planProgress[planId]?.startDate) return '';
-            const date = new Date(this.planProgress[planId].startDate);
+            const dateStr = this.planProgress[planId].startDate;
+            const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         }
     };

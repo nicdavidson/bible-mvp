@@ -113,7 +113,9 @@ class OfflineStorage {
 
         return new Promise((resolve, reject) => {
             const request = index.getAll([translation, book, chapter]);
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => resolve(
+                request.result.sort((a, b) => a.verse - b.verse)
+            );
             request.onerror = () => reject(request.error);
         });
     }
@@ -279,10 +281,11 @@ class OfflineStorage {
             request.onsuccess = () => {
                 let results = request.result;
                 if (verseStart !== undefined) {
+                    const effectiveEnd = verseEnd !== undefined ? verseEnd : verseStart;
                     results = results.filter(entry => {
                         const entryStart = entry.reference_start;
                         const entryEnd = entry.reference_end || entryStart;
-                        return entryStart <= verseEnd && entryEnd >= verseStart;
+                        return entryStart <= effectiveEnd && entryEnd >= verseStart;
                     });
                 }
                 resolve(results);
@@ -333,7 +336,12 @@ class OfflineStorage {
         await this.ready;
         const tx = this.db.transaction(STORES.META, 'readwrite');
         const store = tx.objectStore(STORES.META);
-        await store.put({ key, ...value });
+        store.put({ key, ...value });
+
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
     }
 
     async getMeta(key) {

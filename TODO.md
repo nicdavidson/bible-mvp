@@ -113,10 +113,19 @@
 - [ ] Add tests
 - [ ] Error handling improvements
 - [x] Loading states/skeletons - DONE
+- [x] Database build tooling (`scripts/build_db.py` orchestrator, `scripts/setup_db.sh`, `Makefile`)
+- [x] `DATABASE_PATH` env var support (all import scripts + `database.py`)
 
-### Database Scaling (Future)
+### Performance / Scaling
+- [ ] **Add Cache-Control headers** to API responses — Bible text is immutable, set `Cache-Control: public, max-age=86400` on passage/commentary/cross-ref endpoints. Free scaling with Cloudflare.
+- [ ] Consider LiteFS for multi-region read replicas if user base grows
 - [ ] Consider adding `user_id` to `reading_plan_progress` table for faster RLS queries at scale
 - [ ] Add index on `reading_plan_progress.day_number` if querying "who completed day X" becomes needed
+
+### Commentary UX
+- [ ] **Auto-scroll to current verse in commentary** — When viewing verse 20, commentary should scroll/jump to the section about verse 20 instead of showing from the top. Requires parsing `reference_start`/`reference_end` fields and anchoring to the closest section.
+- [ ] **Collapsible commentary sections** — Long commentaries (especially Matthew Henry) should be broken into expandable sections by verse range, so users can quickly find and expand the relevant section.
+- [ ] **Commentary source tabs** — When multiple commentaries exist for a passage (Matthew Henry + John Gill), show them as sub-tabs rather than concatenated, so users can switch between perspectives.
 - [ ] Consider JSONB array for completed days if row count becomes a concern (365 rows per user per plan)
 
 ## Word-by-Word Alignment (MOSTLY COMPLETE)
@@ -169,12 +178,146 @@
 - [x] Auto-parse commentary for Bible refs during import → make clickable (DONE - 56,228 links)
 - [x] Frontend handlers: Click ref → load verse/panel (DONE)
 
-## Swipe Mode
+## Immersive / Distraction-Free Mode (HIGH PRIORITY)
 
 - [ ] Full-screen verse view with swipe navigation (Alpine.js touch events)
 - [ ] Toggles: Originals, cross-refs, commentary overlays
 - [ ] Integrate as template "screen" type (e.g., optional in "Daily Reading")
+- [ ] "No distraction" mode — clean, focused reading with large typography
+- [ ] Ambient background options, minimal UI chrome
+- [ ] Swipe between chapters/verses, tap to reveal controls
+
+## Future Features (Roadmap)
+
+### Parallel Translation View
+- [ ] Side-by-side comparison of BSB/KJV/WEB for the same passage
+- [ ] Highlight differences between translations
+- [ ] Synchronized scrolling
+
+### Scripture Memory Tool
+- [ ] Spaced repetition flashcards for verse memorization
+- [ ] Progressive word hiding (first letters → blanks → full recall)
+- [ ] Track memorization progress per verse
+- [ ] Daily memory review prompts
+
+### Cross-Reference Graph Visualization
+- [ ] Interactive D3.js force-directed graph showing verse connections
+- [ ] Click a verse → see all 41,649 cross-references as a visual web
+- [ ] Filter by relationship type, book, testament
+- [ ] Zoomable, explorable — "wow factor" feature
+
+### Word Study Dashboard
+- [ ] Click a Strong's number → see full usage dashboard
+- [ ] Occurrence frequency chart by book
+- [ ] All different English translations of the word
+- [ ] Context clusters showing usage patterns
+- [ ] Already have the data (426K alignments + lexicon)
+
+### Passage Comparison Diff
+- [ ] Show highlighted diffs between translations for the same passage
+- [ ] Color-code additions/removals/changes between BSB/KJV/WEB
+- [ ] Pairs with source text transparency to show WHY translations differ
+
+### Sermon Outline Builder
+- [ ] Structured notes mode with headings, points, sub-points
+- [ ] Drag-and-drop verse references into outline slots
+- [ ] Export outline as formatted document
+- [ ] Designed for pastor sermon prep workflow
+
+### Topical Index (Nave's Topical Bible) — credit Orville James Nave
+- [ ] Import Nave's Topical Bible (public domain, 1896, ~20K topics, ~100K refs)
+- [ ] Data source: Open Scriptures project on GitHub (digitized, freely available)
+- [ ] Add "Topics" as a sidebar tab option alongside Commentary/Notes/Cross-Refs
+- [ ] Browse-by-topic UI with search
+- [ ] Topic → verse list with previews, click to navigate
+- [ ] Integrates with existing cross-reference system
+- [ ] Credit Orville James Nave as the original compiler
+
+### Audio Read-Along (Browser TTS) — Zero Cost
+- [ ] Use `window.speechSynthesis` API (zero server cost, runs entirely client-side)
+- [ ] Play button on passages — verses highlight as they're read aloud
+- [ ] Adjustable speed, voice selection (OS/browser-dependent voices)
+- [ ] Pairs perfectly with immersive/distraction-free mode
+- [ ] No API costs — uses built-in browser text-to-speech engine
+- [ ] Quality varies: iOS has excellent voices, Android decent, Chrome desktop good
+
+### Export/Print Study Sessions
+- [ ] Export notes + highlighted verses + commentary as PDF
+- [ ] Clean formatting for sermon prep handouts
+- [ ] Print-friendly stylesheet
+- [ ] Depends on: Sermon Outline Builder for best results
+
+### AI Study Assistant (Claude API)
+- [ ] Ask questions about passages ("What does this Greek word mean in context?")
+- [ ] Generate study questions for small groups
+- [ ] Explain difficult texts with scholarly context
+- [ ] Summarize commentary across sources
+- [ ] Uses Claude API — consider usage limits/costs
+
+### Study Group Sync
+- [ ] Share a "study space" with small group members
+- [ ] See each other's highlights/notes in real-time
+- [ ] Supabase real-time for live sync
+- [ ] Privacy controls — choose what to share
+
+## User Feedback (Feb 2026 - from educated friend / Bible scholar)
+
+### Critical: Original Language Source Text Accuracy
+The interlinear/original language toggle currently shows the same Greek source text regardless of
+which translation the user is reading. This is **misleading** because different translations use
+different source texts:
+- **KJV** → Textus Receptus (TR, Scrivener 1894)
+- **WEB** → Majority Text
+- **BSB** → Critical Text (SBLGNT for Greek, WLCM for Hebrew)
+
+**Why this matters:** When a user reads the WEB or BSB and clicks "original language," they may see
+Textus Receptus text, which is NOT the source their translation used. This reinforces the common
+(incorrect) KJV-only argument that modern translations "removed" text. In reality, the extra text
+in the TR (e.g., the Johannine Comma in 1 John 5:7-8) was most likely added later and corrected
+in newer critical editions.
+
+**Example:** 1 John 5:7 — KJV includes "the Father, the Word, and the Holy Ghost: and these three
+are one" (from TR). Modern translations (NIV, NASB, BSB, WEB) correctly omit this because it's
+not found in the earliest manuscripts.
+
+**Current status:**
+- BSB Hebrew mapping appears correct (uses WLCM)
+- BSB/WEB Greek mapping appears to still show Textus Receptus in some cases
+- The STEPBible TAGNT data DOES include variant markers (NKO system) showing which editions contain
+  each word — we could potentially leverage this to show the correct source text per translation
+
+**Recommendation from friend:** Don't try to solve this all at once. This is literally a lifetime
+of scholarly work. Options:
+1. Label the source text clearly (e.g., "Shown: SBLGNT" or "Shown: Textus Receptus")
+2. Find existing translation→source mappings that scholars have already done
+
+
+### Bug: Original Language Missing for Some Books/Chapters
+- Reported: Original language not available at all for Psalms
+- Reported: Toggle button not appearing in Genesis chapter 4
+- Sporadic issues in Genesis 23-25 (worked later — may be data loading race condition)
+- Need to audit interlinear data coverage across all 66 books
+
+### Attribution: Share Jesus Without Fear
+- Need to credit **William Fay** as the creator of the "Share Jesus Without Fear" method
+- The current Share Jesus modal uses his 5 questions + 7 verses format
+
+### Verse Sharing Feature Request
+- Users want to select verses and share them:
+  - As text (copy/paste formatted)
+  - Overlaid on a pretty background image (like Other app's verse images)
+  - Direct share to social media / messaging apps
+
+### Offline Caching Bug
+- Users report downloading a Bible version, getting success feedback, but:
+  - Data disappears on page refresh
+  - Going offline shows no cached content
+- Root cause likely: `loadPassage()` doesn't fall back to IndexedDB when fetch fails
+
+### Tablet Sidebar
+- On tablets (768px-1024px), the resources sidebar takes up too much space
+- Need a way to collapse/hide the sidebar on tablet-sized screens
 
 ---
 
-Last updated: 2026-01-19
+Last updated: 2026-02-05

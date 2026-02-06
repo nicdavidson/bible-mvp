@@ -8,13 +8,14 @@ Usage:
 
 The script will download the WEB Bible JSON and import it into the SQLite database.
 """
+import os
 import json
 import sqlite3
 import urllib.request
 from pathlib import Path
 
 # Configuration
-DATABASE_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 WEB_URL = "https://raw.githubusercontent.com/seven1m/open-bibles/master/json/WEB.json"
 
 # Book order mapping
