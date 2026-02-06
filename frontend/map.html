@@ -111,8 +111,11 @@
             <div>
                 <template x-if="pathTarget && selectedNode && !hoveredNode">
                     <div>
-                        <div class="focus-ref" x-text="selectedNode.book + ' ' + selectedNode.chapter + ':' + selectedNode.verse + '  ↔  ' + pathTarget.book + ' ' + pathTarget.chapter + ':' + pathTarget.verse"></div>
-                        <div class="focus-path" style="margin-top:4px;">Shift+click to change target · Click to clear</div>
+                        <div class="focus-ref" x-text="(selectedNode.isChrist ? 'Christ' : selectedNode.book + ' ' + selectedNode.chapter + ':' + selectedNode.verse) + '  ↔  ' + (pathTarget.isChrist ? 'Christ' : pathTarget.book + ' ' + pathTarget.chapter + ':' + pathTarget.verse)"></div>
+                        <div class="focus-path" style="margin-top:4px;">
+                            <button class="chain-btn" @click="openPathChain()" style="pointer-events:auto;">View Chain</button>
+                            <span style="margin-left:8px;">Shift+click to change target · Click to clear</span>
+                        </div>
                     </div>
                 </template>
                 <template x-if="!(pathTarget && selectedNode && !hoveredNode)">
@@ -177,6 +180,37 @@
             </template>
             <div x-show="selectedNodeEdges.length > 15" style="font-size:11px;color:var(--text-muted);margin-top:4px;"
                  x-text="'+ ' + (selectedNodeEdges.length - 15) + ' more'"></div>
+        </div>
+    </div>
+
+    <!-- Path Chain Panel -->
+    <div class="chain-panel" x-show="showPathChain" x-transition.opacity>
+        <div class="chain-header">
+            <h3>Cross-Reference Chain</h3>
+            <button class="chain-close" @click="showPathChain = false">&times;</button>
+        </div>
+        <div class="chain-summary" x-text="pathChainNodes.length > 1 ? (pathChainNodes.length - 1) + ' hop' + (pathChainNodes.length - 1 !== 1 ? 's' : '') : ''"></div>
+        <div class="chain-body">
+            <template x-for="(node, idx) in pathChainNodes" :key="'chain-' + (node.id || idx)">
+                <div class="chain-step" :class="{ 'chain-step-seed': node.isSeed, 'chain-step-christ': node.isChrist }">
+                    <div class="chain-marker">
+                        <span class="chain-dot" :class="{ 'chain-dot-seed': node.isSeed, 'chain-dot-christ': node.isChrist, 'chain-dot-start': idx === 0 && !node.isChrist }"></span>
+                        <span class="chain-line" x-show="idx < pathChainNodes.length - 1"></span>
+                    </div>
+                    <div class="chain-content" @click="selectChainNode(node)">
+                        <div class="chain-ref-row">
+                            <span class="chain-ref" x-text="node.isChrist ? 'Christ' : (node.book + ' ' + node.chapter + ':' + node.verse)"></span>
+                            <span class="chain-badge chain-badge-seed" x-show="node.isSeed">Seed</span>
+                            <span class="chain-badge chain-badge-start" x-show="idx === 0 && !node.isChrist && !node.isSeed">Start</span>
+                            <span class="chain-testament" x-show="!node.isChrist" x-text="node.testament"></span>
+                        </div>
+                        <p class="chain-text" x-show="node.text" x-text="node.text"></p>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <div class="chain-footer">
+            <span style="font-size:10px;color:var(--text-muted);">Cross-references from Treasury of Scripture Knowledge (public domain). 41,649 connections with community vote scores.</span>
         </div>
     </div>
 

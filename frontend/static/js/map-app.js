@@ -62,6 +62,9 @@ function crossRefApp() {
         ptjSeedIds: new Set(),
         ptjPathToChrist: null,
         _savedColorMode: 'testament',
+        // Path chain panel
+        showPathChain: false,
+        pathChainNodes: [],  // ordered array of node objects from the highlighted path
         // History & navigation
         history: [],        // [{ref: 'John.3.16', label: 'Jn 3:16', query: 'John 3:16'}]
         historyIndex: -1,
@@ -541,6 +544,25 @@ function crossRefApp() {
             this.selectedNode = null;
             this.pathTarget = null;
             if (this.graph) { this.graph.selectedNode = null; this.graph.pathTarget = null; }
+        },
+
+        openPathChain() {
+            if (!this.graph || !this.graph._pathCache) return;
+            const ordered = this.graph._pathCache.orderedPath || [];
+            if (ordered.length < 2) return;
+            this.pathChainNodes = ordered;
+            this.showPathChain = true;
+        },
+
+        selectChainNode(node) {
+            if (!this.graph || !node) return;
+            this.selectedNode = node;
+            this.graph.selectedNode = node;
+            // Center camera on the node
+            this.graph.camX = node.x * this.graph.zoom;
+            this.graph.camY = node.y * this.graph.zoom;
+            this.graph._draw();
+            this._computeSelectedNodeInfo(node);
         },
 
         exportImage() {

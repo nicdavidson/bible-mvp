@@ -58,7 +58,7 @@ class ForceGraph {
         this.ptjSeedIds = new Set();
 
         // Cached path-finding results (recomputed only on hover/selection change)
-        this._pathCache = { hovNode: null, selNode: null, _pathTarget: null, pathNodes: new Set(), pathEdges: new Set(), hasActive: false };
+        this._pathCache = { hovNode: null, selNode: null, _pathTarget: null, pathNodes: new Set(), pathEdges: new Set(), orderedPath: [], hasActive: false };
 
         this._resize();
         this._bindEvents();
@@ -323,7 +323,7 @@ class ForceGraph {
         this.camX = 0;
         this.camY = 0;
         this.zoom = 1;
-        this._pathCache = { hovNode: null, selNode: null, _pathTarget: null, pathNodes: new Set(), pathEdges: new Set(), hasActive: false };
+        this._pathCache = { hovNode: null, selNode: null, _pathTarget: null, pathNodes: new Set(), pathEdges: new Set(), orderedPath: [], hasActive: false };
 
         this._wake();
     }
@@ -573,31 +573,40 @@ class ForceGraph {
                 }
             }
 
+            // Build ordered path from target back to start
+            const ordered = [];
             let curr = targetNode;
             while (parent.has(curr)) {
                 pNodes.add(curr);
+                ordered.push(curr);
                 const p = parent.get(curr);
                 pEdges.add(p.edgeIdx);
                 curr = p.from;
             }
             pNodes.add(startNode);
-            return { nodes: pNodes, edges: pEdges };
+            ordered.push(startNode);
+            ordered.reverse(); // start → target order
+            return { nodes: pNodes, edges: pEdges, ordered };
         };
+
+        const emptyResult = { nodes: new Set(), edges: new Set(), ordered: [] };
 
         // Two-node path: selectedNode <-> pathTarget
         if (sel && pt) {
             const twoNodePath = findPathBetween(sel, pt);
             cache.pathNodes = twoNodePath.nodes;
             cache.pathEdges = twoNodePath.edges;
+            cache.orderedPath = twoNodePath.ordered || [];
             cache.hasActive = twoNodePath.nodes.size > 0;
             return;
         }
 
         // Default: path from center to hovered or selected node
-        const hovPath = centerNode ? findPathBetween(centerNode, hov) : { nodes: new Set(), edges: new Set() };
-        const selPath = centerNode ? findPathBetween(centerNode, sel) : { nodes: new Set(), edges: new Set() };
+        const hovPath = centerNode ? findPathBetween(centerNode, hov) : emptyResult;
+        const selPath = centerNode ? findPathBetween(centerNode, sel) : emptyResult;
         cache.pathNodes = hovPath.nodes.size > 0 ? hovPath.nodes : selPath.nodes;
         cache.pathEdges = hovPath.edges.size > 0 ? hovPath.edges : selPath.edges;
+        cache.orderedPath = hovPath.ordered.length > 0 ? hovPath.ordered : (selPath.ordered || []);
         cache.hasActive = !!(hov || sel);
     }
 
