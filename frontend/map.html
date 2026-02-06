@@ -195,7 +195,7 @@
             <template x-for="edge in selectedNodeEdges.slice(0, 15)" :key="edge.id">
                 <a class="connection-link" @click.prevent="query = edge.label; search(); selectedNode = null;">
                     <span x-text="edge.label"></span>
-                    <span style="font-size:10px;margin-left:4px;" :style="'color:' + (edge.votes >= 300 ? '#22c55e' : edge.votes >= 150 ? '#38bdf8' : edge.votes >= 75 ? '#eab308' : '#94a3b8')" x-text="edge.votes >= 300 ? 'Strong' : edge.votes >= 150 ? 'Good' : edge.votes >= 75 ? 'Fair' : 'Weak'"></span>
+                    <span style="display:inline-block;width:6px;height:6px;border-radius:50%;margin-left:4px;flex-shrink:0;" :style="'background:' + (edge.votes >= 300 ? '#22c55e' : edge.votes >= 150 ? '#38bdf8' : edge.votes >= 75 ? '#eab308' : '#94a3b8')"></span>
                 </a>
             </template>
             <div x-show="selectedNodeEdges.length > 15" style="font-size:11px;color:var(--text-muted);margin-top:4px;"
@@ -226,11 +226,7 @@
                     <div class="chain-marker">
                         <span class="chain-dot" :class="{ 'chain-dot-seed': node.isSeed, 'chain-dot-christ': node.isChrist, 'chain-dot-start': idx === 0 && !node.isChrist }"></span>
                         <span class="chain-line" x-show="idx < pathChainNodes.length - 1"
-                              :style="pathChainEdges[idx] >= 300 ? 'background:#22c55e' : pathChainEdges[idx] >= 150 ? 'background:#38bdf8' : pathChainEdges[idx] >= 75 ? 'background:#eab308' : ''">
-                            <span class="chain-strength"
-                                  :class="pathChainEdges[idx] >= 300 ? 'chain-strength-strong' : pathChainEdges[idx] >= 150 ? 'chain-strength-good' : pathChainEdges[idx] >= 75 ? 'chain-strength-fair' : 'chain-strength-weak'"
-                                  x-text="(pathChainEdges[idx] >= 300 ? 'Strong' : pathChainEdges[idx] >= 150 ? 'Good' : pathChainEdges[idx] >= 75 ? 'Fair' : 'Weak') + ' · ' + (pathChainEdges[idx] || 0)"></span>
-                        </span>
+                              :style="'width:' + (pathChainEdges[idx] >= 300 ? '4px' : pathChainEdges[idx] >= 150 ? '3px' : pathChainEdges[idx] >= 75 ? '2px' : '1px') + ';background:' + (pathChainEdges[idx] >= 300 ? '#22c55e' : pathChainEdges[idx] >= 150 ? '#38bdf8' : pathChainEdges[idx] >= 75 ? '#eab308' : 'var(--border)')"></span>
                     </div>
                     <div class="chain-content" @click="selectChainNode(node)">
                         <div class="chain-ref-row">

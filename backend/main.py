@@ -1287,7 +1287,7 @@ def _enrich_nodes(conn, nodes: dict):
         row = cursor.fetchone()
         if row:
             text = row[0]
-            node["text"] = text[:120] + "..." if len(text) > 120 else text
+            node["text"] = text
         else:
             node["text"] = ""
 
