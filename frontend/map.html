@@ -29,7 +29,7 @@
             <h1>Cross-Reference Mapper</h1>
             <div class="subtitle" x-text="centerLabel || 'Enter a verse reference'"></div>
         </div>
-        <button x-show="centerLabel" @click="pinCenter()" title="Pin current verse"
+        <button class="pin-center-btn" x-show="centerLabel" @click="pinCenter()" title="Pin current verse"
                 style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted);transition:color 0.15s;flex-shrink:0;"
                 :style="isCenterPinned() ? 'color:#fbbf24;' : ''"
                 x-text="isCenterPinned() ? '\u2605' : '\u2606'"></button>
@@ -43,10 +43,10 @@
         <div class="ptj-method-select" x-show="ptjMode" x-transition.opacity>
             <select x-model="ptjMethod" @change="search()"
                     style="width:100%;padding:4px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:12px;">
+                <option value="find-path">Find the Path</option>
                 <option value="gospel-peaks">Gospel Peaks</option>
                 <option value="messianic">Messianic Thread</option>
                 <option value="red-letter">Red Letter</option>
-                <option value="find-path">Find the Path</option>
             </select>
             <div class="ptj-method-desc" x-text="
                 ptjMethod === 'gospel-peaks' ? 'Starting from the most direct declarations about Christ in each Gospel.' :
@@ -71,6 +71,15 @@
                 </template>
             </div>
         </form>
+        <!-- Mobile PTJ method bar (second row, only visible on mobile when PTJ active) -->
+        <div class="ptj-mobile-bar" x-show="ptjMode">
+            <select x-model="ptjMethod" @change="search()">
+                <option value="find-path">Find the Path</option>
+                <option value="gospel-peaks">Gospel Peaks</option>
+                <option value="messianic">Messianic Thread</option>
+                <option value="red-letter">Red Letter</option>
+            </select>
+        </div>
     </div>
 
     <!-- History Breadcrumb Trail -->
@@ -105,16 +114,23 @@
     </div>
 
     <!-- Focus Bar — shows hovered or selected verse prominently -->
-    <div class="focus-bar" x-show="hoveredNode || selectedNode"
+    <div class="focus-bar" x-show="hoveredNode || selectedNode || (pathTarget && !selectedNode)"
          x-transition.opacity.duration.150ms>
+        <!-- Awaiting second node: pathTarget set, no selection yet -->
+        <template x-if="pathTarget && !selectedNode && !hoveredNode">
+            <div>
+                <div class="focus-ref" x-text="'Target: ' + (pathTarget.isChrist ? 'Christ' : pathTarget.book + ' ' + pathTarget.chapter + ':' + pathTarget.verse)"></div>
+                <div class="focus-path" style="margin-top:4px;">Tap another verse to see the chain</div>
+            </div>
+        </template>
         <template x-if="hoveredNode || selectedNode">
             <div>
                 <template x-if="pathTarget && selectedNode && !hoveredNode">
                     <div>
                         <div class="focus-ref" x-text="(selectedNode.isChrist ? 'Christ' : selectedNode.book + ' ' + selectedNode.chapter + ':' + selectedNode.verse) + '  ↔  ' + (pathTarget.isChrist ? 'Christ' : pathTarget.book + ' ' + pathTarget.chapter + ':' + pathTarget.verse)"></div>
                         <div class="focus-path" style="margin-top:4px;">
-                            <button class="chain-btn" @click="openPathChain()" style="pointer-events:auto;">View Chain</button>
-                            <span style="margin-left:8px;">Shift+click to change target · Click to clear</span>
+                            <button class="chain-btn" @click="openPathChain()" style="pointer-events:auto;">View Chain <span style="font-size:10px;opacity:0.7;" x-text="'(' + ((graph?._pathCache?.orderedPath?.length || 1) - 1) + ' hops)'"></span></button>
+                            <span style="margin-left:8px;">Tap to change target</span>
                         </div>
                     </div>
                 </template>
@@ -159,6 +175,10 @@
                         :style="expandingNode ? 'opacity:0.5;cursor:not-allowed;' : ''">
                     <span x-text="expandingNode ? 'Loading...' : '+ Expand'"></span>
                 </button>
+                <button @click="setAsTarget(selectedNode)"
+                        title="Set as path target to find chain between two verses"
+                        class="set-target-btn" :class="{ active: pathTarget === selectedNode }"
+                        x-text="pathTarget === selectedNode ? '&#x1F3AF; Target' : '&#x1F3AF; Set Target'"></button>
             </div>
         </div>
         <div class="verse-panel-text" x-text="selectedNode?.text || ''"></div>
@@ -183,11 +203,21 @@
         </div>
     </div>
 
+    <!-- Chain Backdrop -->
+    <div class="chain-backdrop" x-show="showPathChain" x-transition.opacity
+         @click="showPathChain = false"></div>
+
     <!-- Path Chain Panel -->
     <div class="chain-panel" x-show="showPathChain" x-transition.opacity>
         <div class="chain-header">
             <h3>Cross-Reference Chain</h3>
-            <button class="chain-close" @click="showPathChain = false">&times;</button>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <button class="chain-action-btn" @click="copyChain()" title="Copy chain text"
+                        x-text="chainCopied ? '\u2713 Copied!' : 'Copy'"></button>
+                <button class="chain-action-btn" @click="shareChain()"
+                        x-show="!!navigator.share" title="Share chain">Share</button>
+                <button class="chain-close" @click="showPathChain = false">&times;</button>
+            </div>
         </div>
         <div class="chain-summary" x-text="pathChainNodes.length > 1 ? (pathChainNodes.length - 1) + ' hop' + (pathChainNodes.length - 1 !== 1 ? 's' : '') : ''"></div>
         <div class="chain-body">

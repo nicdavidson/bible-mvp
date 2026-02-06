@@ -58,13 +58,14 @@ function crossRefApp() {
         expandingNode: false,
         // Points to Jesus mode
         ptjMode: false,
-        ptjMethod: 'gospel-peaks',
+        ptjMethod: 'find-path',
         ptjSeedIds: new Set(),
         ptjPathToChrist: null,
         _savedColorMode: 'testament',
         // Path chain panel
         showPathChain: false,
         pathChainNodes: [],  // ordered array of node objects from the highlighted path
+        chainCopied: false,
         // History & navigation
         history: [],        // [{ref: 'John.3.16', label: 'Jn 3:16', query: 'John 3:16'}]
         historyIndex: -1,
@@ -138,10 +139,16 @@ function crossRefApp() {
 
                 this.graph.onClick = (node, event) => {
                     if (!node) {
-                        this.selectedNode = null;
-                        this.pathTarget = null;
-                        this.graph.selectedNode = null;
-                        this.graph.pathTarget = null;
+                        // Click empty space: if awaiting second node (pathTarget set, no selection), cancel targeting
+                        if (this.pathTarget && !this.selectedNode) {
+                            this.pathTarget = null;
+                            this.graph.pathTarget = null;
+                        } else {
+                            this.selectedNode = null;
+                            this.pathTarget = null;
+                            this.graph.selectedNode = null;
+                            this.graph.pathTarget = null;
+                        }
                         this.graph._draw();
                         return;
                     }
@@ -153,12 +160,23 @@ function crossRefApp() {
                         this.graph._draw();
                         return;
                     }
-                    // Shift+click with existing selection → set as path target
+                    // Shift+click with existing selection → set as path target (desktop)
                     if (event && event.shiftKey && this.selectedNode && this.selectedNode !== node) {
                         this.pathTarget = node;
                         this.graph.pathTarget = node;
-                        this.graph._pathCache.hovNode = null; // force recompute
+                        this.graph._pathCache.hovNode = null;
                         this.graph._draw();
+                        return;
+                    }
+                    // "Set Target" flow: pathTarget already set, awaiting second node
+                    if (this.pathTarget && !this.selectedNode && this.pathTarget !== node) {
+                        this.selectedNode = node;
+                        this.graph.selectedNode = node;
+                        this.graph._pathCache.hovNode = null;
+                        this.graph._draw();
+                        this._computeSelectedNodeInfo(node);
+                        // Auto-open chain view
+                        this.$nextTick(() => this.openPathChain());
                         return;
                     }
                     // Normal click → select node
@@ -503,7 +521,7 @@ function crossRefApp() {
                 this._updateStats(data);
                 this.graph.setData(data.nodes, data.edges, data.center);
 
-                // Find-path: auto-highlight the path by selecting the start and Christ as path target
+                // Find-path: auto-highlight the path and open chain view
                 if (this.ptjMode && this.ptjMethod === 'find-path' && data.pathToChrist && data.pathToChrist.length > 0) {
                     this.$nextTick(() => {
                         const startNode = this.graph.nodeMap[data.center];
@@ -515,6 +533,8 @@ function crossRefApp() {
                             this.graph.pathTarget = christNode;
                             this.graph._pathCache.hovNode = null; // force recompute
                             this.graph._draw();
+                            // Auto-open chain view after path settles
+                            this.$nextTick(() => this.openPathChain());
                         }
                     });
                 }
@@ -552,6 +572,60 @@ function crossRefApp() {
             if (ordered.length < 2) return;
             this.pathChainNodes = ordered;
             this.showPathChain = true;
+        },
+
+        setAsTarget(node) {
+            if (!node || !this.graph) return;
+            this.pathTarget = node;
+            this.graph.pathTarget = node;
+            this.graph._pathCache.hovNode = null; // force recompute
+            this.graph._draw();
+            // Clear selection so user can tap the next node
+            this.selectedNode = null;
+            this.graph.selectedNode = null;
+        },
+
+        copyChain() {
+            if (!this.pathChainNodes || this.pathChainNodes.length < 2) return;
+            const hops = this.pathChainNodes.length - 1;
+            const lines = this.pathChainNodes.map((node, idx) => {
+                const ref = node.isChrist ? 'Christ'
+                    : (node.book + ' ' + node.chapter + ':' + node.verse);
+                const text = node.text ? ' \u2014 "' + node.text + '"' : '';
+                return (idx + 1) + '. ' + ref + text;
+            });
+            const header = 'Cross-Reference Chain (' + hops + ' hop' + (hops !== 1 ? 's' : '') + ')';
+            const footer = '\nShared from In the Word';
+            const fullText = header + '\n\n' + lines.join('\n\n') + footer;
+            navigator.clipboard.writeText(fullText).then(() => {
+                this.chainCopied = true;
+                setTimeout(() => this.chainCopied = false, 2000);
+            }).catch(() => {
+                this.errorMsg = 'Could not copy to clipboard';
+            });
+        },
+
+        async shareChain() {
+            if (!navigator.share || !this.pathChainNodes || this.pathChainNodes.length < 2) return;
+            const startNode = this.pathChainNodes[0];
+            const endNode = this.pathChainNodes[this.pathChainNodes.length - 1];
+            const startLabel = startNode.isChrist ? 'Christ'
+                : (startNode.book + ' ' + startNode.chapter + ':' + startNode.verse);
+            const endLabel = endNode.isChrist ? 'Christ'
+                : (endNode.book + ' ' + endNode.chapter + ':' + endNode.verse);
+            const title = 'Cross-Reference Chain: ' + startLabel + ' \u2192 ' + endLabel;
+            const lines = this.pathChainNodes.map((node, idx) => {
+                const ref = node.isChrist ? 'Christ'
+                    : (node.book + ' ' + node.chapter + ':' + node.verse);
+                const text = node.text ? ' \u2014 "' + node.text + '"' : '';
+                return (idx + 1) + '. ' + ref + text;
+            });
+            const fullText = title + '\n\n' + lines.join('\n\n') + '\n\nShared from In the Word';
+            try {
+                await navigator.share({ title, text: fullText });
+            } catch (err) {
+                if (err.name !== 'AbortError') this.errorMsg = 'Share failed';
+            }
         },
 
         selectChainNode(node) {
