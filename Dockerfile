@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # the pre-built bible.db (~350MB) so it ships with every deploy.
 COPY . .
 
+# Inject git commit hash into service worker for automatic cache busting
+ARG SW_VERSION=dev
+RUN sed -i "s/__SW_VERSION__/${SW_VERSION}/g" frontend/static/sw.js
+
 # Expose the port the app runs on
 EXPOSE 8000
 

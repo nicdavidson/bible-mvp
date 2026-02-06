@@ -103,17 +103,20 @@ setup-sources:
 	@cd data && zstd -d sources.tar.zst -c | tar xf -
 	@echo "Done! Source data ready. Run 'make build' to build the database."
 
+# Git hash for automatic service worker cache busting
+SW_VERSION := $(shell git rev-parse --short HEAD)
+
 # Full deploy: rebuild DB, then deploy to Fly (code + fresh DB)
 deploy: build
 	@echo ""
 	@echo "Generating manifest..."
 	@. .venv/bin/activate 2>/dev/null || true; python scripts/build_db.py --manifest
 	@echo ""
-	@echo "Deploying to Fly.io..."
-	fly deploy
+	@echo "Deploying to Fly.io (SW version: $(SW_VERSION))..."
+	fly deploy --build-arg SW_VERSION=$(SW_VERSION)
 	@echo ""
 	@echo "Deploy complete! Entrypoint will sync DB to volume on startup."
 
 # Code-only deploy (skip DB rebuild, use whatever DB is on the volume)
 deploy-code:
-	fly deploy
+	fly deploy --build-arg SW_VERSION=$(SW_VERSION)

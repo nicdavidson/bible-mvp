@@ -57,6 +57,10 @@
             <div class="side-menu-divider"></div>
 
             <div class="side-menu-section">
+                <a href="/map" class="side-menu-item" style="text-decoration:none;color:inherit;">
+                    <span class="side-menu-icon">🕸️</span>
+                    <span>Cross-Reference Map</span>
+                </a>
                 <button @click="openShareJesus()" class="side-menu-item">
                     <span class="side-menu-icon">✝️</span>
                     <span>Share Jesus</span>
@@ -790,6 +794,14 @@
                     </ul>
                     <div class="crossref-filter-count" x-show="crossRefFilter && crossRefs.length > 0">
                         <span x-text="getFilteredCrossRefs().length + ' of ' + crossRefs.length + ' references'"></span>
+                    </div>
+                    <!-- Path to Christ button -->
+                    <div class="path-to-christ-trigger" x-show="highlightedVerses.length > 0">
+                        <button @click="findPathToChrist()" class="btn-path-to-christ" :disabled="pathToChristLoading">
+                            <span class="ptc-icon">&#10013;</span>
+                            <span x-text="pathToChristLoading ? 'Searching...' : 'Path to Christ'"></span>
+                        </button>
+                        <span class="ptc-hint">Trace cross-references to a christological verse</span>
                     </div>
                 </div>
 
@@ -1600,6 +1612,50 @@
 
                 <div class="about-footer">
                     <span class="about-version">Version 0.1-alpha</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Path to Christ Modal -->
+    <div class="modal-overlay" x-show="showPathToChrist" x-transition @click.self="showPathToChrist = false">
+        <div class="modal ptc-modal">
+            <div class="modal-header">
+                <h2>&#10013; Path to Christ</h2>
+                <button @click="showPathToChrist = false" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading -->
+                <div class="ptc-loading" x-show="pathToChristLoading">
+                    <div class="spinner-small"></div>
+                    <p>Tracing cross-reference path...</p>
+                </div>
+                <!-- Error -->
+                <div class="ptc-error" x-show="!pathToChristLoading && pathToChristError">
+                    <p x-text="pathToChristError"></p>
+                </div>
+                <!-- Path -->
+                <div x-show="!pathToChristLoading && !pathToChristError && pathToChrist.length > 0">
+                    <p class="ptc-summary" x-text="pathToChristHops === 0 ? 'This verse is a christological seed!' : pathToChristHops + ' hop' + (pathToChristHops !== 1 ? 's' : '') + ' through cross-references'"></p>
+                    <div class="ptc-timeline">
+                        <template x-for="(step, idx) in pathToChrist" :key="'ptc-' + idx">
+                            <div class="ptc-step" :class="{ 'ptc-step-seed': step.isSeed, 'ptc-step-start': idx === 0 }">
+                                <div class="ptc-marker">
+                                    <span class="ptc-dot" :class="{ 'ptc-dot-seed': step.isSeed, 'ptc-dot-start': idx === 0 }"></span>
+                                    <span class="ptc-line" x-show="idx < pathToChrist.length - 1"></span>
+                                </div>
+                                <div class="ptc-content">
+                                    <div class="ptc-ref-row">
+                                        <button class="ptc-ref" @click="navigateFromPath(step.reference)" x-text="step.reference"></button>
+                                        <span class="ptc-badge ptc-badge-seed" x-show="step.isSeed">Christological</span>
+                                        <span class="ptc-badge ptc-badge-start" x-show="idx === 0 && !step.isSeed">Selected</span>
+                                        <span class="ptc-testament" x-text="step.testament"></span>
+                                    </div>
+                                    <p class="ptc-text" x-text="step.text"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>

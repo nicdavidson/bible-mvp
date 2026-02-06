@@ -4,9 +4,12 @@
  * Integrates with IndexedDB via postMessage for smart offline storage.
  */
 
-const CACHE_NAME = 'biblemvp-v8';
-const STATIC_CACHE = 'biblemvp-static-v8';
-const CONTENT_CACHE = 'biblemvp-content-v8';
+// __SW_VERSION__ is replaced at Docker build time with the git commit hash.
+// To bust caches locally, change this to any unique string.
+const SW_VERSION = '__SW_VERSION__';
+const CACHE_NAME = `biblemvp-${SW_VERSION}`;
+const STATIC_CACHE = `biblemvp-static-${SW_VERSION}`;
+const CONTENT_CACHE = `biblemvp-content-${SW_VERSION}`;
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
@@ -31,7 +34,7 @@ const CACHEABLE_API_PATTERNS = [
 
 // Install event - cache static assets
 self.addEventListener('install', event => {
-    console.log('[SW] Installing service worker v8...');
+    console.log(`[SW] Installing service worker ${SW_VERSION}...`);
     event.waitUntil(
         caches.open(STATIC_CACHE)
             .then(cache => cache.addAll(STATIC_ASSETS))
@@ -44,7 +47,7 @@ self.addEventListener('install', event => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', event => {
-    console.log('[SW] Activating service worker v8...');
+    console.log(`[SW] Activating service worker ${SW_VERSION}...`);
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(

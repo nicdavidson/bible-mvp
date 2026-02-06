@@ -306,6 +306,13 @@ function bibleApp() {
         showShareJesus: false,
         settingsTab: 'general',
 
+        // Path to Christ modal
+        showPathToChrist: false,
+        pathToChrist: [],
+        pathToChristLoading: false,
+        pathToChristError: null,
+        pathToChristHops: 0,
+
         // Immersive reading mode
         immersiveMode: false,
         immersiveControlsVisible: false,
@@ -1565,6 +1572,44 @@ function bibleApp() {
                 console.error('Failed to load cross-refs:', err);
                 this.crossRefs = [];
             }
+        },
+
+        async findPathToChrist() {
+            if (!this.currentBook || !this.highlightedVerses.length) return;
+            const verseNum = this.highlightedVerses[0];
+            const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+
+            this.pathToChristLoading = true;
+            this.pathToChristError = null;
+            this.pathToChrist = [];
+            this.showPathToChrist = true;
+
+            try {
+                const resp = await fetch(
+                    `/api/path-to-christ/${encodeURIComponent(ref)}?translation=${this.translation}`
+                );
+                if (!resp.ok) {
+                    const body = await resp.json().catch(() => ({}));
+                    throw new Error(body.detail || 'Failed to find path');
+                }
+                const data = await resp.json();
+                if (data.found) {
+                    this.pathToChrist = data.path;
+                    this.pathToChristHops = data.hops;
+                } else {
+                    this.pathToChristError = `No cross-reference path found from ${ref} to Christ within 6 hops.`;
+                }
+            } catch (err) {
+                console.error('Path to Christ error:', err);
+                this.pathToChristError = err.message || 'Could not find a path. Please try again.';
+            } finally {
+                this.pathToChristLoading = false;
+            }
+        },
+
+        navigateFromPath(reference) {
+            this.showPathToChrist = false;
+            this.loadReference(reference);
         },
 
         // Show verse preview on hover (desktop only)

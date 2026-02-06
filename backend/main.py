@@ -1254,6 +1254,677 @@ async def get_devotionals_offline(source: Optional[str] = None):
         conn.close()
 
 
+# ============================================================
+# Christological seed verses for "Points to Jesus" mode
+# ============================================================
+CHRISTOLOGICAL_SEEDS = {
+    "gospel-peaks": [
+        ("John", 1, 1), ("John", 14, 6), ("Matthew", 1, 23),
+        ("Mark", 10, 45), ("Luke", 2, 11), ("Isaiah", 53, 5),
+    ],
+    "messianic": [
+        ("Genesis", 3, 15), ("Psalms", 22, 1), ("Psalms", 110, 1),
+        ("Isaiah", 7, 14), ("Isaiah", 9, 6), ("Isaiah", 53, 5),
+        ("Isaiah", 53, 7), ("Isaiah", 61, 1), ("Micah", 5, 2),
+        ("Zechariah", 9, 9), ("Daniel", 7, 13), ("Malachi", 3, 1),
+        ("Jeremiah", 23, 5), ("Jeremiah", 31, 31), ("Hosea", 11, 1),
+        ("Zechariah", 12, 10), ("Deuteronomy", 18, 15),
+        ("Psalms", 16, 10), ("Psalms", 118, 22), ("Isaiah", 40, 3),
+    ],
+}
+
+
+def _enrich_nodes(conn, nodes: dict):
+    """Add verse text preview and book metadata (testament, book_order) to nodes."""
+    for key, node in nodes.items():
+        if node.get("isChrist"):
+            continue
+        cursor = conn.execute("""
+            SELECT text FROM verses
+            WHERE book = ? AND chapter = ? AND verse = ? AND translation_id = 'BSB'
+            LIMIT 1
+        """, (node["book"], node["chapter"], node["verse"]))
+        row = cursor.fetchone()
+        if row:
+            text = row[0]
+            node["text"] = text[:120] + "..." if len(text) > 120 else text
+        else:
+            node["text"] = ""
+
+    book_meta_cache = {}
+    for key, node in nodes.items():
+        if node.get("isChrist"):
+            continue
+        b = node["book"]
+        if b not in book_meta_cache:
+            cursor = conn.execute(
+                "SELECT book_order, testament FROM books WHERE name = ?", (b,)
+            )
+            row = cursor.fetchone()
+            if row:
+                book_meta_cache[b] = {"book_order": row[0], "testament": row[1]}
+            else:
+                book_meta_cache[b] = {"book_order": 0, "testament": "OT"}
+        meta = book_meta_cache[b]
+        node["testament"] = meta["testament"]
+        node["book_order"] = meta["book_order"]
+
+
+@app.get("/api/crossref-map/christological")
+async def get_crossref_map_christological(
+    method: str = Query(default="gospel-peaks", description="Calculation method"),
+    verse: str = Query(default=None, description="Verse for find-path mode"),
+    depth: int = Query(default=2, ge=1, le=5, description="BFS depth from seeds"),
+    per_verse: int = Query(default=5, ge=1, le=30, description="Top N connections per verse"),
+    limit: int = Query(default=200, ge=20, le=500, description="Max nodes to return"),
+):
+    """
+    Generate a christological cross-reference graph.
+    Center is a synthetic CHRIST node; seeds are christological verses connected to it.
+    """
+    conn = get_db_connection()
+    try:
+        # Determine seed verses
+        if method == "red-letter":
+            # Top cross-referenced Jesus-spoken verses
+            cursor = conn.execute("""
+                SELECT sv.book, sv.chapter, sv.verse,
+                       COUNT(cr.source_book) as xref_count
+                FROM speaker_verses sv
+                LEFT JOIN cross_references cr
+                    ON (cr.source_book = sv.book AND cr.source_chapter = sv.chapter
+                        AND cr.source_verse = sv.verse)
+                    OR (cr.target_book = sv.book AND cr.target_chapter = sv.chapter
+                        AND cr.target_verse = sv.verse)
+                WHERE sv.speaker = 'Jesus'
+                GROUP BY sv.book, sv.chapter, sv.verse
+                ORDER BY xref_count DESC
+                LIMIT 20
+            """)
+            seeds = [(row[0], row[1], row[2]) for row in cursor.fetchall()]
+        elif method == "messianic":
+            seeds = CHRISTOLOGICAL_SEEDS["messianic"]
+        else:
+            # Default: gospel-peaks
+            seeds = CHRISTOLOGICAL_SEEDS["gospel-peaks"]
+
+        # --- Find-path mode: BFS from user's verse to any seed ---
+        if method == "find-path":
+            if not verse:
+                raise HTTPException(status_code=400, detail="Verse required for find-path mode")
+            parsed = parse_reference(verse)
+            if not parsed:
+                raise HTTPException(status_code=400, detail=f"Invalid reference: {verse}")
+            book, chapter, verse_start, verse_end, has_verse = parsed
+            if not has_verse:
+                raise HTTPException(status_code=400, detail="A specific verse is required")
+
+            # All seed IDs we're trying to reach
+            all_seeds = (
+                CHRISTOLOGICAL_SEEDS["gospel-peaks"]
+                + CHRISTOLOGICAL_SEEDS["messianic"]
+            )
+            seed_ids = {f"{s[0]}.{s[1]}.{s[2]}" for s in all_seeds}
+
+            start_key = f"{book}.{chapter}.{verse_start}"
+            nodes = {}
+            edges = []
+            edge_set = set()
+            visited = set()
+            parent = {}  # for path reconstruction
+            queue = [(book, chapter, verse_start, 0)]
+            nodes[start_key] = {
+                "id": start_key, "book": book, "chapter": chapter,
+                "verse": verse_start, "depth": 0
+            }
+
+            found_seed = None
+            max_search_depth = 6
+
+            while queue and not found_seed:
+                src_book, src_chapter, src_verse, current_depth = queue.pop(0)
+                src_key = f"{src_book}.{src_chapter}.{src_verse}"
+                if src_key in visited:
+                    continue
+                visited.add(src_key)
+
+                if src_key in seed_ids and src_key != start_key:
+                    found_seed = src_key
+                    break
+
+                if current_depth >= max_search_depth:
+                    continue
+
+                cursor = conn.execute("""
+                    SELECT target_book, target_chapter, target_verse, votes
+                    FROM (
+                        SELECT target_book, target_chapter, target_verse, votes
+                        FROM cross_references
+                        WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
+                        UNION ALL
+                        SELECT source_book, source_chapter, source_verse, votes
+                        FROM cross_references
+                        WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
+                    )
+                    GROUP BY target_book, target_chapter, target_verse
+                    ORDER BY MAX(votes) DESC
+                    LIMIT ?
+                """, (src_book, src_chapter, src_verse,
+                      src_book, src_chapter, src_verse, 15))
+
+                for row in cursor.fetchall():
+                    tgt_book, tgt_chapter, tgt_verse, votes = row
+                    tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+
+                    edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
+                    if edge_key not in edge_set:
+                        edge_set.add(edge_key)
+                        edges.append({
+                            "source": src_key, "target": tgt_key, "votes": votes
+                        })
+
+                    if tgt_key not in nodes:
+                        nodes[tgt_key] = {
+                            "id": tgt_key, "book": tgt_book,
+                            "chapter": tgt_chapter, "verse": tgt_verse,
+                            "depth": current_depth + 1,
+                            "isSeed": tgt_key in seed_ids,
+                        }
+                        parent[tgt_key] = src_key
+
+                    if tgt_key in seed_ids:
+                        found_seed = tgt_key
+                        break
+
+                    if tgt_key not in visited:
+                        queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+
+            # Reconstruct path
+            path_to_christ = []
+            if found_seed:
+                curr = found_seed
+                while curr and curr != start_key:
+                    path_to_christ.append(curr)
+                    curr = parent.get(curr)
+                path_to_christ.append(start_key)
+                path_to_christ.reverse()
+
+            # Filter to only path + immediate neighbors for clarity
+            path_set = set(path_to_christ) if path_to_christ else set(nodes.keys())
+            filtered_nodes = {}
+            filtered_edges = []
+            for key in path_set:
+                if key in nodes:
+                    filtered_nodes[key] = nodes[key]
+            # Also include one hop around the path for context
+            for e in edges:
+                if e["source"] in path_set or e["target"] in path_set:
+                    if e["source"] in nodes:
+                        filtered_nodes[e["source"]] = nodes[e["source"]]
+                    if e["target"] in nodes:
+                        filtered_nodes[e["target"]] = nodes[e["target"]]
+                    filtered_edges.append(e)
+
+            nodes = filtered_nodes
+            edges = filtered_edges
+
+            # Add Christ node at the end of the path
+            christ_node = {
+                "id": "__CHRIST__", "book": "", "chapter": 0, "verse": 0,
+                "depth": 0, "isChrist": True, "text": "",
+                "testament": "", "book_order": 0,
+            }
+            nodes["__CHRIST__"] = christ_node
+            # Connect Christ to the found seed
+            if found_seed:
+                edges.append({
+                    "source": "__CHRIST__", "target": found_seed, "votes": 9999
+                })
+                if found_seed in nodes:
+                    nodes[found_seed]["isSeed"] = True
+
+            _enrich_nodes(conn, nodes)
+
+            return {
+                "center": start_key,
+                "nodes": list(nodes.values()),
+                "edges": edges,
+                "seedIds": list(seed_ids & set(nodes.keys())),
+                "method": "find-path",
+                "pathToChrist": path_to_christ if found_seed else None,
+                "christNodeId": "__CHRIST__",
+                "foundSeed": found_seed,
+            }
+
+        # --- Standard christological BFS (gospel-peaks, messianic, red-letter) ---
+        nodes = {}
+        edges = []
+        edge_set = set()
+        queue = []
+
+        # Create synthetic Christ center node
+        christ_node = {
+            "id": "__CHRIST__", "book": "", "chapter": 0, "verse": 0,
+            "depth": 0, "isChrist": True, "text": "",
+            "testament": "", "book_order": 0,
+        }
+        nodes["__CHRIST__"] = christ_node
+        seed_ids = []
+
+        # Add seed verses at depth 1 with synthetic edges to Christ
+        for s_book, s_chapter, s_verse in seeds:
+            key = f"{s_book}.{s_chapter}.{s_verse}"
+            # Verify this verse exists
+            cursor = conn.execute(
+                "SELECT 1 FROM verses WHERE book = ? AND chapter = ? AND verse = ? LIMIT 1",
+                (s_book, s_chapter, s_verse)
+            )
+            if not cursor.fetchone():
+                continue
+            nodes[key] = {
+                "id": key, "book": s_book, "chapter": s_chapter,
+                "verse": s_verse, "depth": 1, "isSeed": True,
+            }
+            seed_ids.append(key)
+            edges.append({"source": "__CHRIST__", "target": key, "votes": 9999})
+            edge_set.add(("__CHRIST__", key))
+            queue.append((s_book, s_chapter, s_verse, 1))
+
+        # BFS outward from seeds
+        visited = set(n for n in nodes if n != "__CHRIST__")
+        while queue and len(nodes) < limit:
+            src_book, src_chapter, src_verse, current_depth = queue.pop(0)
+            src_key = f"{src_book}.{src_chapter}.{src_verse}"
+
+            hop_limit = per_verse
+            if current_depth >= depth:
+                continue
+
+            cursor = conn.execute("""
+                SELECT target_book, target_chapter, target_verse, votes
+                FROM (
+                    SELECT target_book, target_chapter, target_verse, votes
+                    FROM cross_references
+                    WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
+                    UNION ALL
+                    SELECT source_book, source_chapter, source_verse, votes
+                    FROM cross_references
+                    WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
+                )
+                GROUP BY target_book, target_chapter, target_verse
+                ORDER BY MAX(votes) DESC
+                LIMIT ?
+            """, (src_book, src_chapter, src_verse,
+                  src_book, src_chapter, src_verse, hop_limit))
+
+            for row in cursor.fetchall():
+                tgt_book, tgt_chapter, tgt_verse, votes = row
+                tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+
+                edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
+                if edge_key not in edge_set:
+                    edge_set.add(edge_key)
+                    edges.append({
+                        "source": src_key, "target": tgt_key, "votes": votes
+                    })
+
+                if tgt_key not in nodes and len(nodes) < limit:
+                    nodes[tgt_key] = {
+                        "id": tgt_key, "book": tgt_book,
+                        "chapter": tgt_chapter, "verse": tgt_verse,
+                        "depth": current_depth + 1,
+                    }
+                    if current_depth + 1 < depth:
+                        queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+
+        _enrich_nodes(conn, nodes)
+
+        return {
+            "center": "__CHRIST__",
+            "nodes": list(nodes.values()),
+            "edges": edges,
+            "seedIds": seed_ids,
+            "method": method,
+            "pathToChrist": None,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/path-to-christ/{reference}")
+async def get_path_to_christ(
+    reference: str,
+    translation: str = Query(default="BSB", description="Translation for verse text"),
+):
+    """Find shortest cross-reference path from a verse to a christological seed."""
+    conn = get_db_connection()
+    try:
+        parsed = parse_reference(reference)
+        if not parsed:
+            raise HTTPException(status_code=400, detail=f"Invalid reference: {reference}")
+        book, chapter, verse_start, verse_end, has_verse = parsed
+        if not has_verse:
+            raise HTTPException(status_code=400, detail="A specific verse is required")
+
+        all_seeds = CHRISTOLOGICAL_SEEDS["gospel-peaks"] + CHRISTOLOGICAL_SEEDS["messianic"]
+        seed_ids = set()
+        seed_info = {}  # key -> (book, chapter, verse)
+        for s in all_seeds:
+            key = f"{s[0]}.{s[1]}.{s[2]}"
+            seed_ids.add(key)
+            seed_info[key] = s
+
+        start_key = f"{book}.{chapter}.{verse_start}"
+
+        # If the start verse IS a seed, return immediately
+        if start_key in seed_ids:
+            cursor = conn.execute(
+                "SELECT text FROM verses WHERE book = ? AND chapter = ? AND verse = ? AND translation_id = ?",
+                (book, chapter, verse_start, translation)
+            )
+            row = cursor.fetchone()
+            # Get testament
+            bcur = conn.execute("SELECT testament FROM books WHERE name = ?", (book,))
+            brow = bcur.fetchone()
+            testament = brow[0] if brow else "NT"
+            return {
+                "found": True,
+                "start": start_key,
+                "seed": start_key,
+                "path": [{
+                    "key": start_key,
+                    "book": book,
+                    "chapter": chapter,
+                    "verse": verse_start,
+                    "text": row[0] if row else "",
+                    "reference": f"{book} {chapter}:{verse_start}",
+                    "isSeed": True,
+                    "testament": testament,
+                }],
+                "hops": 0,
+            }
+
+        # BFS
+        visited = set()
+        parent = {}
+        verse_lookup = {}  # key -> (book, chapter, verse)
+        verse_lookup[start_key] = (book, chapter, verse_start)
+        queue = [(book, chapter, verse_start, 0)]
+        found_seed = None
+        max_search_depth = 6
+
+        while queue and not found_seed:
+            src_book, src_chapter, src_verse, current_depth = queue.pop(0)
+            src_key = f"{src_book}.{src_chapter}.{src_verse}"
+            if src_key in visited:
+                continue
+            visited.add(src_key)
+
+            if src_key in seed_ids and src_key != start_key:
+                found_seed = src_key
+                break
+
+            if current_depth >= max_search_depth:
+                continue
+
+            cursor = conn.execute("""
+                SELECT target_book, target_chapter, target_verse, votes
+                FROM (
+                    SELECT target_book, target_chapter, target_verse, votes
+                    FROM cross_references
+                    WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
+                    UNION ALL
+                    SELECT source_book, source_chapter, source_verse, votes
+                    FROM cross_references
+                    WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
+                )
+                GROUP BY target_book, target_chapter, target_verse
+                ORDER BY MAX(votes) DESC
+                LIMIT ?
+            """, (src_book, src_chapter, src_verse,
+                  src_book, src_chapter, src_verse, 15))
+
+            for row in cursor.fetchall():
+                tgt_book, tgt_chapter, tgt_verse, votes = row
+                tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+
+                if tgt_key not in verse_lookup:
+                    verse_lookup[tgt_key] = (tgt_book, tgt_chapter, tgt_verse)
+
+                if tgt_key not in parent and tgt_key != start_key:
+                    parent[tgt_key] = src_key
+
+                if tgt_key in seed_ids:
+                    found_seed = tgt_key
+                    break
+
+                if tgt_key not in visited:
+                    queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+
+        if not found_seed:
+            return {"found": False, "start": start_key, "seed": None, "path": [], "hops": 0}
+
+        # Reconstruct path
+        path_keys = []
+        curr = found_seed
+        while curr and curr != start_key:
+            path_keys.append(curr)
+            curr = parent.get(curr)
+        path_keys.append(start_key)
+        path_keys.reverse()
+
+        # Enrich with full verse text
+        # Cache testament lookups
+        testament_cache = {}
+        path = []
+        for key in path_keys:
+            v_book, v_chapter, v_verse = verse_lookup[key]
+            cursor = conn.execute(
+                "SELECT text FROM verses WHERE book = ? AND chapter = ? AND verse = ? AND translation_id = ?",
+                (v_book, v_chapter, v_verse, translation)
+            )
+            row = cursor.fetchone()
+            # Testament
+            if v_book not in testament_cache:
+                bcur = conn.execute("SELECT testament FROM books WHERE name = ?", (v_book,))
+                brow = bcur.fetchone()
+                testament_cache[v_book] = brow[0] if brow else "NT"
+            path.append({
+                "key": key,
+                "book": v_book,
+                "chapter": v_chapter,
+                "verse": v_verse,
+                "text": row[0] if row else "",
+                "reference": f"{v_book} {v_chapter}:{v_verse}",
+                "isSeed": key in seed_ids,
+                "testament": testament_cache[v_book],
+            })
+
+        return {
+            "found": True,
+            "start": start_key,
+            "seed": found_seed,
+            "path": path,
+            "hops": len(path) - 1,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/crossref-map/{reference}")
+async def get_crossref_map(
+    reference: str,
+    depth: int = Query(default=1, ge=1, le=7, description="How many hops to follow"),
+    per_verse: int = Query(default=5, ge=1, le=50, description="Top N connections per verse"),
+    diminish: bool = Query(default=False, description="Reduce connections at each hop depth"),
+    limit: int = Query(default=150, ge=10, le=500, description="Max nodes to return"),
+    focus_books: str = Query(default=None, description="Comma-separated book names to prioritize in BFS")
+):
+    """
+    Get cross-reference graph data for visualization.
+    Uses per-verse top-N selection so every verse gets its best connections
+    regardless of absolute vote count.
+    """
+    conn = get_db_connection()
+    try:
+        parsed = parse_reference(reference)
+        if not parsed:
+            raise HTTPException(status_code=400, detail=f"Invalid reference: {reference}")
+
+        book, chapter, verse_start, verse_end, has_verse = parsed
+
+        # Parse focus books and auto-boost depth/limit when focusing
+        focus_list = []
+        if focus_books:
+            focus_list = [b.strip() for b in focus_books.split(",") if b.strip()]
+        if focus_list:
+            depth = max(depth, 3)
+            limit = max(limit, 250)
+
+        # Build graph by BFS traversal of cross-references
+        nodes = {}  # key -> node dict
+        edges = []  # list of edge dicts
+        edge_set = set()  # for O(1) dedup
+        visited = set()
+        queue = []
+
+        # Seed with the requested verses
+        if has_verse:
+            for v in range(verse_start, verse_end + 1):
+                key = f"{book}.{chapter}.{v}"
+                nodes[key] = {"id": key, "book": book, "chapter": chapter, "verse": v, "depth": 0}
+                queue.append((book, chapter, v, 0))
+        else:
+            # For whole chapter, get the top cross-referenced verses
+            cursor = conn.execute("""
+                SELECT source_verse, COUNT(*) as cnt
+                FROM cross_references
+                WHERE source_book = ? AND source_chapter = ?
+                GROUP BY source_verse ORDER BY cnt DESC LIMIT 5
+            """, (book, chapter))
+            seed_verses = [row[0] for row in cursor.fetchall()]
+            if not seed_verses:
+                seed_verses = [1]
+            for v in seed_verses:
+                key = f"{book}.{chapter}.{v}"
+                nodes[key] = {"id": key, "book": book, "chapter": chapter, "verse": v, "depth": 0}
+                queue.append((book, chapter, v, 0))
+
+        # BFS to collect graph
+        # per_verse controls how many connections each verse contributes (top N by votes).
+        # diminish mode: each hop gets fewer connections (tapers outward)
+        # normal mode: deeper hops get slightly more connections
+        while queue and len(nodes) < limit:
+            src_book, src_chapter, src_verse, current_depth = queue.pop(0)
+            src_key = f"{src_book}.{src_chapter}.{src_verse}"
+
+            if src_key in visited:
+                continue
+            visited.add(src_key)
+
+            if diminish:
+                # Each hop gets ~60% of the previous hop's connections (min 2)
+                hop_limit = max(2, round(per_verse * (0.6 ** current_depth)))
+            else:
+                hop_limit = per_verse + min(per_verse, current_depth * 2)
+
+            # Get top cross-refs for this verse (bidirectional), ordered by votes
+            # When focus_books is set, prioritize those books in the sort order
+            if focus_list:
+                placeholders = ",".join(["?" for _ in focus_list])
+                sql = f"""
+                    SELECT target_book, target_chapter, target_verse, votes
+                    FROM (
+                        SELECT target_book, target_chapter, target_verse, votes
+                        FROM cross_references
+                        WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
+                        UNION ALL
+                        SELECT source_book, source_chapter, source_verse, votes
+                        FROM cross_references
+                        WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
+                    )
+                    GROUP BY target_book, target_chapter, target_verse
+                    ORDER BY CASE WHEN target_book IN ({placeholders})
+                             THEN 0 ELSE 1 END, MAX(votes) DESC
+                    LIMIT ?
+                """
+                params = (
+                    src_book, src_chapter, src_verse,
+                    src_book, src_chapter, src_verse,
+                    *focus_list, hop_limit,
+                )
+                cursor = conn.execute(sql, params)
+            else:
+                cursor = conn.execute("""
+                    SELECT target_book, target_chapter, target_verse, votes
+                    FROM (
+                        SELECT target_book, target_chapter, target_verse, votes
+                        FROM cross_references
+                        WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
+                        UNION ALL
+                        SELECT source_book, source_chapter, source_verse, votes
+                        FROM cross_references
+                        WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
+                    )
+                    GROUP BY target_book, target_chapter, target_verse
+                    ORDER BY MAX(votes) DESC
+                    LIMIT ?
+                """, (src_book, src_chapter, src_verse,
+                      src_book, src_chapter, src_verse,
+                      hop_limit))
+
+            for row in cursor.fetchall():
+                tgt_book, tgt_chapter, tgt_verse, votes = row
+                tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+
+                # Add edge (deduplicate with set)
+                edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
+                if edge_key not in edge_set:
+                    edge_set.add(edge_key)
+                    edges.append({
+                        "source": src_key,
+                        "target": tgt_key,
+                        "votes": votes
+                    })
+
+                # Add node if new
+                if tgt_key not in nodes and len(nodes) < limit:
+                    nodes[tgt_key] = {
+                        "id": tgt_key,
+                        "book": tgt_book,
+                        "chapter": tgt_chapter,
+                        "verse": tgt_verse,
+                        "depth": current_depth + 1
+                    }
+
+                    # Queue for next depth level
+                    if current_depth + 1 < depth:
+                        queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+
+        _enrich_nodes(conn, nodes)
+
+        return {
+            "center": f"{book}.{chapter}.{verse_start}" if has_verse else f"{book}.{chapter}.1",
+            "nodes": list(nodes.values()),
+            "edges": edges,
+            "stats": {
+                "node_count": len(nodes),
+                "edge_count": len(edges),
+                "depth": depth,
+                "per_verse": per_verse,
+                "focus_books": focus_list or None
+            }
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/map")
+async def serve_map():
+    """Serve the cross-reference mapper visualization page."""
+    return FileResponse(frontend_path / "map.html")
+
+
 # Route for reading plan URLs (e.g., /plan/chronological-year/45)
 # Must be registered before the catch-all book/chapter routes
 @app.get("/plan/{plan_id}/{day}")

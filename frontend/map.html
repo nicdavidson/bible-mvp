@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Cross-Reference Mapper - In the Word</title>
+    <link rel="stylesheet" href="/static/css/map.css">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="crossRefApp()" x-init="init()">
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" x-show="loading" x-transition.opacity>
+        <div class="spinner"></div>
+        <div class="loading-text" x-text="loadingMsg"></div>
+    </div>
+
+    <!-- Error Toast -->
+    <div class="error-toast" x-show="errorMsg" x-transition
+         x-effect="if (errorMsg) setTimeout(() => errorMsg = '', 5000)">
+        <span x-text="errorMsg"></span>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <a href="/" class="back-link">&larr; Bible</a>
+        <div class="header-title">
+            <h1>Cross-Reference Mapper</h1>
+            <div class="subtitle" x-text="centerLabel || 'Enter a verse reference'"></div>
+        </div>
+        <button x-show="centerLabel" @click="pinCenter()" title="Pin current verse"
+                style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted);transition:color 0.15s;flex-shrink:0;"
+                :style="isCenterPinned() ? 'color:#fbbf24;' : ''"
+                x-text="isCenterPinned() ? '\u2605' : '\u2606'"></button>
+        <!-- Points to Jesus toggle -->
+        <button class="ptj-toggle" :class="{ active: ptjMode }"
+                @click="togglePointsToJesus()"
+                title="Points to Jesus — see how all scripture connects to Christ">
+            <span class="ptj-cross">&#10013;</span>
+            <span class="ptj-label" x-text="ptjMode ? 'Exit PTJ' : 'Points to Jesus'"></span>
+        </button>
+        <div class="ptj-method-select" x-show="ptjMode" x-transition.opacity>
+            <select x-model="ptjMethod" @change="search()"
+                    style="width:100%;padding:4px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:12px;">
+                <option value="gospel-peaks">Gospel Peaks</option>
+                <option value="messianic">Messianic Thread</option>
+                <option value="red-letter">Red Letter</option>
+                <option value="find-path">Find the Path</option>
+            </select>
+            <div class="ptj-method-desc" x-text="
+                ptjMethod === 'gospel-peaks' ? 'Starting from the most direct declarations about Christ in each Gospel.' :
+                ptjMethod === 'messianic' ? 'Old Testament prophecies traced to their New Testament fulfillment.' :
+                ptjMethod === 'red-letter' ? 'Starting from Jesus\'s own words, see how His teaching connects.' :
+                'Enter any verse and discover how it connects back to Christ.'
+            "></div>
+        </div>
+        <form class="search-form" @submit.prevent="search(); showSuggestions = false" style="position:relative;">
+            <input class="search-input" type="text" x-model="query"
+                   :placeholder="ptjMode && ptjMethod === 'find-path' ? 'Enter a verse to trace to Christ...' : 'e.g. John 3:16'" :disabled="loading"
+                   @focus="showSuggestions = true; $event.target.select()"
+                   @blur="setTimeout(() => showSuggestions = false, 200)"
+                   @input="showSuggestions = true">
+            <button class="search-btn" type="submit" :disabled="loading" x-text="ptjMode && ptjMethod === 'find-path' ? 'Find Path' : 'Search'"></button>
+            <div class="search-suggestions" x-show="showSuggestions && !loading" x-transition.opacity>
+                <template x-for="s in filteredSuggestions()" :key="s.ref">
+                    <div class="suggestion-item" @mousedown.prevent="query = s.ref; search(); showSuggestions = false">
+                        <span class="ref" x-text="s.ref"></span>
+                        <span class="desc" x-text="s.desc"></span>
+                    </div>
+                </template>
+            </div>
+        </form>
+    </div>
+
+    <!-- History Breadcrumb Trail -->
+    <div class="history-bar" x-show="history.length > 1">
+        <template x-for="(h, i) in history" :key="h.ref + i">
+            <div class="history-crumb">
+                <span class="history-sep" x-show="i > 0">&rsaquo;</span>
+                <a :class="{ active: i === historyIndex }"
+                   @click.prevent="navigateHistory(i)"
+                   x-text="h.label"></a>
+            </div>
+        </template>
+    </div>
+
+    <!-- Pinned Verses -->
+    <div class="pinned-bar" x-show="pinnedVerses.length > 0"
+         :style="'top:' + (history.length > 1 ? '80px' : '56px')">
+        <div class="pinned-header">
+            <span>Pinned</span>
+        </div>
+        <template x-for="(p, i) in pinnedVerses" :key="p.ref">
+            <div class="pinned-item">
+                <span class="pin-ref" @click="query = p.query; search()" x-text="p.label"></span>
+                <button class="pin-remove" @click.stop="pinnedVerses.splice(i, 1); savePins()">&times;</button>
+            </div>
+        </template>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-wrap">
+        <canvas x-ref="canvas"></canvas>
+    </div>
+
+    <!-- Focus Bar — shows hovered or selected verse prominently -->
+    <div class="focus-bar" x-show="hoveredNode || selectedNode"
+         x-transition.opacity.duration.150ms>
+        <template x-if="hoveredNode || selectedNode">
+            <div>
+                <template x-if="pathTarget && selectedNode && !hoveredNode">
+                    <div>
+                        <div class="focus-ref" x-text="selectedNode.book + ' ' + selectedNode.chapter + ':' + selectedNode.verse + '  ↔  ' + pathTarget.book + ' ' + pathTarget.chapter + ':' + pathTarget.verse"></div>
+                        <div class="focus-path" style="margin-top:4px;">Shift+click to change target · Click to clear</div>
+                    </div>
+                </template>
+                <template x-if="!(pathTarget && selectedNode && !hoveredNode)">
+                    <div>
+                        <div class="focus-ref" x-text="(hoveredNode || selectedNode).isChrist ? 'Christ' : ((hoveredNode || selectedNode).book + ' ' + (hoveredNode || selectedNode).chapter + ':' + (hoveredNode || selectedNode).verse)"></div>
+                        <div class="focus-text" x-text="(hoveredNode || selectedNode).text || ''"></div>
+                        <div class="focus-path" x-show="(hoveredNode || selectedNode).depth > 0"
+                             x-text="(hoveredNode || selectedNode).isSeed ? 'Christological seed verse' : (hoveredNode || selectedNode).depth + (((hoveredNode || selectedNode).depth === 1) ? (ptjMode ? ' hop from Christ' : ' hop from center') : (ptjMode ? ' hops from Christ' : ' hops from center'))"></div>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </div>
+
+    <!-- Tooltip (follows cursor — now just the ref badge, text is in focus bar) -->
+    <div class="tooltip" x-show="tooltip.show" x-transition.opacity.duration.100ms
+         :style="'left:' + tooltip.x + 'px; top:' + tooltip.y + 'px;'"
+         style="padding:6px 10px;">
+        <div class="tooltip-ref" style="margin-bottom:0;" x-text="tooltip.ref"></div>
+    </div>
+
+    <!-- Verse Info Panel -->
+    <div class="verse-panel" :class="{ 'verse-panel-with-history': history.length > 1 }" x-show="selectedNode && !selectedNode?.isChrist" x-transition.opacity>
+        <button class="verse-panel-close" @click="selectedNode = null; pathTarget = null; if(graph) { graph.selectedNode = null; graph.pathTarget = null; graph._draw(); }">&times;</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-right:20px;">
+            <div class="verse-panel-ref" style="margin-bottom:0;" x-text="selectedNode ? (selectedNode.isChrist ? 'Christ' : selectedNode.book + ' ' + selectedNode.chapter + ':' + selectedNode.verse) : ''"></div>
+            <div style="display:flex;gap:4px;">
+                <button @click="pinVerse(selectedNode)" title="Pin this verse"
+                        style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text-muted);cursor:pointer;padding:2px 6px;font-size:14px;transition:color 0.15s;"
+                        :style="isVersePinned(selectedNode) ? 'color:#fbbf24;border-color:#fbbf24;' : ''"
+                        x-text="isVersePinned(selectedNode) ? '\u2605' : '\u2606'"></button>
+                <button @click="if(selectedNode) { query = selectedNode.book + ' ' + selectedNode.chapter + ':' + selectedNode.verse; search(); }"
+                        title="Explore this verse"
+                        style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--accent);cursor:pointer;padding:2px 6px;font-size:12px;font-weight:600;transition:opacity 0.15s;">
+                    Explore &rarr;
+                </button>
+                <button @click="expandNode(selectedNode)"
+                        title="Load more cross-references for this verse"
+                        :disabled="expandingNode"
+                        style="background:none;border:1px solid var(--border);border-radius:4px;color:#22c55e;cursor:pointer;padding:2px 6px;font-size:12px;font-weight:600;transition:opacity 0.15s;"
+                        :style="expandingNode ? 'opacity:0.5;cursor:not-allowed;' : ''">
+                    <span x-text="expandingNode ? 'Loading...' : '+ Expand'"></span>
+                </button>
+            </div>
+        </div>
+        <div class="verse-panel-text" x-text="selectedNode?.text || ''"></div>
+        <div class="verse-panel-meta">
+            <span class="tag" x-show="selectedNode?.isSeed" style="color:#fbbf24;border-color:rgba(251,191,36,0.4);">Seed Verse</span>
+            <span class="tag" x-text="selectedNode?.testament === 'OT' ? 'Old Testament' : 'New Testament'"></span>
+            <span class="tag" x-text="selectedNode?.book"></span>
+            <template x-if="selectedNode">
+                <span class="tag" x-text="(selectedNodeConnections || 0) + ' connections'"></span>
+            </template>
+        </div>
+        <div class="verse-panel-connections" x-show="selectedNodeEdges.length > 0">
+            <h4>Connected Verses</h4>
+            <template x-for="edge in selectedNodeEdges.slice(0, 15)" :key="edge.id">
+                <a class="connection-link" @click.prevent="query = edge.label; search(); selectedNode = null;">
+                    <span x-text="edge.label"></span>
+                    <span style="font-size:10px;margin-left:4px;" :style="'color:' + (edge.votes >= 300 ? '#22c55e' : edge.votes >= 150 ? '#38bdf8' : edge.votes >= 75 ? '#eab308' : '#94a3b8')" x-text="edge.votes >= 300 ? 'Strong' : edge.votes >= 150 ? 'Good' : edge.votes >= 75 ? 'Fair' : 'Weak'"></span>
+                </a>
+            </template>
+            <div x-show="selectedNodeEdges.length > 15" style="font-size:11px;color:var(--text-muted);margin-top:4px;"
+                 x-text="'+ ' + (selectedNodeEdges.length - 15) + ' more'"></div>
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" x-show="graphStats.nodes > 0">
+        <div class="stat"><span class="stat-val" x-text="graphStats.nodes"></span> nodes</div>
+        <div class="stat"><span class="stat-val" x-text="graphStats.edges"></span> edges</div>
+        <div class="stat"><span class="stat-val" x-text="graphStats.books"></span> books</div>
+        <div class="stat" x-show="graphStats.hub"><span class="stat-val" x-text="graphStats.hub"></span> most connected</div>
+    </div>
+
+    <!-- Dynamic Legend -->
+    <div class="legend">
+        <template x-if="colorMode === 'testament'">
+            <div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div><span>Old Testament</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#38bdf8;"></div><span>New Testament</span></div>
+            </div>
+        </template>
+        <template x-if="colorMode === 'genre'">
+            <div>
+                <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div><span>Law</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div><span>History</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#eab308;"></div><span>Wisdom</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div><span>Major Prophets</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f97316;"></div><span>Minor Prophets</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div><span>Gospels</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#06b6d4;"></div><span>Acts</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ec4899;"></div><span>Epistles</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6;"></div><span>Apocalyptic</span></div>
+            </div>
+        </template>
+        <template x-if="colorMode === 'depth'">
+            <div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f43f5e;"></div><span>Center</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f97316;"></div><span>1 hop</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#eab308;"></div><span>2 hops</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div><span>3 hops</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div><span>4-5 hops</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6;"></div><span>6+ hops</span></div>
+            </div>
+        </template>
+        <template x-if="colorMode === 'book'">
+            <div>
+                <div class="legend-item" style="font-size:11px; color:var(--text-muted);">Each book = unique color</div>
+            </div>
+        </template>
+        <template x-if="colorMode === 'author'">
+            <div>
+                <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div><span>Moses</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#eab308;"></div><span>David</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div><span>Solomon</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div><span>Isaiah</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#dc2626;"></div><span>Jeremiah</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#e11d48;"></div><span>Minor Prophets</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div><span>Gospel writers</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ec4899;"></div><span>Paul</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#14b8a6;"></div><span>Other NT</span></div>
+            </div>
+        </template>
+        <template x-if="colorMode === 'era'">
+            <div>
+                <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div><span>Patriarchs</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#16a34a;"></div><span>Exodus & Law</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div><span>Conquest</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#eab308;"></div><span>Kingdom</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div><span>Prophets</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#06b6d4;"></div><span>Return</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div><span>Gospels</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ec4899;"></div><span>Early Church</span></div>
+            </div>
+        </template>
+        <template x-if="colorMode === 'connectivity'">
+            <div>
+                <div class="legend-item"><div class="legend-dot" style="background:rgb(0,0,255);"></div><span>Few connections</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:rgb(255,200,0);"></div><span>Some</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:rgb(255,0,0);"></div><span>Hub (many)</span></div>
+            </div>
+        </template>
+        <template x-if="colorMode === 'christological'">
+            <div>
+                <div class="legend-item"><div class="legend-dot" style="background:#fef3c7;box-shadow:0 0 6px rgba(251,191,36,0.6);"></div><span>Christ</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div><span>Seed Verse</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div><span>Near (1-2 hops)</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#14b8a6;"></div><span>Mid (3 hops)</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div><span>Far (4+ hops)</span></div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Controls Panel -->
+    <div class="controls">
+        <div class="controls-header">
+            <span>Controls</span>
+            <button class="controls-toggle" @click="controlsOpen = !controlsOpen"
+                    x-text="controlsOpen ? '\u25BC' : '\u25B2'"></button>
+        </div>
+        <div x-show="controlsOpen" x-collapse>
+            <div class="control-group">
+                <div class="control-row">
+                    <label>Depth</label>
+                    <span class="value" x-text="depth"></span>
+                </div>
+                <input type="range" min="1" max="7" step="1" x-model.number="depth"
+                       @change="search()">
+            </div>
+            <div class="control-group">
+                <div class="control-row">
+                    <label>Per verse</label>
+                    <span class="value" x-text="perVerse <= 3 ? perVerse + ' (top only)' : perVerse <= 8 ? perVerse : perVerse <= 15 ? perVerse + ' (broad)' : perVerse + ' (all)'"></span>
+                </div>
+                <input type="range" min="1" max="30" step="1" x-model.number="perVerse"
+                       @change="search()">
+                <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);margin-top:2px;padding:0 2px;">
+                    <span>Focused</span>
+                    <span>Broad</span>
+                </div>
+                <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:var(--text-muted);cursor:pointer;">
+                    <input type="checkbox" x-model="diminish" @change="search()"
+                           style="accent-color:var(--accent);cursor:pointer;">
+                    <span>Diminishing <span style="font-size:9px;opacity:0.7">— fewer connections per hop</span></span>
+                </label>
+            </div>
+            <div class="control-group">
+                <div class="control-row">
+                    <label>Max nodes</label>
+                    <span class="value" x-text="maxNodes"></span>
+                </div>
+                <input type="range" min="20" max="500" step="10" x-model.number="maxNodes"
+                       @change="search()">
+            </div>
+            <div class="control-group">
+                <div class="control-row">
+                    <label>Color by</label>
+                </div>
+                <select x-model="colorMode" @change="if(graph) graph.colorMode = colorMode; graph._draw()"
+                        style="width:100%; padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:13px;">
+                    <option value="testament">Testament (OT/NT)</option>
+                    <option value="book">Book</option>
+                    <option value="genre">Genre</option>
+                    <option value="author">Author</option>
+                    <option value="era">Era</option>
+                    <option value="connectivity">Connectivity (heat)</option>
+                    <option value="depth">Hop Distance</option>
+                    <option value="christological">Christological</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <div class="control-row">
+                    <label>Group by</label>
+                </div>
+                <select x-model="groupMode" @change="if(graph) { graph.groupMode = groupMode; graph._wake(); }"
+                        style="width:100%; padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:13px;">
+                    <option value="none">None (physics only)</option>
+                    <option value="depth">Hop Distance (rings)</option>
+                    <option value="testament">Testament (OT / NT)</option>
+                    <option value="book">Book</option>
+                    <option value="genre">Genre</option>
+                    <option value="author">Author</option>
+                    <option value="era">Era</option>
+                </select>
+                <label x-show="groupMode !== 'none'" style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--text-muted);cursor:pointer;">
+                    <input type="checkbox" x-model="showGroupLabels"
+                           @change="if(graph) { graph.showGroupLabels = showGroupLabels; graph._draw(); }"
+                           style="accent-color:var(--accent);">
+                    Show group labels
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--text-muted);cursor:pointer;">
+                    <input type="checkbox" x-model="showHeatmap"
+                           @change="if(graph) { graph.showHeatmap = showHeatmap; graph._draw(); }"
+                           style="accent-color:var(--accent);">
+                    Show heatmap
+                </label>
+            </div>
+            <div class="control-group">
+                <div class="control-row">
+                    <label>Path trace</label>
+                </div>
+                <select x-model="pathMode" @change="if(graph) { graph.pathMode = pathMode; graph._draw(); }"
+                        style="width:100%; padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:13px;">
+                    <option value="shortest">Shortest (fewest hops)</option>
+                    <option value="strongest">Strongest (best connections)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <div class="control-row">
+                    <label>Filter</label>
+                </div>
+                <select x-model="filterMode" @change="filterValue = ''; selectedBooks = []; if(graph) { graph.filterMode = filterMode; graph.filterValue = ''; graph.selectedBooks = []; graph._draw(); }"
+                        style="width:100%; padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:13px;">
+                    <option value="none">None (show all)</option>
+                    <option value="testament">Testament</option>
+                    <option value="book">Book</option>
+                    <option value="author">Author</option>
+                </select>
+                <template x-if="filterMode === 'testament'">
+                    <select x-model="filterValue" @change="if(graph) { graph.filterValue = filterValue; graph._draw(); }"
+                            style="width:100%; padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:13px; margin-top:4px;">
+                        <option value="">-- select --</option>
+                        <option value="OT">Old Testament</option>
+                        <option value="NT">New Testament</option>
+                    </select>
+                </template>
+                <template x-if="filterMode === 'book'">
+                    <div style="margin-top:4px;">
+                        <div style="display:flex;gap:4px;margin-bottom:4px;flex-wrap:wrap;">
+                            <button @click="selectedBooks = Object.keys(BOOK_ABBREVS).slice(0,39); applyBookFilter()"
+                                    style="font-size:10px;padding:1px 6px;background:var(--bg);color:var(--text-muted);border:1px solid var(--border);border-radius:3px;cursor:pointer;">OT</button>
+                            <button @click="selectedBooks = Object.keys(BOOK_ABBREVS).slice(39); applyBookFilter()"
+                                    style="font-size:10px;padding:1px 6px;background:var(--bg);color:var(--text-muted);border:1px solid var(--border);border-radius:3px;cursor:pointer;">NT</button>
+                            <button @click="selectedBooks = []; applyBookFilter()"
+                                    style="font-size:10px;padding:1px 6px;background:var(--bg);color:var(--text-muted);border:1px solid var(--border);border-radius:3px;cursor:pointer;">Clear</button>
+                            <span x-show="selectedBooks.length > 0" style="font-size:10px;color:var(--accent);margin-left:auto;align-self:center;"
+                                  x-text="selectedBooks.length + ' selected'"></span>
+                        </div>
+                        <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:2px 0;columns:2;column-gap:0;">
+                            <template x-for="b in Object.keys(BOOK_ABBREVS)" :key="b">
+                                <label style="display:flex;align-items:center;gap:3px;padding:1px 6px;font-size:11px;cursor:pointer;break-inside:avoid;white-space:nowrap;"
+                                       :style="selectedBooks.includes(b) ? 'color:var(--accent);font-weight:600;' : 'color:var(--text);'">
+                                    <input type="checkbox" :value="b" x-model="selectedBooks"
+                                           @change="applyBookFilter()"
+                                           style="accent-color:var(--accent);width:12px;height:12px;">
+                                    <span x-text="b"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="filterMode === 'author'">
+                    <select x-model="filterValue" @change="if(graph) { graph.filterValue = filterValue; graph._draw(); }"
+                            style="width:100%; padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:13px; margin-top:4px;">
+                        <option value="">-- select --</option>
+                        <template x-for="a in [...new Set(Object.values(BOOK_AUTHORS))].sort()" :key="a">
+                            <option :value="a" x-text="a"></option>
+                        </template>
+                    </select>
+                </template>
+                <label x-show="filterMode !== 'none'" style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--text-muted);cursor:pointer;">
+                    <input type="checkbox" x-model="filterDim"
+                           @change="if(graph) { graph.filterDim = filterDim; graph._draw(); }"
+                           style="accent-color:var(--accent);">
+                    <span>Dim <span style="font-size:9px;opacity:0.7">— uncheck to hide</span></span>
+                </label>
+            </div>
+            <button class="reset-btn" @click="resetView()">Reset View</button>
+            <button class="reset-btn" @click="exportImage()" style="margin-top:6px;">Export PNG</button>
+        </div>
+    </div>
+
+    <!-- JS: load order matters (data → graph engine → app) -->
+    <script src="/static/js/map-data.js"></script>
+    <script src="/static/js/force-graph.js"></script>
+    <script src="/static/js/map-app.js"></script>
+</body>
+</html>
