@@ -62,6 +62,14 @@ function crossRefApp() {
         ptjSeedIds: new Set(),
         ptjPathToChrist: null,
         _savedColorMode: 'testament',
+        // Seed verse presets
+        ptjPresets: [],
+        ptjActivePreset: null,
+        ptjSeedToggles: {},
+        ptjSeedPanelOpen: false,
+        ptjPresetsLoaded: false,
+        // Vote thresholds (percentile-based, recomputed per graph)
+        voteThresholds: { p75: 300, p50: 150, p25: 75 },
         // Path chain panel
         showPathChain: false,
         pathChainNodes: [],  // ordered array of node objects from the highlighted path
@@ -237,12 +245,13 @@ function crossRefApp() {
                 this._savedColorMode = this.colorMode;
                 this.colorMode = 'christological';
                 if (this.graph) this.graph.colorMode = 'christological';
-                this.search();
+                this.loadPresets().then(() => this.search());
             } else {
                 this.colorMode = this._savedColorMode || 'testament';
                 if (this.graph) this.graph.colorMode = this.colorMode;
                 this.ptjSeedIds = new Set();
                 this.ptjPathToChrist = null;
+                this.ptjSeedPanelOpen = false;
                 if (this.graph) {
                     this.graph.ptjSeedIds = new Set();
                     this.graph.ptjMode = false;
@@ -449,6 +458,9 @@ function crossRefApp() {
                         }
                         params.set('verse', q);
                     }
+                    // Send custom seed list if user has toggled some off
+                    const customSeeds = this._getActiveSeeds();
+                    if (customSeeds) params.set('seeds', customSeeds);
                     url = `/api/crossref-map/christological?${params}`;
                 } else {
                     const ref = parseReference(q);
@@ -520,9 +532,10 @@ function crossRefApp() {
                 }
 
                 this._updateStats(data);
+                this._computeVoteThresholds(data.edges);
                 this.graph.setData(data.nodes, data.edges, data.center);
 
-                // Find-path: auto-highlight the path and open chain view
+                // Find-path: auto-highlight the path
                 if (this.ptjMode && this.ptjMethod === 'find-path' && data.pathToChrist && data.pathToChrist.length > 0) {
                     this.$nextTick(() => {
                         const startNode = this.graph.nodeMap[data.center];
@@ -634,6 +647,139 @@ function crossRefApp() {
             } catch (err) {
                 if (err.name !== 'AbortError') this.errorMsg = 'Share failed';
             }
+        },
+
+        // --- Seed verse presets ---
+        async loadPresets() {
+            if (this.ptjPresetsLoaded) return;
+            try {
+                const resp = await fetch('/api/crossref-map/presets');
+                if (!resp.ok) throw new Error('Failed to load presets');
+                const data = await resp.json();
+                this.ptjPresets = data.presets;
+                this.ptjPresetsLoaded = true;
+                // Auto-select preset matching current method
+                if (!this.ptjActivePreset) {
+                    const match = this.ptjPresets.find(p => p.id === this.ptjMethod);
+                    if (match) this._initPreset(match);
+                }
+            } catch (err) {
+                this.errorMsg = 'Could not load seed verse presets';
+            }
+        },
+
+        selectPreset(presetId) {
+            const preset = this.ptjPresets.find(p => p.id === presetId);
+            if (!preset) return;
+            this.ptjMethod = presetId;
+            this._initPreset(preset);
+            this.search();
+        },
+
+        _initPreset(preset) {
+            this.ptjActivePreset = preset;
+            this.ptjSeedToggles = {};
+            for (const seed of preset.seeds) {
+                this.ptjSeedToggles[seed.id] = true;
+            }
+            this._loadSeedToggles();
+        },
+
+        toggleSeed(seedId) {
+            this.ptjSeedToggles[seedId] = !this.ptjSeedToggles[seedId];
+            this._saveSeedToggles();
+            this.search();
+        },
+
+        _saveSeedToggles() {
+            try {
+                localStorage.setItem('ptj-seed-toggles', JSON.stringify({
+                    preset: this.ptjMethod,
+                    toggles: this.ptjSeedToggles,
+                }));
+            } catch (_) {}
+        },
+
+        _loadSeedToggles() {
+            try {
+                const saved = localStorage.getItem('ptj-seed-toggles');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    if (data.preset === this.ptjMethod && data.toggles) {
+                        for (const [id, val] of Object.entries(data.toggles)) {
+                            if (id in this.ptjSeedToggles) {
+                                this.ptjSeedToggles[id] = val;
+                            }
+                        }
+                    }
+                }
+            } catch (_) {}
+        },
+
+        _getActiveSeeds() {
+            if (!this.ptjActivePreset) return null;
+            const all = this.ptjActivePreset.seeds;
+            const active = all.filter(s => this.ptjSeedToggles[s.id] !== false);
+            if (active.length === all.length || active.length === 0) return null;
+            return active.map(s => s.id).join(',');
+        },
+
+        _getActiveSeedCount() {
+            if (!this.ptjActivePreset) return 0;
+            return this.ptjActivePreset.seeds.filter(s => this.ptjSeedToggles[s.id] !== false).length;
+        },
+
+        _allSeedsOn() {
+            if (!this.ptjActivePreset) return;
+            for (const seed of this.ptjActivePreset.seeds) {
+                this.ptjSeedToggles[seed.id] = true;
+            }
+            this._saveSeedToggles();
+            this.search();
+        },
+
+        _allSeedsOff() {
+            if (!this.ptjActivePreset) return;
+            for (const seed of this.ptjActivePreset.seeds) {
+                this.ptjSeedToggles[seed.id] = false;
+            }
+            this._saveSeedToggles();
+        },
+
+        // --- Vote thresholds (percentile-based) ---
+        _computeVoteThresholds(edges) {
+            if (!edges || edges.length < 4) return;
+            const votes = edges.map(e => e.votes || 0).filter(v => v > 0).sort((a, b) => a - b);
+            if (votes.length < 4) return;
+            this.voteThresholds = {
+                p75: votes[Math.floor(votes.length * 0.75)] || 1,
+                p50: votes[Math.floor(votes.length * 0.50)] || 1,
+                p25: votes[Math.floor(votes.length * 0.25)] || 1,
+            };
+        },
+
+        voteColor(v) {
+            const t = this.voteThresholds;
+            if (v >= t.p75) return '#22c55e';
+            if (v >= t.p50) return '#38bdf8';
+            if (v >= t.p25) return '#eab308';
+            return 'var(--border)';
+        },
+
+        voteWidth(v) {
+            const t = this.voteThresholds;
+            if (v >= t.p75) return '4px';
+            if (v >= t.p50) return '3px';
+            if (v >= t.p25) return '2px';
+            return '1px';
+        },
+
+        voteDotColor(v) {
+            const t = this.voteThresholds;
+            if (v >= t.p75) return '#22c55e';
+            if (v >= t.p50) return '#38bdf8';
+            if (v >= t.p25) return '#eab308';
+            return '#94a3b8';
         },
 
         selectChainNode(node) {

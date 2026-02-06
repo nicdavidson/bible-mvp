@@ -1273,6 +1273,21 @@ CHRISTOLOGICAL_SEEDS = {
     ],
 }
 
+PRESET_META = {
+    "gospel-peaks": {
+        "name": "Gospel Peaks",
+        "description": "The most direct declarations about Christ, one from each Gospel plus Isaiah.",
+    },
+    "messianic": {
+        "name": "Messianic Thread",
+        "description": "Old Testament prophecies fulfilled in Christ, from Genesis to Malachi.",
+    },
+    "red-letter": {
+        "name": "Red Letter",
+        "description": "Jesus's own words: the most cross-referenced verses He spoke.",
+    },
+}
+
 
 def _enrich_nodes(conn, nodes: dict):
     """Add verse text preview and book metadata (testament, book_order) to nodes."""
@@ -1310,6 +1325,75 @@ def _enrich_nodes(conn, nodes: dict):
         node["book_order"] = meta["book_order"]
 
 
+def _get_red_letter_seeds(conn):
+    """Get top cross-referenced Jesus-spoken verses."""
+    cursor = conn.execute("""
+        SELECT sv.book, sv.chapter, sv.verse,
+               COUNT(cr.source_book) as xref_count
+        FROM speaker_verses sv
+        LEFT JOIN cross_references cr
+            ON (cr.source_book = sv.book AND cr.source_chapter = sv.chapter
+                AND cr.source_verse = sv.verse)
+            OR (cr.target_book = sv.book AND cr.target_chapter = sv.chapter
+                AND cr.target_verse = sv.verse)
+        WHERE sv.speaker = 'Jesus'
+        GROUP BY sv.book, sv.chapter, sv.verse
+        ORDER BY xref_count DESC
+        LIMIT 20
+    """)
+    return [(row[0], row[1], row[2]) for row in cursor.fetchall()]
+
+
+def _parse_seed_ids(seeds_str: str):
+    """Parse comma-separated seed IDs like 'John.1.1,Isaiah.53.5' into tuples."""
+    result = []
+    for sid in seeds_str.split(","):
+        sid = sid.strip()
+        parts = sid.rsplit(".", 2)
+        if len(parts) == 3:
+            try:
+                result.append((parts[0], int(parts[1]), int(parts[2])))
+            except ValueError:
+                continue
+    return result
+
+
+@app.get("/api/crossref-map/presets")
+async def get_crossref_presets():
+    """Return available seed verse presets with their verse lists and text."""
+    conn = get_db_connection()
+    try:
+        result = []
+        for key, meta in PRESET_META.items():
+            seeds = (CHRISTOLOGICAL_SEEDS.get(key)
+                     or (_get_red_letter_seeds(conn) if key == "red-letter" else []))
+            seed_list = []
+            for book, chapter, v in seeds:
+                cursor = conn.execute(
+                    "SELECT text FROM verses WHERE book = ? AND chapter = ? "
+                    "AND verse = ? AND translation_id = 'BSB' LIMIT 1",
+                    (book, chapter, v)
+                )
+                row = cursor.fetchone()
+                text = row[0] if row else ""
+                if len(text) > 120:
+                    text = text[:120] + "..."
+                seed_list.append({
+                    "id": f"{book}.{chapter}.{v}",
+                    "ref": f"{book} {chapter}:{v}",
+                    "text": text,
+                })
+            result.append({
+                "id": key,
+                "name": meta["name"],
+                "description": meta["description"],
+                "seeds": seed_list,
+            })
+        return {"presets": result}
+    finally:
+        conn.close()
+
+
 @app.get("/api/crossref-map/christological")
 async def get_crossref_map_christological(
     method: str = Query(default="gospel-peaks", description="Calculation method"),
@@ -1317,6 +1401,7 @@ async def get_crossref_map_christological(
     depth: int = Query(default=2, ge=1, le=5, description="BFS depth from seeds"),
     per_verse: int = Query(default=5, ge=1, le=30, description="Top N connections per verse"),
     limit: int = Query(default=200, ge=20, le=500, description="Max nodes to return"),
+    seeds: str = Query(default=None, description="Comma-separated seed verse IDs to override preset"),
 ):
     """
     Generate a christological cross-reference graph.
@@ -1324,29 +1409,21 @@ async def get_crossref_map_christological(
     """
     conn = get_db_connection()
     try:
-        # Determine seed verses
-        if method == "red-letter":
-            # Top cross-referenced Jesus-spoken verses
-            cursor = conn.execute("""
-                SELECT sv.book, sv.chapter, sv.verse,
-                       COUNT(cr.source_book) as xref_count
-                FROM speaker_verses sv
-                LEFT JOIN cross_references cr
-                    ON (cr.source_book = sv.book AND cr.source_chapter = sv.chapter
-                        AND cr.source_verse = sv.verse)
-                    OR (cr.target_book = sv.book AND cr.target_chapter = sv.chapter
-                        AND cr.target_verse = sv.verse)
-                WHERE sv.speaker = 'Jesus'
-                GROUP BY sv.book, sv.chapter, sv.verse
-                ORDER BY xref_count DESC
-                LIMIT 20
-            """)
-            seeds = [(row[0], row[1], row[2]) for row in cursor.fetchall()]
-        elif method == "messianic":
-            seeds = CHRISTOLOGICAL_SEEDS["messianic"]
+        # Determine seed verses (custom seeds override preset defaults)
+        if seeds:
+            seed_list = _parse_seed_ids(seeds)
+            if not seed_list:
+                seed_list = None  # fall back to method default
         else:
-            # Default: gospel-peaks
-            seeds = CHRISTOLOGICAL_SEEDS["gospel-peaks"]
+            seed_list = None
+
+        if seed_list is None:
+            if method == "red-letter":
+                seed_list = _get_red_letter_seeds(conn)
+            elif method == "messianic":
+                seed_list = CHRISTOLOGICAL_SEEDS["messianic"]
+            else:
+                seed_list = CHRISTOLOGICAL_SEEDS["gospel-peaks"]
 
         # --- Find-path mode: BFS from user's verse to any seed ---
         if method == "find-path":
@@ -1359,8 +1436,8 @@ async def get_crossref_map_christological(
             if not has_verse:
                 raise HTTPException(status_code=400, detail="A specific verse is required")
 
-            # All seed IDs we're trying to reach
-            all_seeds = (
+            # Use custom seed_list as BFS targets, or default to all seeds
+            all_seeds = seed_list if seed_list else (
                 CHRISTOLOGICAL_SEEDS["gospel-peaks"]
                 + CHRISTOLOGICAL_SEEDS["messianic"]
             )
@@ -1512,7 +1589,7 @@ async def get_crossref_map_christological(
         seed_ids = []
 
         # Add seed verses at depth 1 with synthetic edges to Christ
-        for s_book, s_chapter, s_verse in seeds:
+        for s_book, s_chapter, s_verse in seed_list:
             key = f"{s_book}.{s_chapter}.{s_verse}"
             # Verify this verse exists
             cursor = conn.execute(

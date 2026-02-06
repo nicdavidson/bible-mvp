@@ -41,17 +41,25 @@
             <span class="ptj-label" x-text="ptjMode ? 'Exit PTJ' : 'Points to Jesus'"></span>
         </button>
         <div class="ptj-method-select" x-show="ptjMode" x-transition.opacity>
-            <select x-model="ptjMethod" @change="search()"
-                    style="width:100%;padding:4px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:12px;">
-                <option value="find-path">Find the Path</option>
-                <option value="gospel-peaks">Gospel Peaks</option>
-                <option value="messianic">Messianic Thread</option>
-                <option value="red-letter">Red Letter</option>
-            </select>
+            <div style="display:flex;gap:4px;align-items:center;">
+                <select x-model="ptjMethod" @change="selectPreset(ptjMethod)"
+                        style="flex:1;padding:4px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:12px;">
+                    <option value="find-path">Find the Path</option>
+                    <template x-for="p in ptjPresets" :key="p.id">
+                        <option :value="p.id" x-text="p.name"></option>
+                    </template>
+                </select>
+                <button class="seed-edit-btn" @click="ptjSeedPanelOpen = !ptjSeedPanelOpen"
+                        x-show="ptjMethod !== 'find-path' && ptjActivePreset"
+                        title="Edit seed verses">
+                    &#9881;
+                    <span x-show="_getActiveSeedCount() < (ptjActivePreset?.seeds?.length || 0)"
+                          style="font-size:9px;opacity:0.8;"
+                          x-text="_getActiveSeedCount() + '/' + (ptjActivePreset?.seeds?.length || 0)"></span>
+                </button>
+            </div>
             <div class="ptj-method-desc" x-text="
-                ptjMethod === 'gospel-peaks' ? 'Starting from the most direct declarations about Christ in each Gospel.' :
-                ptjMethod === 'messianic' ? 'Old Testament prophecies traced to their New Testament fulfillment.' :
-                ptjMethod === 'red-letter' ? 'Starting from Jesus\'s own words, see how His teaching connects.' :
+                ptjActivePreset && ptjMethod !== 'find-path' ? ptjActivePreset.description :
                 'Enter any verse and discover how it connects back to Christ.'
             "></div>
         </div>
@@ -73,12 +81,20 @@
         </form>
         <!-- Mobile PTJ method bar (second row, only visible on mobile when PTJ active) -->
         <div class="ptj-mobile-bar" x-show="ptjMode">
-            <select x-model="ptjMethod" @change="search()">
+            <select x-model="ptjMethod" @change="selectPreset(ptjMethod)">
                 <option value="find-path">Find the Path</option>
-                <option value="gospel-peaks">Gospel Peaks</option>
-                <option value="messianic">Messianic Thread</option>
-                <option value="red-letter">Red Letter</option>
+                <template x-for="p in ptjPresets" :key="p.id">
+                    <option :value="p.id" x-text="p.name"></option>
+                </template>
             </select>
+            <button class="seed-edit-btn" @click="ptjSeedPanelOpen = !ptjSeedPanelOpen"
+                    x-show="ptjMethod !== 'find-path' && ptjActivePreset"
+                    title="Edit seed verses">
+                &#9881;
+                <span x-show="_getActiveSeedCount() < (ptjActivePreset?.seeds?.length || 0)"
+                      style="font-size:9px;opacity:0.8;"
+                      x-text="_getActiveSeedCount() + '/' + (ptjActivePreset?.seeds?.length || 0)"></span>
+            </button>
         </div>
     </div>
 
@@ -195,7 +211,7 @@
             <template x-for="edge in selectedNodeEdges.slice(0, 15)" :key="edge.id">
                 <a class="connection-link" @click.prevent="query = edge.label; search(); selectedNode = null;">
                     <span x-text="edge.label"></span>
-                    <span style="display:inline-block;width:6px;height:6px;border-radius:50%;margin-left:4px;flex-shrink:0;" :style="'background:' + (edge.votes >= 300 ? '#22c55e' : edge.votes >= 150 ? '#38bdf8' : edge.votes >= 75 ? '#eab308' : '#94a3b8')"></span>
+                    <span style="display:inline-block;width:6px;height:6px;border-radius:50%;margin-left:4px;flex-shrink:0;" :style="'background:' + voteDotColor(edge.votes)"></span>
                 </a>
             </template>
             <div x-show="selectedNodeEdges.length > 15" style="font-size:11px;color:var(--text-muted);margin-top:4px;"
@@ -226,7 +242,7 @@
                     <div class="chain-marker">
                         <span class="chain-dot" :class="{ 'chain-dot-seed': node.isSeed, 'chain-dot-christ': node.isChrist, 'chain-dot-start': idx === 0 && !node.isChrist }"></span>
                         <span class="chain-line" x-show="idx < pathChainNodes.length - 1"
-                              :style="'width:' + (pathChainEdges[idx] >= 300 ? '4px' : pathChainEdges[idx] >= 150 ? '3px' : pathChainEdges[idx] >= 75 ? '2px' : '1px') + ';background:' + (pathChainEdges[idx] >= 300 ? '#22c55e' : pathChainEdges[idx] >= 150 ? '#38bdf8' : pathChainEdges[idx] >= 75 ? '#eab308' : 'var(--border)')"></span>
+                              :style="'width:' + voteWidth(pathChainEdges[idx]) + ';background:' + voteColor(pathChainEdges[idx])"></span>
                     </div>
                     <div class="chain-content" @click="selectChainNode(node)">
                         <div class="chain-ref-row">
@@ -242,6 +258,39 @@
         </div>
         <div class="chain-footer">
             <span style="font-size:10px;color:var(--text-muted);">Cross-references from Treasury of Scripture Knowledge (public domain). 41,649 connections with community vote scores.</span>
+        </div>
+    </div>
+
+    <!-- Seed Verse Panel Backdrop -->
+    <div class="seed-backdrop" x-show="ptjSeedPanelOpen" x-transition.opacity
+         @click="ptjSeedPanelOpen = false"></div>
+
+    <!-- Seed Verse Panel -->
+    <div class="seed-panel" x-show="ptjSeedPanelOpen" x-transition.opacity>
+        <div class="seed-panel-header">
+            <h3 x-text="ptjActivePreset ? ptjActivePreset.name : 'Seed Verses'"></h3>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <span class="seed-count"
+                      x-text="_getActiveSeedCount() + ' of ' + (ptjActivePreset ? ptjActivePreset.seeds.length : 0) + ' active'"></span>
+                <button class="chain-close" @click="ptjSeedPanelOpen = false">&times;</button>
+            </div>
+        </div>
+        <p class="seed-panel-desc" x-text="ptjActivePreset ? ptjActivePreset.description : ''"></p>
+        <div class="seed-panel-body">
+            <template x-for="seed in (ptjActivePreset ? ptjActivePreset.seeds : [])" :key="seed.id">
+                <label class="seed-item" :class="{ 'seed-item-off': ptjSeedToggles[seed.id] === false }">
+                    <input type="checkbox" :checked="ptjSeedToggles[seed.id] !== false"
+                           @change="toggleSeed(seed.id)">
+                    <div class="seed-item-content">
+                        <span class="seed-ref" x-text="seed.ref"></span>
+                        <span class="seed-text" x-text="seed.text"></span>
+                    </div>
+                </label>
+            </template>
+        </div>
+        <div class="seed-panel-footer">
+            <button class="seed-all-btn" @click="_allSeedsOn()">All On</button>
+            <button class="seed-all-btn" @click="_allSeedsOff()">All Off</button>
         </div>
     </div>
 
