@@ -521,7 +521,7 @@ class ForceGraph {
         const findPathBetween = (startNode, targetNode) => {
             const pNodes = new Set();
             const pEdges = new Set();
-            if (!targetNode || !startNode || targetNode === startNode) return { nodes: pNodes, edges: pEdges };
+            if (!targetNode || !startNode || targetNode === startNode) return { nodes: pNodes, edges: pEdges, ordered: [] };
 
             const adjMap = new Map();
             for (let ei = 0; ei < this.edges.length; ei++) {
