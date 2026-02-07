@@ -54,19 +54,27 @@ def create_alignment_table(conn):
             english_gloss TEXT,              -- English translation/gloss
             strong_number TEXT,              -- Primary Strong's number (e.g., H0430)
             grammar TEXT,                    -- Morphology code
+            word_type TEXT,                  -- NKO variant type (e.g., 'NKO', 'K', 'KO', 'N(k)O')
+            editions TEXT,                   -- Edition list (e.g., 'NA28+NA27+Tyn+SBL+WH+Treg+TR+Byz')
             UNIQUE(book, chapter, verse, word_position)
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_alignment_ref ON word_alignments(book, chapter, verse)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_alignment_strongs ON word_alignments(strong_number)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_alignment_word_type ON word_alignments(word_type)")
     conn.commit()
     print("Created word_alignments table")
 
 
 def parse_reference(ref_str):
-    """Parse reference like 'Gen.1.1#01=L' into (book, chapter, verse, word_pos)."""
+    """Parse reference like 'Gen.1.1#01=L' into (book, chapter, verse, word_pos, word_type).
+
+    The word_type is the NKO variant marker (e.g., 'NKO', 'K', 'KO', 'N(k)O', 'L', 'Q').
+    For Greek TAGNT: NKO system (N=Ancient/Critical, K=Traditional/TR, O=Other)
+    For Hebrew TAHOT: L=Leningrad, Q=Qere, K=Ketiv, R=Restored, X=LXX-based
+    """
     # Pattern: Book.Chapter.Verse#Position=Type
-    match = re.match(r'([A-Za-z0-9]+)\.(\d+)\.(\d+)#(\d+)', ref_str)
+    match = re.match(r'([A-Za-z0-9]+)\.(\d+)\.(\d+)#(\d+)=?(.*)', ref_str)
     if not match:
         return None
 
@@ -74,12 +82,13 @@ def parse_reference(ref_str):
     chapter = int(match.group(2))
     verse = int(match.group(3))
     word_pos = int(match.group(4))
+    word_type = match.group(5).strip() if match.group(5) else None
 
     book = BOOK_MAP.get(book_abbr)
     if not book:
         return None
 
-    return (book, chapter, verse, word_pos)
+    return (book, chapter, verse, word_pos, word_type)
 
 
 def extract_primary_strong(dstrongs, is_greek=False):
@@ -194,7 +203,7 @@ def import_alignment_file(conn, filepath, book_filter=None):
             if not ref:
                 continue
 
-            book, chapter, verse, word_pos = ref
+            book, chapter, verse, word_pos, word_type = ref
 
             # Apply book filter if specified
             if book_filter and book != book_filter:
@@ -207,11 +216,13 @@ def import_alignment_file(conn, filepath, book_filter=None):
                 # 2: English gloss ([The] book)
                 # 3: Strong's + morphology (G0976=N-NSF)
                 # 4: Lexeme info (βίβλος=book)
+                # 5: Editions (NA28+NA27+Tyn+SBL+WH+Treg+TR+Byz)
                 original_text = parts[1].split('(')[0].strip() if len(parts) > 1 else None
                 transliteration = extract_transliteration_from_greek(parts[1]) if len(parts) > 1 else None
                 english_gloss = clean_gloss(parts[2]) if len(parts) > 2 else None
                 dstrongs = parts[3] if len(parts) > 3 else None
                 grammar = dstrongs.split('=')[1] if dstrongs and '=' in dstrongs else None
+                editions = parts[5].strip() if len(parts) > 5 else None
             else:
                 # Hebrew TAHOT format:
                 # 0: Reference (Gen.1.1#01=L)
@@ -225,6 +236,7 @@ def import_alignment_file(conn, filepath, book_filter=None):
                 english_gloss = clean_gloss(parts[3]) if len(parts) > 3 else None
                 dstrongs = parts[4] if len(parts) > 4 else None
                 grammar = parts[5] if len(parts) > 5 else None
+                editions = None  # Hebrew doesn't have edition markers
 
             strong_number = extract_primary_strong(dstrongs, is_greek=is_greek)
 
@@ -236,7 +248,7 @@ def import_alignment_file(conn, filepath, book_filter=None):
             alignments.append((
                 book, chapter, verse, word_pos,
                 original_text, transliteration, english_gloss,
-                strong_number, grammar
+                strong_number, grammar, word_type, editions
             ))
 
     # Insert into database
@@ -244,8 +256,8 @@ def import_alignment_file(conn, filepath, book_filter=None):
         conn.executemany("""
             INSERT OR REPLACE INTO word_alignments
             (book, chapter, verse, word_position, hebrew_text, transliteration,
-             english_gloss, strong_number, grammar)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             english_gloss, strong_number, grammar, word_type, editions)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, alignments)
         conn.commit()
 

@@ -81,13 +81,13 @@
 - [x] IndexedDB storage layer (for offline data) - DONE
 - [x] Note tags/categories - DONE (with Supabase sync)
 - [ ] Migrate notes from localStorage to IndexedDB
-- [ ] Highlight colors
-- [ ] Export notes
+- [x] Highlight colors — DONE (6-color picker → auto-creates tags, highlights stored as tagged notes, syncs via Supabase)
+- [x] Export notes — DONE (copy to clipboard or download as .txt, includes tags)
 
 ### Navigation
 - [x] Book/chapter picker dropdown - DONE
-- [ ] Reading history
-- [ ] Bookmarks
+- [x] Reading history — DONE (localStorage, welcome screen + side menu, 50 entries, relative timestamps)
+- [x] Bookmarks — DONE (bookmark button on verses, welcome screen list, localStorage)
 
 ### Reading Plans
 - [x] Chronological Bible reading plan - DONE (365 days)
@@ -106,7 +106,7 @@
 
 ### Polish
 - [x] Keyboard shortcuts (arrows for nav, / for search, G for go-to, D for dark mode, ? for help)
-- [ ] Print-friendly styles
+- [x] Print-friendly styles — DONE (@media print hides UI chrome, clean verse layout)
 - [ ] Share verse functionality
 
 ## Technical Debt
@@ -117,15 +117,15 @@
 - [x] `DATABASE_PATH` env var support (all import scripts + `database.py`)
 
 ### Performance / Scaling
-- [ ] **Add Cache-Control headers** to API responses — Bible text is immutable, set `Cache-Control: public, max-age=86400` on passage/commentary/cross-ref endpoints. Free scaling with Cloudflare.
+- [x] **Add Cache-Control headers** to API responses — middleware sets 24hr cache on immutable Bible data, 1hr on semi-dynamic
 - [ ] Consider LiteFS for multi-region read replicas if user base grows
 - [ ] Consider adding `user_id` to `reading_plan_progress` table for faster RLS queries at scale
 - [ ] Add index on `reading_plan_progress.day_number` if querying "who completed day X" becomes needed
 
 ### Commentary UX
-- [ ] **Auto-scroll to current verse in commentary** — When viewing verse 20, commentary should scroll/jump to the section about verse 20 instead of showing from the top. Requires parsing `reference_start`/`reference_end` fields and anchoring to the closest section.
-- [ ] **Collapsible commentary sections** — Long commentaries (especially Matthew Henry) should be broken into expandable sections by verse range, so users can quickly find and expand the relevant section.
-- [ ] **Commentary source tabs** — When multiple commentaries exist for a passage (Matthew Henry + John Gill), show them as sub-tabs rather than concatenated, so users can switch between perspectives.
+- [x] **Auto-scroll to current verse in commentary** — Clicking a verse or scrolling through text auto-scrolls commentary panel to matching entry. 300ms debounce on scroll tracking.
+- [x] **Collapsible commentary sections** — Each entry has a clickable header with verse ref + preview. Click to expand/collapse. Active verse entries auto-expand.
+- [x] **Commentary source tabs** — Tabs for switching between Matthew Henry and John Gill (replaces collapsible accordion). Single source shows static header.
 - [ ] Consider JSONB array for completed days if row count becomes a concern (365 rows per user per plan)
 
 ## Word-by-Word Alignment (MOSTLY COMPLETE)
@@ -180,24 +180,24 @@
 
 ## Immersive / Distraction-Free Mode (HIGH PRIORITY)
 
-- [ ] Full-screen verse view with swipe navigation (Alpine.js touch events)
+- [x] Full-screen verse view with swipe navigation (Alpine.js touch events)
 - [ ] Toggles: Originals, cross-refs, commentary overlays
 - [ ] Integrate as template "screen" type (e.g., optional in "Daily Reading")
-- [ ] "No distraction" mode — clean, focused reading with large typography
+- [x] "No distraction" mode — clean, focused reading with large typography
 - [ ] Ambient background options, minimal UI chrome
-- [ ] Swipe between chapters/verses, tap to reveal controls
+- [x] Swipe between chapters/verses, tap to reveal controls
 
 ## Future Features (Roadmap)
 
 ### Parallel Translation View
-- [ ] Side-by-side comparison of BSB/KJV/WEB for the same passage
-- [ ] Highlight differences between translations
-- [ ] Synchronized scrolling
+- [x] Side-by-side comparison of BSB/KJV/WEB for the same passage
+- [x] Highlight differences between translations — "Show differences" toggle, set-based word diff with amber highlighting
+- [x] Synchronized scrolling (single scroll container)
 
 ### Scripture Memory Tool
-- [ ] Spaced repetition flashcards for verse memorization
-- [ ] Progressive word hiding (first letters → blanks → full recall)
-- [ ] Track memorization progress per verse
+- [x] Spaced repetition flashcards for verse memorization — DONE (SM-2 algorithm, localStorage)
+- [x] Progressive word hiding (first letters → blanks → full recall) — DONE
+- [x] Track memorization progress per verse — DONE (interval, ease, review count)
 - [ ] Daily memory review prompts
 
 ### Cross-Reference Graph Visualization
@@ -225,13 +225,14 @@
 - [ ] Designed for pastor sermon prep workflow
 
 ### Topical Index (Nave's Topical Bible) — credit Orville James Nave
-- [ ] Import Nave's Topical Bible (public domain, 1896, ~20K topics, ~100K refs)
-- [ ] Data source: Open Scriptures project on GitHub (digitized, freely available)
-- [ ] Add "Topics" as a sidebar tab option alongside Commentary/Notes/Cross-Refs
-- [ ] Browse-by-topic UI with search
-- [ ] Topic → verse list with previews, click to navigate
-- [ ] Integrates with existing cross-reference system
-- [ ] Credit Orville James Nave as the original compiler
+- [x] Import Nave's Topical Bible (5,319 topics, 49,399 refs) — `scripts/import_naves.py`
+- [x] Data source: BradyStephenson/bible-data on GitHub (CSV, public domain)
+- [x] Add "Topics" as a sidebar tab option alongside Commentary/Notes/Cross-Refs
+- [x] Browse-by-topic UI with A-Z navigation + FTS search
+- [x] Topic → verse list with BSB text previews, click to navigate
+- [x] Clickable verse references in topic entry text
+- [x] Auto-loads related topics when verse is selected
+- [x] Credit Orville James Nave as the original compiler
 
 ### Audio Read-Along (Browser TTS) — Zero Cost
 - [ ] Use `window.speechSynthesis` API (zero server cost, runs entirely client-side)
@@ -244,7 +245,7 @@
 ### Export/Print Study Sessions
 - [ ] Export notes + highlighted verses + commentary as PDF
 - [ ] Clean formatting for sermon prep handouts
-- [ ] Print-friendly stylesheet
+- [x] Print-friendly stylesheet — DONE (@media print hides UI chrome, clean verse layout)
 - [ ] Depends on: Sermon Outline Builder for best results
 
 ### AI Study Assistant (Claude API)
@@ -280,27 +281,33 @@ in newer critical editions.
 are one" (from TR). Modern translations (NIV, NASB, BSB, WEB) correctly omit this because it's
 not found in the earliest manuscripts.
 
-**Current status:**
-- BSB Hebrew mapping appears correct (uses WLCM)
-- BSB/WEB Greek mapping appears to still show Textus Receptus in some cases
-- The STEPBible TAGNT data DOES include variant markers (NKO system) showing which editions contain
-  each word — we could potentially leverage this to show the correct source text per translation
+**Current status (updated Feb 2026 after deep research):**
+- BSB Hebrew mapping is correct (uses WLCM — all translations share this)
+- Greek interlinear shows ALL edition words without filtering (NKO markers stripped during import)
+- Full research documented in `docs/TRANSLATION_SOURCE_TEXT_RESEARCH.md`
 
-**Recommendation from friend:** Don't try to solve this all at once. This is literally a lifetime
-of scholarly work. Options:
-1. Label the source text clearly (e.g., "Shown: SBLGNT" or "Shown: Textus Receptus")
-2. Find existing translation→source mappings that scholars have already done
+**Research findings:**
+- STEPBible TAGNT NKO system is perfectly suited for this — already in our data files
+- 94% of NT words (NKO) are identical across all editions — no filtering needed
+- ~3,500 words are K-only (TR), ~800 are N-only (Critical Text)
+- `import_stepbible_alignment.py` line 69 discards the NKO marker — easy fix
+- Need to add `word_type` and `editions` columns to `word_alignments` table
+- Hebrew doesn't need edition filtering (all translations use Masoretic Text)
+- For WEB (Byzantine), must filter on `editions LIKE '%Byz%'` (NKO's K covers both TR and Byz)
+- NA28 text is copyrighted — but SBLGNT + NKO filtering is a valid workaround
+
+**Implementation phases:**
+- [x] **Phase 1 (quick win):** Fix source text labels per translation in API
+- [x] **Phase 2:** Add `word_type` + `editions` columns, update import script, re-import TAGNT (141,720 words)
+- [x] **Phase 3:** Filter interlinear API results by translation's source edition (BSB→SBL, KJV→TR, WEB→Byz)
+- [x] **Phase 4:** Frontend variant display — dotted underline on variant words, edition info in word details, info banner updated
 
 
 ### Bug: Original Language Missing for Some Books/Chapters
-- Reported: Original language not available at all for Psalms
-- Reported: Toggle button not appearing in Genesis chapter 4
-- Sporadic issues in Genesis 23-25 (worked later — may be data loading race condition)
-- Need to audit interlinear data coverage across all 66 books
+- [x] Fixed: Psalms has 11,136 word alignments, Genesis 4 works, race condition resolved
 
 ### Attribution: Share Jesus Without Fear
-- Need to credit **William Fay** as the creator of the "Share Jesus Without Fear" method
-- The current Share Jesus modal uses his 5 questions + 7 verses format
+- [x] Credited William Fay in the Share Jesus modal
 
 ### Verse Sharing Feature Request
 - Users want to select verses and share them:
@@ -309,15 +316,11 @@ of scholarly work. Options:
   - Direct share to social media / messaging apps
 
 ### Offline Caching Bug
-- Users report downloading a Bible version, getting success feedback, but:
-  - Data disappears on page refresh
-  - Going offline shows no cached content
-- Root cause likely: `loadPassage()` doesn't fall back to IndexedDB when fetch fails
+- [x] Fixed: `loadPassage()` now falls back to IndexedDB via `_loadFromCache()`
 
 ### Tablet Sidebar
-- On tablets (768px-1024px), the resources sidebar takes up too much space
-- Need a way to collapse/hide the sidebar on tablet-sized screens
+- [x] Fixed: Collapsible sidebar with toggle button, persists to localStorage
 
 ---
 
-Last updated: 2026-02-05
+Last updated: 2026-02-06

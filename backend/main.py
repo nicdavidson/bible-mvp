@@ -2,29 +2,26 @@
 BibleMVP - FastAPI Backend
 A free, open-source Bible study platform.
 """
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+import logging
+import sqlite3
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
-import sqlite3
+
+from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .database import get_db_connection, init_db
-from .models import Passage, SearchResult, WordDetail, CommentaryEntry
 
-app = FastAPI(
-    title="BibleMVP API",
-    description="Free Bible study platform with cross-resource linking",
-    version="0.1.0"
-)
+logger = logging.getLogger(__name__)
 
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"
-app.mount("/static", StaticFiles(directory=frontend_path / "static"), name="static")
 
 
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     init_db()
     # Create indexes needed for bidirectional cross-reference lookups
@@ -37,6 +34,43 @@ async def startup():
         conn.commit()
     finally:
         conn.close()
+    yield
+
+
+app = FastAPI(
+    title="BibleMVP API",
+    description="Free Bible study platform with cross-resource linking",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+app.mount("/static", StaticFiles(directory=frontend_path / "static"), name="static")
+
+# Bible text is immutable - set aggressive cache headers on API endpoints.
+# This enables free scaling via CDN (e.g. Cloudflare) without any code changes.
+CACHE_LONG = "public, max-age=86400"  # 24 hours for immutable content
+CACHE_SHORT = "public, max-age=3600"  # 1 hour for semi-dynamic content (devotionals)
+
+# Paths that serve immutable Bible data (passages, commentary, cross-refs, interlinear, lexicon)
+_CACHEABLE_PREFIXES = (
+    "/api/passage/", "/api/verse/", "/api/word/", "/api/word-alignment",
+    "/api/offline/", "/api/reading-plans", "/api/crossref-map/",
+    "/api/path-to-christ/", "/api/search", "/api/topics/",
+)
+_SHORT_CACHE_PREFIXES = ("/api/devotional",)
+
+
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    """Add Cache-Control headers to API responses for CDN-friendly caching."""
+    response: Response = await call_next(request)
+    path = request.url.path
+    if response.status_code == 200:
+        if any(path.startswith(p) for p in _CACHEABLE_PREFIXES):
+            response.headers["Cache-Control"] = CACHE_LONG
+        elif any(path.startswith(p) for p in _SHORT_CACHE_PREFIXES):
+            response.headers["Cache-Control"] = CACHE_SHORT
+    return response
 
 
 @app.get("/")
@@ -377,9 +411,9 @@ async def search(
                     LIMIT 50
                 """, (fts_query,))
                 results.extend([dict(r) for r in cursor.fetchall()])
-        except sqlite3.OperationalError:
+        except sqlite3.OperationalError as e:
             # Malformed FTS query - return empty results rather than 500
-            pass
+            logger.warning("FTS query error for %r: %s", q, e)
 
         return {"query": q, "scope": scope, "results": results}
     finally:
@@ -487,7 +521,7 @@ async def get_word(strong_number: str):
             if align_row and align_row['transliteration']:
                 word_dict['transliteration'] = align_row['transliteration']
 
-        # Get all occurrences
+        # Get all occurrences from words table
         cursor = conn.execute("""
             SELECT v.book, v.chapter, v.verse, w.position, w.translation
             FROM words w
@@ -498,10 +532,54 @@ async def get_word(strong_number: str):
 
         occurrences = cursor.fetchall()
 
+        # Also get occurrences from word_alignments (zero-padded Strong's)
+        prefix = strong_number[0]  # H or G
+        num = strong_number[1:]
+        padded_strong = f"{prefix}{num.zfill(4)}"
+
+        # If words table had no results, try word_alignments for occurrences
+        if not occurrences:
+            cursor = conn.execute("""
+                SELECT book, chapter, verse, word_position as position, english_gloss as translation
+                FROM word_alignments
+                WHERE strong_number = ?
+                ORDER BY book, chapter, verse, word_position
+            """, (padded_strong,))
+            occurrences = cursor.fetchall()
+
+        # Get translation variants (how the word is rendered in English)
+        # Strip trailing/leading punctuation and normalize case for grouping
+        cursor = conn.execute("""
+            SELECT LOWER(TRIM(
+                REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                    english_gloss, '.', ''), ',', ''), ';', ''), ':', ''), '!', '')
+            )) as gloss, COUNT(*) as cnt
+            FROM word_alignments
+            WHERE strong_number = ?
+              AND english_gloss IS NOT NULL AND english_gloss != ''
+            GROUP BY gloss
+            HAVING gloss != ''
+            ORDER BY cnt DESC
+            LIMIT 15
+        """, (padded_strong,))
+        glosses = [{"gloss": row["gloss"], "count": row["cnt"]} for row in cursor.fetchall()]
+
+        # Get book frequency
+        cursor = conn.execute("""
+            SELECT book, COUNT(*) as cnt
+            FROM word_alignments
+            WHERE strong_number = ?
+            GROUP BY book
+            ORDER BY cnt DESC
+        """, (padded_strong,))
+        book_frequency = [{"book": row["book"], "count": row["cnt"]} for row in cursor.fetchall()]
+
         return {
             "word": word_dict,
             "occurrences": [dict(o) for o in occurrences],
-            "count": len(occurrences)
+            "count": len(occurrences),
+            "glosses": glosses,
+            "book_frequency": book_frequency
         }
     finally:
         conn.close()
@@ -515,9 +593,9 @@ async def get_passage_interlinear(
     """Get interlinear (original language) data for an entire chapter.
 
     The interlinear data comes from word_alignments which contains the original
-    Hebrew/Greek text with English glosses. This is translation-independent since
-    the original language text is the same regardless of which English translation
-    is being viewed.
+    Hebrew/Greek text with English glosses. For Greek NT, words are filtered by
+    the active translation's source text edition (BSB→SBLGNT, KJV→TR, WEB→Byzantine).
+    Hebrew OT is the same for all translations (Masoretic/WLCM).
     """
     conn = get_db_connection()
     try:
@@ -527,14 +605,23 @@ async def get_passage_interlinear(
 
         book, chapter, _, _, _ = parsed
 
-        # Query alignment data directly - this works for any translation since
-        # the Hebrew/Greek text is the same. Normalize Strong's numbers for lexicon lookup.
-        # Include word_id for deterministic English word alignment.
+        # Build edition filter for Greek NT based on translation
+        # BSB→SBL, KJV→TR, WEB→Byz. Hebrew has no edition data, so no filter needed.
+        EDITION_FILTERS = {
+            'BSB': "SBL",
+            'KJV': "TR",
+            'WEB': "Byz",
+        }
+        edition_key = EDITION_FILTERS.get(translation)
+
+        # Query alignment data with variant info.
+        # For Greek NT, filter to only show words present in the translation's source edition.
+        # Words with no editions data (Hebrew OT, or legacy data) are always included.
         cursor = conn.execute("""
             SELECT a.verse, a.word_position as position, a.hebrew_text as original_text,
                    a.book || '.' || a.chapter || '.' || a.verse || '.' || a.word_position as word_id,
-                   CASE WHEN a.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
-                        WHEN a.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
+                   CASE WHEN a.strong_number LIKE 'H0%%' THEN 'H' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
+                        WHEN a.strong_number LIKE 'G0%%' THEN 'G' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
                         ELSE a.strong_number END as strong_number,
                    a.grammar as parsing,
                    a.english_gloss as translation,
@@ -543,15 +630,18 @@ async def get_passage_interlinear(
                    l.pronunciation,
                    l.definition,
                    l.extended_definition,
-                   l.language
+                   l.language,
+                   a.word_type,
+                   a.editions
             FROM word_alignments a
             LEFT JOIN lexicon l ON l.strong_number = CASE
-                WHEN a.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
-                WHEN a.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
+                WHEN a.strong_number LIKE 'H0%%' THEN 'H' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
+                WHEN a.strong_number LIKE 'G0%%' THEN 'G' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
                 ELSE a.strong_number END
             WHERE a.book = ? AND a.chapter = ?
+              AND (a.editions IS NULL OR ? IS NULL OR a.editions LIKE '%%' || ? || '%%')
             ORDER BY a.verse, a.word_position
-        """, (book, chapter))
+        """, (book, chapter, edition_key, edition_key))
 
         rows = cursor.fetchall()
 
@@ -590,12 +680,20 @@ async def get_passage_interlinear(
         if not language and verses_data:
             language = 'hebrew' if book in OT_BOOKS else 'greek' if book in NT_BOOKS else None
 
-        # Determine source text based on language
+        # Determine source text based on language and translation
+        # Different translations use different Greek source texts:
+        #   BSB → SBLGNT (Critical Text), KJV → Textus Receptus, WEB → Byzantine Majority Text
+        # All translations use the same Hebrew source (Masoretic Text / WLCM)
+        GREEK_SOURCE_LABELS = {
+            'BSB': 'SBL Greek New Testament',
+            'KJV': 'Textus Receptus (Scrivener 1894)',
+            'WEB': 'Byzantine Majority Text (Robinson-Pierpont)',
+        }
         source_text = None
         if language == 'hebrew':
             source_text = 'Westminster Leningrad Codex'
         elif language == 'greek':
-            source_text = 'SBL Greek New Testament'
+            source_text = GREEK_SOURCE_LABELS.get(translation, 'SBL Greek New Testament')
 
         return {
             "reference": reference,
@@ -1994,6 +2092,204 @@ async def get_crossref_map(
         }
     finally:
         conn.close()
+
+
+@app.get("/api/topics/search")
+async def search_topics(
+    q: str = Query(..., min_length=1, description="Search query"),
+    limit: int = Query(default=50, le=200)
+):
+    """Search Nave's Topical Bible by keyword or topic name."""
+    conn = get_db_connection()
+    try:
+        results = []
+
+        # First: exact topic name match (case-insensitive)
+        cursor = conn.execute(
+            "SELECT id, topic, section, entry_text FROM naves_topics "
+            "WHERE UPPER(topic) = UPPER(?) LIMIT 1",
+            (q.strip(),)
+        )
+        exact = cursor.fetchone()
+        if exact:
+            refs = _get_topic_refs(conn, exact["id"])
+            results.append({
+                "id": exact["id"],
+                "topic": exact["topic"],
+                "section": exact["section"],
+                "entry_text": exact["entry_text"],
+                "refs": refs,
+                "exact": True,
+            })
+
+        # FTS search for broader matches
+        try:
+            fts_q = q.strip().replace('"', '""')
+            cursor = conn.execute("""
+                SELECT t.id, t.topic, t.section,
+                       snippet(naves_topics_fts, 1, '<mark>', '</mark>', '...', 40) as snippet
+                FROM naves_topics_fts fts
+                JOIN naves_topics t ON t.id = fts.rowid
+                WHERE naves_topics_fts MATCH ?
+                LIMIT ?
+            """, (f'"{fts_q}"', limit))
+
+            for row in cursor.fetchall():
+                if exact and row["id"] == exact["id"]:
+                    continue
+                results.append({
+                    "id": row["id"],
+                    "topic": row["topic"],
+                    "section": row["section"],
+                    "snippet": row["snippet"],
+                })
+        except Exception:
+            # FTS match syntax error — fall back to LIKE
+            cursor = conn.execute(
+                "SELECT id, topic, section FROM naves_topics "
+                "WHERE topic LIKE ? OR entry_text LIKE ? LIMIT ?",
+                (f'%{q}%', f'%{q}%', limit)
+            )
+            for row in cursor.fetchall():
+                if exact and row["id"] == exact["id"]:
+                    continue
+                results.append({
+                    "id": row["id"],
+                    "topic": row["topic"],
+                    "section": row["section"],
+                })
+
+        return {"query": q, "results": results}
+    finally:
+        conn.close()
+
+
+@app.get("/api/topics/for-verse")
+async def get_topics_for_verse(
+    book: str = Query(...),
+    chapter: int = Query(...),
+    verse: int = Query(...)
+):
+    """Get all Nave's topics that reference a specific verse."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.execute("""
+            SELECT DISTINCT t.id, t.topic, t.section
+            FROM naves_topics t
+            JOIN naves_topic_refs r ON t.id = r.topic_id
+            WHERE r.book = ? AND r.chapter = ?
+              AND r.verse_start <= ?
+              AND (r.verse_end >= ? OR r.verse_end IS NULL OR r.verse_end = r.verse_start)
+            ORDER BY t.topic
+            LIMIT 30
+        """, (book, chapter, verse, verse))
+
+        topics = [dict(row) for row in cursor.fetchall()]
+        return {"book": book, "chapter": chapter, "verse": verse, "topics": topics}
+    finally:
+        conn.close()
+
+
+@app.get("/api/topics/browse")
+async def browse_topics(
+    section: str = Query(default=None, description="Filter by section letter (A-Z)"),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, le=200)
+):
+    """Browse Nave's topics alphabetically."""
+    conn = get_db_connection()
+    try:
+        offset = (page - 1) * per_page
+
+        if section:
+            cursor = conn.execute(
+                "SELECT id, topic, section FROM naves_topics "
+                "WHERE section = ? ORDER BY topic LIMIT ? OFFSET ?",
+                (section.upper(), per_page, offset)
+            )
+            count_cursor = conn.execute(
+                "SELECT COUNT(*) FROM naves_topics WHERE section = ?",
+                (section.upper(),)
+            )
+        else:
+            cursor = conn.execute(
+                "SELECT id, topic, section FROM naves_topics "
+                "ORDER BY topic LIMIT ? OFFSET ?",
+                (per_page, offset)
+            )
+            count_cursor = conn.execute("SELECT COUNT(*) FROM naves_topics")
+
+        topics = [dict(row) for row in cursor.fetchall()]
+        total = count_cursor.fetchone()[0]
+
+        # Section counts for navigation
+        sec_cursor = conn.execute(
+            "SELECT section, COUNT(*) as count FROM naves_topics GROUP BY section ORDER BY section"
+        )
+        sections = {row[0]: row[1] for row in sec_cursor.fetchall()}
+
+        return {
+            "topics": topics,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "sections": sections,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/topics/{topic_id}")
+async def get_topic(topic_id: int):
+    """Get a single Nave's topic with full entry text and verse references."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.execute(
+            "SELECT id, topic, section, entry_text FROM naves_topics WHERE id = ?",
+            (topic_id,)
+        )
+        topic = cursor.fetchone()
+        if not topic:
+            raise HTTPException(status_code=404, detail="Topic not found")
+
+        refs = _get_topic_refs(conn, topic_id)
+
+        # Get verse text previews for up to 20 refs
+        ref_previews = []
+        for ref in refs[:20]:
+            ve = ref["verse_end"] if ref["verse_end"] is not None else ref["verse_start"]
+            cursor = conn.execute(
+                "SELECT text FROM verses WHERE book = ? AND chapter = ? "
+                "AND verse >= ? AND verse <= ? AND translation_id = 'BSB' "
+                "ORDER BY verse LIMIT 3",
+                (ref["book"], ref["chapter"], ref["verse_start"], ve)
+            )
+            texts = [r["text"] for r in cursor.fetchall()]
+            preview = " ".join(texts)
+            if len(preview) > 150:
+                preview = preview[:147] + "..."
+            ref_previews.append({**ref, "preview": preview})
+
+        return {
+            "id": topic["id"],
+            "topic": topic["topic"],
+            "section": topic["section"],
+            "entry_text": topic["entry_text"],
+            "refs": ref_previews,
+            "total_refs": len(refs),
+        }
+    finally:
+        conn.close()
+
+
+def _get_topic_refs(conn, topic_id):
+    """Get verse references for a topic."""
+    cursor = conn.execute(
+        "SELECT book, chapter, verse_start, verse_end FROM naves_topic_refs "
+        "WHERE topic_id = ? ORDER BY book, chapter, verse_start",
+        (topic_id,)
+    )
+    return [dict(row) for row in cursor.fetchall()]
 
 
 @app.get("/map")

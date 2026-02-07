@@ -2,11 +2,11 @@
 Database initialization and connection management for BibleMVP.
 Uses SQLite with FTS5 for full-text search.
 """
+import logging
 import os
+import re
 import sqlite3
 from pathlib import Path
-import logging
-import re
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ def init_db():
 
             # Run one-time migrations
             _migrate_commentary_links(conn)
+            _migrate_word_alignment_variants(conn)
         except Exception as e:
             logger.error(f"Error checking database: {e}")
         finally:
@@ -49,6 +50,25 @@ def init_db():
             conn.commit()
         finally:
             conn.close()
+
+
+def _migrate_word_alignment_variants(conn):
+    """Add word_type and editions columns to word_alignments for NKO variant filtering."""
+    try:
+        conn.execute("SELECT word_type FROM word_alignments LIMIT 1")
+        return  # Already migrated
+    except Exception:
+        pass
+
+    logger.info("Adding word_type and editions columns to word_alignments...")
+    try:
+        conn.execute("ALTER TABLE word_alignments ADD COLUMN word_type TEXT")
+        conn.execute("ALTER TABLE word_alignments ADD COLUMN editions TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_alignment_word_type ON word_alignments(word_type)")
+        conn.commit()
+        logger.info("word_alignments variant columns added successfully")
+    except Exception as e:
+        logger.error(f"Error adding variant columns: {e}")
 
 
 def _migrate_commentary_links(conn):

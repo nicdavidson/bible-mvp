@@ -29,7 +29,8 @@ const CACHEABLE_API_PATTERNS = [
     /^\/api\/verse\//,
     /^\/api\/word\//,
     /^\/api\/word-alignment/,
-    /^\/api\/offline\//
+    /^\/api\/offline\//,
+    /^\/api\/topics\//
 ];
 
 // Install event - cache static assets

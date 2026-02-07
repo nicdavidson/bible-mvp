@@ -1,8 +1,8 @@
 {
   "version": "2026.02.06",
-  "sha256": "348f6a72a5985414f4952ceb53c715c012698cea2fb66e289b5e5d1cc392fc8f",
-  "size": 353386496,
-  "built": "2026-02-06T00:21:00.449648",
+  "sha256": "8cc34a3d531debea5b46b595c140da64ea0a25aa6adeafebc375371e8d35ed1f",
+  "size": 384897024,
+  "built": "2026-02-06T19:03:40.273773",
   "imports": {
     "schema": {
       "version": "1.0",
@@ -58,6 +58,11 @@
       "version": "1.0",
       "row_count": 732,
       "completed_at": "2026-02-06T00:21:00.148234"
+    },
+    "naves": {
+      "version": "1.0",
+      "row_count": 49399,
+      "completed_at": "2026-02-06T19:03:39.059275"
     }
   }
 }

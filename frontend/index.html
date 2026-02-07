@@ -52,9 +52,28 @@
                     <span class="side-menu-icon">📚</span>
                     <span>Reading Plans</span>
                 </button>
+                <button @click="openMemoryTool()" class="side-menu-item">
+                    <span class="side-menu-icon">🧠</span>
+                    <span>Scripture Memory</span>
+                    <span class="side-menu-badge" x-show="getMemoryStats().due > 0" x-text="getMemoryStats().due"></span>
+                </button>
             </div>
 
             <div class="side-menu-divider"></div>
+
+            <!-- Recent history in side menu -->
+            <div class="side-menu-section" x-show="readingHistory.length > 0">
+                <div class="side-menu-section-label">Recent</div>
+                <template x-for="(item, idx) in getRecentHistory(5)" :key="'menu-hist-' + idx">
+                    <button @click="loadReference(item.reference); showSideMenu = false" class="side-menu-item side-menu-history-item">
+                        <span class="side-menu-icon">📄</span>
+                        <span x-text="item.reference"></span>
+                        <span class="side-menu-history-time" x-text="formatHistoryTime(item.timestamp)"></span>
+                    </button>
+                </template>
+            </div>
+
+            <div class="side-menu-divider" x-show="readingHistory.length > 0"></div>
 
             <div class="side-menu-section">
                 <a href="/map" class="side-menu-item" style="text-decoration:none;color:inherit;">
@@ -292,9 +311,9 @@
                 </div>
             </div>
 
-            <!-- Source text mismatch warning -->
-            <div class="source-text-warning" x-show="showInterlinear && interlinearSourceText && translation !== 'BSB' && !sourceTextWarningDismissed">
-                <span class="source-text-warning-text" x-text="'Note: The original language text shown is aligned to the BSB translation (Critical Text). The ' + translation + ' may use a different manuscript tradition.'"></span>
+            <!-- Source text info note (word-click alignment is BSB-specific) -->
+            <div class="source-text-warning source-text-info" x-show="showInterlinear && translation !== 'BSB' && !sourceTextWarningDismissed">
+                <span class="source-text-warning-text" x-text="'Interlinear text is sourced from the ' + interlinearSourceText + '. Clicking English words for alignment is BSB-specific.'"></span>
                 <button @click="dismissSourceTextWarning()" class="source-text-warning-close" title="Dismiss">&times;</button>
             </div>
 
@@ -307,6 +326,41 @@
 
                 <!-- Book selector when no passage loaded -->
                 <div x-show="!loading && !error && verses.length === 0" class="book-selector">
+                    <!-- Reading History -->
+                    <div class="reading-history-section" x-show="readingHistory.length > 0">
+                        <div class="history-header">
+                            <h3>Recent</h3>
+                            <button @click="clearHistory()" class="btn-clear-history" title="Clear history">Clear</button>
+                        </div>
+                        <div class="history-list">
+                            <template x-for="(item, idx) in getRecentHistory(8)" :key="'hist-' + idx">
+                                <button @click="loadReference(item.reference)" class="history-item">
+                                    <span class="history-ref" x-text="item.reference"></span>
+                                    <span class="history-meta">
+                                        <span class="history-translation" x-text="item.translation"></span>
+                                        <span class="history-time" x-text="formatHistoryTime(item.timestamp)"></span>
+                                    </span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Bookmarks -->
+                    <div class="bookmarks-section" x-show="bookmarks.length > 0">
+                        <h3>Bookmarks</h3>
+                        <div class="bookmarks-list">
+                            <template x-for="(bm, idx) in bookmarks.slice(0, 6)" :key="'bm-' + idx">
+                                <div class="bookmark-item">
+                                    <button @click="goToBookmark(bm)" class="bookmark-ref-btn">
+                                        <span class="bookmark-ref" x-text="bm.reference"></span>
+                                        <span class="bookmark-preview" x-text="bm.preview + '...'"></span>
+                                    </button>
+                                    <button @click="removeBookmark(bm.reference)" class="btn-remove-bookmark" title="Remove">&times;</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
                     <p class="book-selector-intro">Select a book to begin reading:</p>
                     <div class="book-section">
                         <h3>Old Testament</h3>
@@ -348,6 +402,10 @@
                                 <span x-text="tid"></span>
                             </label>
                         </template>
+                        <label class="parallel-toggle-label parallel-diff-toggle" x-show="parallelTranslations.length >= 2">
+                            <input type="checkbox" :checked="parallelDiffMode" @change="parallelDiffMode = !parallelDiffMode">
+                            <span>Show differences</span>
+                        </label>
                     </div>
                     <div class="parallel-header">
                         <div class="parallel-verse-num-header"></div>
@@ -361,7 +419,8 @@
                             <template x-for="tid in parallelTranslations" :key="tid + '-' + verse.verse">
                                 <div class="parallel-cell" :data-translation="tid">
                                     <span class="parallel-cell-label" x-text="tid"></span>
-                                    <p x-text="(parallelData[tid] || []).find(v => v.verse === verse.verse)?.text || '\u2014'"></p>
+                                    <p x-show="!parallelDiffMode" x-text="(parallelData[tid] || []).find(v => v.verse === verse.verse)?.text || '\u2014'"></p>
+                                    <p x-show="parallelDiffMode" x-html="getParallelDiffHtml(verse.verse, tid)"></p>
                                 </div>
                             </template>
                         </div>
@@ -384,8 +443,10 @@
                                     'verse-speaking': ttsCurrentVerse === verse.verse,
                                     'has-interlinear': showInterlinear && hasInterlinear(verse.verse, verseIdx),
                                     'verse-selected-for-note': noteEditMode && isVerseSelectedForNote(verse.verse),
-                                    'verse-selected-for-share': shareMode && shareSelectedVerses.includes(verse.verse)
+                                    'verse-selected-for-share': shareMode && shareSelectedVerses.includes(verse.verse),
+                                    'verse-color-highlighted': !!getVerseHighlightColor(verse.verse)
                                 }"
+                                :style="getVerseHighlightColor(verse.verse) ? 'background-color: ' + getVerseHighlightColor(verse.verse) : ''"
                                 @click="shareMode ? toggleShareVerse(verse.verse) : handleVerseBoxClick($event, verse.verse, verseIdx)"
                             >
                             <!-- Tag indicator dots -->
@@ -406,9 +467,9 @@
                                     <span
                                         class="interlinear-word"
                                         @click.stop="handleInterlinearWordClick(word, $event)"
-                                        :class="{ 'has-strong': word.strong_number }"
+                                        :class="{ 'has-strong': word.strong_number, 'variant-word': word.word_type && word.word_type !== 'NKO' && word.word_type !== 'L' }"
                                         :data-word-id="word.word_id"
-                                        :title="(word.transliteration || '') + (word.strong_number ? ' [' + word.strong_number + ']' : '')"
+                                        :title="(word.transliteration || '') + (word.strong_number ? ' [' + word.strong_number + ']' : '') + (word.word_type && word.word_type !== 'NKO' && word.word_type !== 'L' ? ' [variant: ' + word.word_type + ']' : '')"
                                     >
                                         <span class="original-text" x-text="word.original_text"></span>
                                         <span class="word-gloss" x-text="getWordGloss(word)"></span>
@@ -417,6 +478,34 @@
                             </div>
                             <div class="verse-actions" x-show="!shareMode">
                                 <button
+                                    class="btn-highlight-toggle"
+                                    @click.stop="toggleHighlightPicker(verse.verse)"
+                                    :title="getVerseHighlightColor(verse.verse) ? 'Change highlight' : 'Highlight verse'"
+                                    :class="{ 'has-highlight': getVerseHighlightColor(verse.verse) }"
+                                    :style="getVerseHighlightColor(verse.verse) ? 'color: ' + getVerseHighlightColor(verse.verse) : ''"
+                                >●</button>
+                                <button
+                                    class="btn-memorize"
+                                    @click.stop="addToMemory(verse.verse)"
+                                    x-show="!isInMemory(verse.verse)"
+                                    title="Add to memory verses"
+                                >🧠</button>
+                                <button
+                                    class="btn-memorize in-memory"
+                                    @click.stop
+                                    x-show="isInMemory(verse.verse)"
+                                    title="In memory verses"
+                                >✓</button>
+                                <button
+                                    class="btn-bookmark"
+                                    @click.stop="toggleBookmark(verse.verse)"
+                                    :title="isBookmarked(verse.verse) ? 'Remove bookmark' : 'Bookmark verse'"
+                                    :class="{ 'bookmarked': isBookmarked(verse.verse) }"
+                                >
+                                    <span x-show="!isBookmarked(verse.verse)">🔖</span>
+                                    <span x-show="isBookmarked(verse.verse)">★</span>
+                                </button>
+                                <button
                                     class="btn-copy"
                                     @click.stop="copyVerse(verse)"
                                     :title="copyFeedback === verse.verse ? 'Copied!' : 'Copy verse'"
@@ -424,6 +513,23 @@
                                     <span x-show="copyFeedback !== verse.verse">📋</span>
                                     <span x-show="copyFeedback === verse.verse">✓</span>
                                 </button>
+                            </div>
+                            <!-- Highlight color picker (creates tag-based notes) -->
+                            <div class="highlight-picker" x-show="showHighlightPicker === verse.verse" @click.outside="showHighlightPicker = null" x-transition>
+                                <template x-for="(hc, hIdx) in highlightColors" :key="'hc-' + hIdx">
+                                    <button
+                                        class="highlight-color-btn"
+                                        :style="'background-color: ' + hc"
+                                        @click.stop="quickHighlight(verse.verse, hc)"
+                                        :class="{ 'active': getVerseHighlightColor(verse.verse) === hc }"
+                                    ></button>
+                                </template>
+                                <button
+                                    class="highlight-color-btn highlight-clear"
+                                    @click.stop="removeVerseHighlight(verse.verse)"
+                                    x-show="getVerseHighlightColor(verse.verse)"
+                                    title="Remove highlight"
+                                >✕</button>
                             </div>
                             </div>
                         </div>
@@ -472,6 +578,11 @@
                     :class="{ 'active': activeTab === 'crossrefs', 'has-content': crossRefs.length > 0 }"
                     class="tab-btn"
                 >Cross-Refs<span x-show="crossRefs.length > 0" class="tab-indicator" x-text="'(' + crossRefs.length + ')'"></span></button>
+                <button
+                    @click="activeTab = 'topics'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar(); initTopicSections()"
+                    :class="{ 'active': activeTab === 'topics', 'has-content': verseTopics.length > 0 }"
+                    class="tab-btn"
+                >Topics<span x-show="verseTopics.length > 0" class="tab-indicator" x-text="'(' + verseTopics.length + ')'"></span></button>
             </div>
             <!-- Collapsed sidebar icons (tablet/desktop only) -->
             <div class="sidebar-collapsed-icons">
@@ -486,6 +597,10 @@
                 <button @click="activeTab = 'crossrefs'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'crossrefs' }" title="Cross-Refs">
                     <span class="collapsed-icon-label">X</span>
                     <span class="collapsed-icon-dot" x-show="crossRefs.length > 0"></span>
+                </button>
+                <button @click="activeTab = 'topics'; toggleSidebar(); initTopicSections()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'topics' }" title="Topics">
+                    <span class="collapsed-icon-label">T</span>
+                    <span class="collapsed-icon-dot" x-show="verseTopics.length > 0"></span>
                 </button>
             </div>
             <div class="panel-body">
@@ -510,36 +625,46 @@
                             <span class="empty-state-hint">Try another passage or check back later</span>
                         </div>
                     </template>
-                    <!-- Normal mode OR verse selected in combined mode: Grouped by source with collapsible sections -->
+                    <!-- Normal mode OR verse selected in combined mode: Tabbed by source -->
                     <template x-if="!combinedPlanReading || highlightedVerses.length > 0">
                         <div>
-                            <template x-for="(group, source) in getGroupedCommentary()" :key="'comm-group-' + source">
-                                <div class="commentary-group">
+                            <!-- Source tabs (only when multiple sources available) -->
+                            <div class="commentary-source-tabs" x-show="getCommentarySources().length > 1">
+                                <template x-for="source in getCommentarySources()" :key="'comm-tab-' + source">
                                     <button
-                                        class="commentary-group-header"
-                                        @click="toggleCommentarySource(source)"
-                                        :class="{ 'expanded': isCommentarySourceExpanded(source) }"
-                                    >
-                                        <span class="commentary-source-name" x-text="source"></span>
-                                        <span class="commentary-entry-count" x-text="'(' + group.length + (group.length === 1 ? ' entry' : ' entries') + ')'"></span>
-                                        <span class="commentary-toggle-icon" x-text="isCommentarySourceExpanded(source) ? '▼' : '▶'"></span>
-                                    </button>
-                                    <div class="commentary-preview" x-show="!isCommentarySourceExpanded(source)" x-text="getCommentaryPreview(group)"></div>
-                                    <div class="commentary-entries" x-show="isCommentarySourceExpanded(source)" x-transition>
-                                        <template x-for="(entry, idx) in group" :key="'comm-' + source + '-' + idx">
-                                            <div class="commentary-entry" :class="{ 'commentary-active': commentaryMatchesActiveVerse(entry) }">
-                                                <button
-                                                    class="commentary-verse-ref"
-                                                    x-show="entry.reference_start"
-                                                    @click="selectVerseFromRef(entry.reference_start)"
-                                                    x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
-                                                ></button>
-                                                <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
-                                            </div>
-                                        </template>
+                                        class="commentary-source-tab"
+                                        :class="{ 'active': getActiveCommentarySource() === source }"
+                                        @click="switchCommentarySource(source)"
+                                        x-text="source"
+                                    ></button>
+                                </template>
+                            </div>
+                            <!-- Single source header -->
+                            <div class="commentary-single-source" x-show="getCommentarySources().length === 1">
+                                <span x-text="getCommentarySources()[0]"></span>
+                            </div>
+                            <!-- Entries for active source -->
+                            <div class="commentary-entries commentary-tab-entries">
+                                <template x-for="(entry, idx) in getActiveSourceEntries()" :key="'comm-' + idx">
+                                    <div class="commentary-entry"
+                                         :class="{ 'commentary-active': commentaryMatchesActiveVerse(entry), 'commentary-expanded': isCommentaryEntryExpanded(entry, idx) }"
+                                         :data-verse-start="entry.reference_start"
+                                         :data-verse-end="entry.reference_end || entry.reference_start">
+                                        <button
+                                            class="commentary-entry-header"
+                                            @click="toggleCommentaryEntry(entry, idx)"
+                                        >
+                                            <span class="commentary-verse-ref-label"
+                                                x-show="entry.reference_start"
+                                                x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
+                                            ></span>
+                                            <span class="commentary-entry-preview" x-show="!isCommentaryEntryExpanded(entry, idx)" x-text="getCommentaryEntryPreview(entry)"></span>
+                                            <span class="commentary-entry-toggle" x-text="isCommentaryEntryExpanded(entry, idx) ? '▼' : '▶'"></span>
+                                        </button>
+                                        <div class="commentary-content" x-show="isCommentaryEntryExpanded(entry, idx)" x-transition x-html="entry.content" @click="handleCommentaryClick($event)"></div>
                                     </div>
-                                </div>
-                            </template>
+                                </template>
+                            </div>
                         </div>
                     </template>
 
@@ -685,6 +810,9 @@
                             </button>
                         </div>
                     </template>
+                    <div class="notes-export-row" x-show="getRelevantNotes().length > 0">
+                        <button @click="exportNotes()" class="btn-export-notes" title="Copy all notes to clipboard">Export Notes</button>
+                    </div>
                     <div class="saved-notes">
                         <template x-for="note in getRelevantNotes()" :key="note.id">
                             <div class="note-card" :class="{ 'note-active': noteMatchesActiveVerse(note), 'note-editing': editingNoteId === note.id }">
@@ -805,6 +933,100 @@
                     </div>
                 </div>
 
+                <!-- Topics Tab (Nave's Topical Bible) -->
+                <div x-show="activeTab === 'topics'" class="tab-content">
+                    <!-- Topic detail view -->
+                    <template x-if="topicDetail">
+                        <div class="topic-detail">
+                            <button class="topic-back-btn" @click="topicBackToList()">&larr; Back</button>
+                            <h3 class="topic-detail-title" x-text="topicDetail.topic"></h3>
+                            <div class="topic-detail-entry" x-html="formatTopicEntry(topicDetail.entry_text)" @click="handleTopicClick($event)"></div>
+                            <div class="topic-refs-section" x-show="topicDetail.refs && topicDetail.refs.length > 0">
+                                <h4 class="topic-refs-heading">References (<span x-text="topicDetail.total_refs"></span>)</h4>
+                                <ul class="topic-ref-list">
+                                    <template x-for="ref in topicDetail.refs" :key="ref.book + ref.chapter + ref.verse_start">
+                                        <li class="topic-ref-item" @click="goToTopicRef(ref)">
+                                            <span class="topic-ref-label" x-text="ref.book + ' ' + ref.chapter + ':' + ref.verse_start + (ref.verse_end && ref.verse_end !== ref.verse_start ? '-' + ref.verse_end : '')"></span>
+                                            <span class="topic-ref-preview" x-text="ref.preview || ''"></span>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <div class="topic-refs-more" x-show="topicDetail.total_refs > topicDetail.refs.length">
+                                    <span x-text="'+ ' + (topicDetail.total_refs - topicDetail.refs.length) + ' more references'"></span>
+                                </div>
+                            </div>
+                            <div class="topic-credit">Nave's Topical Bible &mdash; Orville James Nave (1896)</div>
+                        </div>
+                    </template>
+
+                    <!-- Search + Browse view (shown when no detail open) -->
+                    <template x-if="!topicDetail">
+                        <div class="topic-browse">
+                            <!-- Search bar -->
+                            <div class="topic-search-bar">
+                                <input type="text" class="topic-search-input" placeholder="Search topics..."
+                                    x-model="topicSearchQuery"
+                                    @input.debounce.300ms="searchTopics()"
+                                    @keydown.escape="topicSearchQuery = ''; topicSearchResults = []">
+                            </div>
+
+                            <!-- Verse topics (shown when verse is selected) -->
+                            <div class="topic-verse-section" x-show="verseTopics.length > 0 && !topicSearchQuery">
+                                <h4 class="topic-section-title">Topics for this verse</h4>
+                                <div class="topic-chip-list">
+                                    <template x-for="t in verseTopics" :key="t.id">
+                                        <button class="topic-chip" @click="viewTopic(t.id)" x-text="t.topic"></button>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Search results -->
+                            <div class="topic-search-results" x-show="topicSearchQuery && topicSearchResults.length > 0">
+                                <template x-for="r in topicSearchResults" :key="r.id">
+                                    <div class="topic-search-item" @click="viewTopic(r.id)">
+                                        <span class="topic-search-name" x-text="r.topic"></span>
+                                        <span class="topic-search-snippet" x-show="r.snippet" x-html="r.snippet"></span>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="empty-state" x-show="topicSearchQuery && topicSearchResults.length === 0 && !topicLoading">
+                                <span class="empty-state-icon">&#128218;</span>
+                                <span class="empty-state-hint">No topics found</span>
+                            </div>
+
+                            <!-- A-Z Browse -->
+                            <div class="topic-az-section" x-show="!topicSearchQuery">
+                                <h4 class="topic-section-title">Browse A-Z</h4>
+                                <div class="topic-az-bar">
+                                    <template x-for="letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')" :key="letter">
+                                        <button class="topic-az-btn"
+                                            :class="{ active: topicBrowseSection === letter, disabled: !topicSections[letter] }"
+                                            :disabled="!topicSections[letter]"
+                                            @click="browseTopics(letter)"
+                                            x-text="letter"></button>
+                                    </template>
+                                </div>
+                                <div class="topic-browse-list" x-show="topicBrowseList.length > 0">
+                                    <template x-for="t in topicBrowseList" :key="t.id">
+                                        <div class="topic-browse-item" @click="viewTopic(t.id)" x-text="t.topic"></div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Loading -->
+                            <div class="panel-loading" x-show="topicLoading">
+                                <div class="loading-dots"><span></span><span></span><span></span></div>
+                            </div>
+
+                            <div class="topic-credit" x-show="!topicSearchQuery && topicBrowseList.length === 0 && verseTopics.length === 0">
+                                <p>Nave's Topical Bible</p>
+                                <p class="topic-credit-sub">Compiled by Orville James Nave (1896)</p>
+                                <p class="topic-credit-sub">5,319 topics &middot; 49,399 references</p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
             </div>
         </section>
 
@@ -825,6 +1047,10 @@
                         <div class="word-strongs" x-show="selectedWord?.strong_number">
                             <span class="strong-badge" :class="selectedWord?.language" x-text="selectedWord?.strong_number"></span>
                             <span class="word-lang-label" x-text="selectedWord?.language === 'hebrew' ? 'Hebrew' : selectedWord?.language === 'greek' ? 'Greek' : ''"></span>
+                        </div>
+                        <div class="word-editions" x-show="selectedWord?.editions">
+                            <span class="editions-label">Editions:</span>
+                            <span class="editions-list" x-text="selectedWord?.editions?.replace(/\+/g, ', ')"></span>
                         </div>
                         <div class="word-pronunciation" x-show="selectedWord?.pronunciation">
                             <em x-text="selectedWord?.pronunciation"></em>
@@ -851,6 +1077,33 @@
                 <div class="word-derivation" x-show="selectedWord?.derivation">
                     <strong>Derivation:</strong>
                     <p x-text="selectedWord?.derivation"></p>
+                </div>
+                <!-- Translation variants (how the word is rendered in English) -->
+                <div class="word-glosses" x-show="selectedWord?.glosses?.length > 0">
+                    <strong>Translated as:</strong>
+                    <div class="gloss-chips">
+                        <template x-for="(g, gIdx) in (selectedWord?.glosses || []).slice(0, 8)" :key="'gl-' + gIdx">
+                            <span class="gloss-chip">
+                                <span class="gloss-text" x-text="g.gloss"></span>
+                                <span class="gloss-count" x-text="'(' + g.count + ')'"></span>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+                <!-- Book frequency chart -->
+                <div class="word-frequency" x-show="selectedWord?.book_frequency?.length > 0">
+                    <strong>Frequency by book:</strong>
+                    <div class="freq-chart">
+                        <template x-for="(bf, bfIdx) in (selectedWord?.book_frequency || []).slice(0, 10)" :key="'bf-' + bfIdx">
+                            <div class="freq-row">
+                                <span class="freq-book" x-text="bf.book"></span>
+                                <div class="freq-bar-bg">
+                                    <div class="freq-bar" :style="'width: ' + Math.round((bf.count / (selectedWord?.book_frequency?.[0]?.count || 1)) * 100) + '%'"></div>
+                                </div>
+                                <span class="freq-count" x-text="bf.count"></span>
+                            </div>
+                        </template>
+                    </div>
                 </div>
                 <div class="word-occurrences" x-show="selectedWord?.count > 0">
                     <h4>Appears <span x-text="selectedWord?.count"></span> times:</h4>
@@ -2177,6 +2430,116 @@
                     </div>
                 </div>
             </template>
+        </div>
+    </div>
+
+    <!-- Scripture Memory Tool Modal -->
+    <div class="modal-overlay" x-show="showMemoryTool" x-transition @click.self="showMemoryTool = false">
+        <div class="modal memory-modal">
+            <div class="modal-header">
+                <h2>Scripture Memory</h2>
+                <button @click="showMemoryTool = false" class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Stats bar -->
+                <div class="memory-stats-bar">
+                    <div class="memory-stat">
+                        <span class="memory-stat-num" x-text="getMemoryStats().total"></span>
+                        <span class="memory-stat-label">Total</span>
+                    </div>
+                    <div class="memory-stat memory-stat-due">
+                        <span class="memory-stat-num" x-text="getMemoryStats().due"></span>
+                        <span class="memory-stat-label">Due</span>
+                    </div>
+                    <div class="memory-stat">
+                        <span class="memory-stat-num" x-text="getMemoryStats().mastered"></span>
+                        <span class="memory-stat-label">Mastered</span>
+                    </div>
+                </div>
+
+                <!-- No active review: show verse list + start button -->
+                <template x-if="memoryActiveCard === null">
+                    <div>
+                        <div x-show="memoryVerses.length === 0" class="empty-state" style="padding: 2rem;">
+                            <span class="empty-state-icon">🧠</span>
+                            <span class="empty-state-title">No memory verses yet</span>
+                            <span class="empty-state-hint">Click the 🧠 icon on any verse to start memorizing</span>
+                        </div>
+
+                        <button x-show="getMemoryStats().due > 0"
+                                @click="startMemoryReview()"
+                                class="btn-start-review">
+                            Review <span x-text="getMemoryStats().due"></span> Due Verse<span x-show="getMemoryStats().due !== 1">s</span>
+                        </button>
+
+                        <div x-show="getMemoryStats().due === 0 && memoryVerses.length > 0" class="memory-all-done">
+                            All caught up! Next review due later.
+                        </div>
+
+                        <!-- Verse list -->
+                        <div class="memory-verse-list" x-show="memoryVerses.length > 0">
+                            <template x-for="(mv, idx) in memoryVerses" :key="'mv-' + idx">
+                                <div class="memory-verse-item">
+                                    <div class="memory-verse-info">
+                                        <button @click="showMemoryTool = false; loadReference(mv.reference)" class="memory-verse-ref" x-text="mv.reference"></button>
+                                        <span class="memory-verse-preview" x-text="mv.text.substring(0, 60) + '...'"></span>
+                                        <div class="memory-verse-meta">
+                                            <span class="memory-interval" x-text="mv.interval >= 21 ? 'Mastered' : (mv.interval + 'd interval')"></span>
+                                            <span class="memory-reviews" x-text="mv.reviewCount + ' reviews'"></span>
+                                        </div>
+                                    </div>
+                                    <button @click="removeFromMemory(mv.reference)" class="btn-remove-memory" title="Remove">&times;</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Active flashcard review -->
+                <template x-if="memoryActiveCard !== null && getCurrentMemoryCard()">
+                    <div class="memory-flashcard">
+                        <div class="flashcard-progress">
+                            <span x-text="(memoryActiveCard + 1) + ' / ' + memoryDueCards.length"></span>
+                        </div>
+                        <div class="flashcard-reference" x-text="getCurrentMemoryCard().reference"></div>
+                        <div class="flashcard-translation" x-text="getCurrentMemoryCard().translation"></div>
+
+                        <div class="flashcard-body">
+                            <!-- Prompt stage: just reference -->
+                            <div x-show="memoryStage === 'prompt'" class="flashcard-prompt">
+                                Can you recite this verse?
+                            </div>
+                            <!-- Other stages: show text with hiding -->
+                            <div x-show="memoryStage !== 'prompt'" class="flashcard-text" x-text="getMemoryDisplay()"></div>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="flashcard-controls">
+                            <template x-if="memoryStage !== 'reveal'">
+                                <div class="flashcard-hint-controls">
+                                    <button @click="advanceMemoryStage()" class="btn-hint">
+                                        <span x-show="memoryStage === 'prompt'">Show first letters</span>
+                                        <span x-show="memoryStage === 'firstLetters'">Show blanks only</span>
+                                        <span x-show="memoryStage === 'blanks'">Reveal answer</span>
+                                    </button>
+                                    <button @click="memoryStage = 'reveal'" class="btn-reveal">Show Answer</button>
+                                </div>
+                            </template>
+                            <template x-if="memoryStage === 'reveal'">
+                                <div class="flashcard-rating">
+                                    <span class="rating-label">How well did you know it?</span>
+                                    <div class="rating-buttons">
+                                        <button @click="rateMemoryCard(0)" class="btn-rate btn-rate-forgot">Forgot</button>
+                                        <button @click="rateMemoryCard(1)" class="btn-rate btn-rate-hard">Hard</button>
+                                        <button @click="rateMemoryCard(2)" class="btn-rate btn-rate-good">Good</button>
+                                        <button @click="rateMemoryCard(3)" class="btn-rate btn-rate-easy">Easy</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 

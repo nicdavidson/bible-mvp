@@ -16,6 +16,7 @@ Data sources:
     Local files (in repo):
         - data/alignment/TAHOT_*.txt, TAGNT_*.txt  (STEPBible, ~100MB)
         - data/cross_references.txt                  (OpenBible.info, 8MB)
+        - data/naves/NavesTopicalDictionary.csv      (Nave's Topical Bible, 1.4MB)
     Cloned repos (auto-downloaded):
         - data/clear-bible/     (Clear-Bible/Alignments - BSB word alignments)
         - data/speaker-quotations/ (Clear-Bible/speaker-quotations - red letter)
@@ -119,6 +120,13 @@ IMPORT_STEPS = [
         "description": "Spurgeon Morning & Evening devotionals (730 entries)",
         "version": "1.0",
         "script": "import_spurgeon.py",
+    },
+    {
+        "name": "naves",
+        "description": "Nave's Topical Bible (5,319 topics, 49K refs)",
+        "version": "1.0",
+        "script": "import_naves.py",
+        "requires_data": "naves/NavesTopicalDictionary.csv",
     },
 ]
 
@@ -332,6 +340,7 @@ def count_rows(conn, step_name):
         "commentary_jg": "commentary_entries",
         "speakers": "speaker_verses",
         "spurgeon": "devotionals",
+        "naves": "naves_topics",
     }
     table = table_map.get(step_name)
     if not table:

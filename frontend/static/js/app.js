@@ -228,6 +228,15 @@ function bibleApp() {
         crossRefs: [],
         crossRefSort: 'biblical',  // 'biblical' or 'relevance'
         crossRefFilter: '',        // book name filter
+        // Nave's Topical Index
+        verseTopics: [],           // topics for current verse
+        topicSearchQuery: '',
+        topicSearchResults: [],
+        topicDetail: null,         // currently viewed topic
+        topicBrowseSection: null,  // A-Z filter
+        topicBrowseList: [],
+        topicSections: {},         // { A: 123, B: 45, ... }
+        topicLoading: false,
         notes: [],
         currentNote: '',
         selectedWord: null,
@@ -369,6 +378,10 @@ function bibleApp() {
             '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
         ],
 
+        // Highlight picker state (uses tag system for storage)
+        showHighlightPicker: null,  // verse number showing color picker
+        highlightColors: ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#fed7aa', '#e9d5ff'],
+
         // Multi-verse selection state
         noteEditMode: false,  // When true, taps select verses instead of word lookup
         selectedVerses: [],  // Verses selected for note (numbers)
@@ -407,6 +420,7 @@ function bibleApp() {
         combinedNotes: [],  // Store notes for combined reading chapters
 
         // Commentary grouping state
+        activeCommentarySource: null,  // Currently selected source tab
         expandedCommentarySources: {},  // { source: boolean }
         expandedCommentaryChapters: {},  // { chapterRef: boolean } for combined plan reading
 
@@ -456,8 +470,23 @@ function bibleApp() {
         feedbackSuccess: false,
         feedbackError: null,
 
+        // Reading history state
+        readingHistory: JSON.parse(localStorage.getItem('readingHistory') || '[]'),
+
+        // Bookmarks state
+        bookmarks: JSON.parse(localStorage.getItem('bible-bookmarks') || '[]'),
+
+        // Scripture Memory state
+        showMemoryTool: false,
+        memoryVerses: JSON.parse(localStorage.getItem('memoryVerses') || '[]'),
+        memoryActiveCard: null,  // index in memoryDueCards
+        memoryStage: 'prompt',   // 'prompt', 'firstLetters', 'blanks', 'reveal'
+        memoryDueCards: [],      // computed subset of memoryVerses that are due for review
+        memoryShowAnswer: false,
+
         // Parallel translation state
         parallelMode: false,
+        parallelDiffMode: false,
         parallelTranslations: ['BSB', 'KJV', 'WEB'],
         parallelData: {},
 
@@ -607,6 +636,13 @@ function bibleApp() {
                         const verseNum = parseInt(bestEntry.target.id.replace('verse-', ''), 10);
                         if (verseNum && verseNum !== this.scrollActiveVerse) {
                             this.scrollActiveVerse = verseNum;
+                            // Auto-scroll commentary when freely scrolling (no verse explicitly selected)
+                            clearTimeout(this._commentaryScrollTimeout);
+                            this._commentaryScrollTimeout = setTimeout(() => {
+                                if (this.activeTab === 'commentary' && this.highlightedVerses.length === 0) {
+                                    this.scrollCommentaryToVerse(verseNum);
+                                }
+                            }, 300);
                         }
                     }
                 },
@@ -943,6 +979,9 @@ function bibleApp() {
                 // Parse reference for navigation
                 this.parseCurrentReference();
 
+                // Track in reading history
+                this.addToHistory(this.currentReference, this.translation);
+
                 // Update URL with clean path format (new chapter = new history entry)
                 this.updateURL(true);
 
@@ -1113,6 +1152,38 @@ function bibleApp() {
             this.loadParallelPassage();
         },
 
+        // Simple word-level diff between two texts (set-based)
+        diffWords(textA, textB) {
+            const wordsA = (textA || '').split(/\s+/).filter(Boolean);
+            const wordsB = (textB || '').split(/\s+/).filter(Boolean);
+            const normalize = w => w.toLowerCase().replace(/[.,;:!?'")\]]+$/, '').replace(/^['"(\[]+/, '');
+            const setB = new Set(wordsB.map(normalize));
+            const setA = new Set(wordsA.map(normalize));
+            const markedA = wordsA.map(w => ({ word: w, diff: !setB.has(normalize(w)) }));
+            const markedB = wordsB.map(w => ({ word: w, diff: !setA.has(normalize(w)) }));
+            return { a: markedA, b: markedB };
+        },
+
+        // Get diff-highlighted HTML for a verse in a given translation
+        getParallelDiffHtml(verseNum, translationId) {
+            const translations = this.parallelTranslations;
+            const currentVerse = (this.parallelData[translationId] || []).find(v => v.verse === verseNum);
+            if (!currentVerse) return '\u2014';
+            if (translations.length < 2) return currentVerse.text;
+
+            // Compare against primary (first) translation; if this IS primary, compare against second
+            const compareId = translationId === translations[0] ? translations[1] : translations[0];
+            const compareVerse = (this.parallelData[compareId] || []).find(v => v.verse === verseNum);
+            if (!compareVerse) return currentVerse.text;
+
+            const result = this.diffWords(currentVerse.text, compareVerse.text);
+            return result.a.map(item =>
+                item.diff
+                    ? `<span class="diff-word">${item.word}</span>`
+                    : item.word
+            ).join(' ');
+        },
+
         // Load commentary for current chapter (always full chapter for browsing)
         async loadCommentary() {
             if (!this.currentBook || !this.currentChapter) {
@@ -1184,6 +1255,151 @@ function bibleApp() {
             return [...books].sort();
         },
 
+        // === Nave's Topical Index ===
+
+        async loadTopicsForVerse(verseNum) {
+            if (!this.currentBook || !this.currentChapter) return;
+            try {
+                const resp = await fetch(`/api/topics/for-verse?book=${encodeURIComponent(this.currentBook)}&chapter=${this.currentChapter}&verse=${verseNum}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    this.verseTopics = data.topics || [];
+                }
+            } catch (e) {
+                console.error('Failed to load topics for verse:', e);
+            }
+        },
+
+        async searchTopics() {
+            const q = this.topicSearchQuery.trim();
+            if (!q) { this.topicSearchResults = []; return; }
+            this.topicLoading = true;
+            try {
+                const resp = await fetch(`/api/topics/search?q=${encodeURIComponent(q)}&limit=30`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    this.topicSearchResults = data.results || [];
+                    this.topicDetail = null;
+                } else {
+                    this.topicSearchResults = [];
+                }
+            } catch (e) {
+                console.error('Failed to search topics:', e);
+                this.topicSearchResults = [];
+            } finally {
+                this.topicLoading = false;
+            }
+        },
+
+        async viewTopic(topicId) {
+            this.topicLoading = true;
+            try {
+                const resp = await fetch(`/api/topics/${topicId}`);
+                if (resp.ok) {
+                    this.topicDetail = await resp.json();
+                } else {
+                    this.topicDetail = null;
+                }
+            } catch (e) {
+                console.error('Failed to load topic:', e);
+                this.topicDetail = null;
+            } finally {
+                this.topicLoading = false;
+            }
+        },
+
+        async browseTopics(section) {
+            this.topicBrowseSection = section;
+            this.topicLoading = true;
+            this.topicDetail = null;
+            this.topicSearchQuery = '';
+            this.topicSearchResults = [];
+            try {
+                const resp = await fetch(`/api/topics/browse?section=${section}&per_page=200`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    this.topicBrowseList = data.topics || [];
+                    this.topicSections = data.sections || {};
+                } else {
+                    this.topicBrowseList = [];
+                }
+            } catch (e) {
+                console.error('Failed to browse topics:', e);
+                this.topicBrowseList = [];
+            } finally {
+                this.topicLoading = false;
+            }
+        },
+
+        async initTopicSections() {
+            if (Object.keys(this.topicSections).length > 0) return;
+            try {
+                const resp = await fetch('/api/topics/browse?per_page=1');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    this.topicSections = data.sections || {};
+                }
+            } catch (e) { /* silent */ }
+        },
+
+        topicBackToList() {
+            this.topicDetail = null;
+        },
+
+        formatTopicEntry(text) {
+            if (!text) return '';
+            const bookMap = {
+                'GEN':'Genesis','EXO':'Exodus','LEV':'Leviticus','NUM':'Numbers',
+                'DEU':'Deuteronomy','JOS':'Joshua','JDG':'Judges','RUT':'Ruth',
+                '1SA':'1 Samuel','2SA':'2 Samuel','1KI':'1 Kings','2KI':'2 Kings',
+                '1CH':'1 Chronicles','2CH':'2 Chronicles','EZR':'Ezra','NEH':'Nehemiah',
+                'EST':'Esther','JOB':'Job','PSA':'Psalms','PRO':'Proverbs',
+                'ECC':'Ecclesiastes','ISA':'Isaiah','JER':'Jeremiah','LAM':'Lamentations',
+                'EZK':'Ezekiel','DAN':'Daniel','HOS':'Hosea','JOL':'Joel','AMO':'Amos',
+                'OBA':'Obadiah','JON':'Jonah','MIC':'Micah','NAM':'Nahum','NAH':'Nahum',
+                'HAB':'Habakkuk','ZEP':'Zephaniah','HAG':'Haggai','ZEC':'Zechariah',
+                'MAL':'Malachi','MAT':'Matthew','MRK':'Mark','LUK':'Luke','JHN':'John',
+                'ACT':'Acts','ROM':'Romans','1CO':'1 Corinthians','2CO':'2 Corinthians',
+                'GAL':'Galatians','EPH':'Ephesians','PHP':'Philippians','COL':'Colossians',
+                '1TH':'1 Thessalonians','2TH':'2 Thessalonians','1TI':'1 Timothy',
+                '2TI':'2 Timothy','TIT':'Titus','PHM':'Philemon','HEB':'Hebrews',
+                'JAS':'James','1PE':'1 Peter','2PE':'2 Peter','1JN':'1 John',
+                '2JN':'2 John','3JN':'3 John','JDE':'Jude','REV':'Revelation'
+            };
+            // Convert -SubTopic headings to styled lines
+            let html = text.replace(/^-/gm, '<br>&#x2022; ')
+                          .replace(/\n/g, '<br>')
+                          .replace(/\s{5,}/g, '<br>&nbsp;&nbsp;&nbsp;');
+            // Make verse references clickable using data-ref (same pattern as commentary)
+            html = html.replace(
+                /([A-Z1-3][A-Z]{1,4})\s+(\d+):(\d+)/g,
+                (match, abbr, ch, vs) => {
+                    const book = bookMap[abbr];
+                    if (!book) return match;
+                    return `<a href="#" class="topic-ref-link" data-ref="${book} ${ch}:${vs}">${match}</a>`;
+                }
+            );
+            return html;
+        },
+
+        // Handle clicks on Bible reference links in topic entries (event delegation)
+        handleTopicClick(event) {
+            const link = event.target.closest('.topic-ref-link');
+            if (link) {
+                event.preventDefault();
+                const ref = link.dataset.ref;
+                if (ref) this.loadReference(ref);
+            }
+        },
+
+        goToTopicRef(ref) {
+            if (!ref || !ref.book || !ref.chapter || !ref.verse_start) return;
+            const vs = ref.verse_start;
+            const ve = ref.verse_end && ref.verse_end !== vs ? ref.verse_end : null;
+            const refStr = ve ? `${ref.book} ${ref.chapter}:${vs}-${ve}` : `${ref.book} ${ref.chapter}:${vs}`;
+            this.loadReference(refStr);
+        },
+
         // Check if a commentary entry applies to the active verse
         commentaryMatchesActiveVerse(entry) {
             const activeVerse = this.getActiveVerse();
@@ -1191,6 +1407,34 @@ function bibleApp() {
             const start = entry.reference_start || 1;
             const end = entry.reference_end || start;
             return activeVerse >= start && activeVerse <= end;
+        },
+
+        // Auto-scroll commentary panel to the entry matching a verse number
+        scrollCommentaryToVerse(verseNum) {
+            if (!verseNum) return;
+            const entries = document.querySelectorAll('.commentary-entry[data-verse-start]');
+            let targetEntry = null;
+            let bestPreceding = null;
+            for (const el of entries) {
+                const start = parseInt(el.dataset.verseStart) || 0;
+                const end = parseInt(el.dataset.verseEnd) || start;
+                if (verseNum >= start && verseNum <= end) {
+                    targetEntry = el;
+                    break;
+                }
+                // Track closest preceding entry as fallback
+                if (start <= verseNum) {
+                    bestPreceding = el;
+                }
+            }
+            const scrollTarget = targetEntry || bestPreceding;
+            if (scrollTarget) {
+                const panelBody = scrollTarget.closest('.panel-body');
+                if (panelBody) {
+                    const entryTop = scrollTarget.offsetTop - panelBody.offsetTop;
+                    panelBody.scrollTo({ top: entryTop - 10, behavior: 'smooth' });
+                }
+            }
         },
 
         // Select a verse from a verse reference (e.g., clicking "v. 3" in commentary)
@@ -1385,7 +1629,47 @@ function bibleApp() {
             }
         },
 
-        // Group commentary entries by source
+        // Get ordered list of unique commentary sources
+        getCommentarySources() {
+            const sources = [];
+            const seen = new Set();
+            for (const entry of this.commentary) {
+                const source = entry.source || 'Unknown';
+                if (!seen.has(source)) {
+                    seen.add(source);
+                    sources.push(source);
+                }
+            }
+            return sources;
+        },
+
+        // Get the currently active commentary source (defaults to first)
+        getActiveCommentarySource() {
+            const sources = this.getCommentarySources();
+            if (sources.length === 0) return null;
+            if (this.activeCommentarySource && sources.includes(this.activeCommentarySource)) {
+                return this.activeCommentarySource;
+            }
+            return sources[0];
+        },
+
+        // Get commentary entries for the active source tab
+        getActiveSourceEntries() {
+            const activeSource = this.getActiveCommentarySource();
+            if (!activeSource) return [];
+            return this.commentary.filter(e => (e.source || 'Unknown') === activeSource);
+        },
+
+        // Switch active commentary source tab
+        switchCommentarySource(source) {
+            this.activeCommentarySource = source;
+            const activeVerse = this.getActiveVerse();
+            if (activeVerse) {
+                this.$nextTick(() => this.scrollCommentaryToVerse(activeVerse));
+            }
+        },
+
+        // Group commentary entries by source (kept for combined plan reading mode)
         getGroupedCommentary() {
             const grouped = {};
             for (const entry of this.commentary) {
@@ -1474,6 +1758,37 @@ function bibleApp() {
             return truncated.substring(0, breakPoint).trim() + '...';
         },
 
+        // Check if a commentary entry is expanded (active entries auto-expand)
+        isCommentaryEntryExpanded(entry, idx) {
+            // Active verse entries are always expanded
+            if (this.commentaryMatchesActiveVerse(entry)) return true;
+            // Check manual expansion state
+            const key = (entry.source || '') + '-' + idx;
+            return this._expandedCommentaryEntries?.[key] === true;
+        },
+
+        // Toggle a commentary entry's expanded state
+        toggleCommentaryEntry(entry, idx) {
+            if (!this._expandedCommentaryEntries) this._expandedCommentaryEntries = {};
+            const key = (entry.source || '') + '-' + idx;
+            // If it's the active verse, clicking should navigate to that verse
+            if (this.commentaryMatchesActiveVerse(entry)) {
+                if (entry.reference_start) this.selectVerseFromRef(entry.reference_start);
+                return;
+            }
+            this._expandedCommentaryEntries[key] = !this._expandedCommentaryEntries[key];
+        },
+
+        // Get preview text for a single commentary entry
+        getCommentaryEntryPreview(entry) {
+            const content = entry.content || '';
+            const plainText = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            if (plainText.length <= 100) return plainText;
+            const truncated = plainText.substring(0, 100);
+            const lastSpace = truncated.lastIndexOf(' ');
+            return truncated.substring(0, lastSpace > 60 ? lastSpace : 100).trim() + '...';
+        },
+
         // Select a specific verse (click on verse box) - toggles off if already selected
         // verseIdx is optional and used in combined mode to identify the exact verse
         async selectVerse(verseNum, verseIdx) {
@@ -1522,9 +1837,11 @@ function bibleApp() {
                     this.currentReference = `${verse._book} ${verse._chapter}:${verseNum}`;
                     this.referenceInput = this.currentReference;
 
-                    // Load cross-refs and commentary for just this verse
+                    // Load cross-refs, commentary, and topics for just this verse
                     await this.loadCrossRefs();
                     await this.loadCommentary();
+                    this.loadTopicsForVerse(verseNum);
+                    this.$nextTick(() => this.scrollCommentaryToVerse(verseNum));
                 }
                 return;
             }
@@ -1536,9 +1853,11 @@ function bibleApp() {
             // Update URL
             this.updateURL();
 
-            // Reload cross-references and commentary for the selected verse
+            // Reload cross-references, commentary, and topics for the selected verse
             await this.loadCrossRefs();
             await this.loadCommentary();
+            this.loadTopicsForVerse(verseNum);
+            this.$nextTick(() => this.scrollCommentaryToVerse(verseNum));
         },
 
         // Load cross-references for current verse
@@ -1937,7 +2256,7 @@ function bibleApp() {
             }
 
             if (word.strong_number) {
-                await this.loadWordDetails(word.strong_number);
+                await this.loadWordDetails(word.strong_number, word);
             } else {
                 this.selectedWord = {
                     text: word.original_text,
@@ -1946,6 +2265,8 @@ function bibleApp() {
                     strong_number: null,
                     parsing: word.parsing || 'N/A',
                     definition: word.definition || 'No definition available',
+                    editions: word.editions || null,
+                    word_type: word.word_type || null,
                     occurrences: [],
                     count: 0
                 };
@@ -1953,7 +2274,7 @@ function bibleApp() {
         },
 
         // Load word details by Strong's number
-        async loadWordDetails(strongNumber) {
+        async loadWordDetails(strongNumber, interlinearWord) {
             this.showAllOccurrences = false;
             try {
                 const response = await fetch(`/api/word/${strongNumber}`);
@@ -1970,8 +2291,12 @@ function bibleApp() {
                         extended_definition: data.word.extended_definition,
                         derivation: data.word.derivation,
                         language: data.word.language,
+                        editions: interlinearWord?.editions || null,
+                        word_type: interlinearWord?.word_type || null,
                         occurrences: data.occurrences,
-                        count: data.count
+                        count: data.count,
+                        glosses: data.glosses || [],
+                        book_frequency: data.book_frequency || []
                     };
                 }
             } catch (err) {
@@ -2941,7 +3266,10 @@ function bibleApp() {
 
         // Get all notes for the current chapter, sorted with active verse notes first
         getRelevantNotes() {
-            const chapterNotes = this.notes.filter(note => this.noteInCurrentChapter(note));
+            // Filter to current chapter, exclude highlight-only notes (no content)
+            const chapterNotes = this.notes.filter(note =>
+                this.noteInCurrentChapter(note) && (note.content?.trim())
+            );
 
             // Sort: active verse notes first, then by verse number
             return chapterNotes.sort((a, b) => {
@@ -5003,6 +5331,401 @@ function bibleApp() {
             const dateStr = this.planProgress[planId].startDate;
             const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        },
+
+        // ========== VERSE HIGHLIGHTING (via tags) ==========
+
+        getVerseHighlightColor(verseNum) {
+            // Returns the first tag color on this verse (used for background)
+            const colors = this.getVerseTagColors(verseNum);
+            return colors.length > 0 ? colors[0] : null;
+        },
+
+        toggleHighlightPicker(verseNum) {
+            this.showHighlightPicker = this.showHighlightPicker === verseNum ? null : verseNum;
+        },
+
+        async quickHighlight(verseNum, color) {
+            if (!this.currentBook || !this.currentChapter) return;
+            this.showHighlightPicker = null;
+
+            // Find or create a tag with this color
+            let tag = this.tags.find(t => t.color === color);
+            if (!tag) {
+                // Auto-create a highlight tag for this color
+                const colorNames = {
+                    '#fef08a': 'Yellow', '#bbf7d0': 'Green', '#bfdbfe': 'Blue',
+                    '#fbcfe8': 'Pink', '#fed7aa': 'Orange', '#e9d5ff': 'Purple'
+                };
+                const name = colorNames[color] || 'Highlight';
+                const tagData = { name, color };
+                try {
+                    if (this.authUser && window.SupabaseAuth) {
+                        tag = await window.SupabaseAuth.createUserTag(name, color);
+                        this.tags.push(tag);
+                    } else {
+                        tag = { id: Date.now(), ...tagData, sortOrder: this.tags.length, synced: false };
+                        this.tags.push(tag);
+                        localStorage.setItem('bible-tags', JSON.stringify(this.tags));
+                    }
+                } catch (err) {
+                    console.error('Failed to create tag:', err);
+                    return;
+                }
+            }
+
+            // Check if verse already has a note with this tag — if so, remove it (toggle off)
+            const existingNote = this.notes.find(n =>
+                n.book === this.currentBook &&
+                n.chapter === this.currentChapter &&
+                n.startVerse === verseNum &&
+                (n.endVerse || n.startVerse) === verseNum &&
+                (this.noteTags[n.id] || []).includes(tag.id)
+            );
+            if (existingNote) {
+                await this.toggleNoteTag(existingNote.id, tag.id);
+                // If the note has no content and no tags left, delete it
+                const remainingTags = this.noteTags[existingNote.id] || [];
+                if (!existingNote.content?.trim() && remainingTags.length === 0) {
+                    await this.deleteNote(existingNote.id);
+                }
+                return;
+            }
+
+            // Check if verse already has a highlight note (no content) — add tag to it
+            const emptyNote = this.notes.find(n =>
+                n.book === this.currentBook &&
+                n.chapter === this.currentChapter &&
+                n.startVerse === verseNum &&
+                (n.endVerse || n.startVerse) === verseNum &&
+                !n.content?.trim()
+            );
+            if (emptyNote) {
+                // Clear existing tags on this empty note, apply new color
+                const currentTagIds = this.noteTags[emptyNote.id] || [];
+                for (const tid of currentTagIds) {
+                    await this.toggleNoteTag(emptyNote.id, tid);
+                }
+                await this.toggleNoteTag(emptyNote.id, tag.id);
+                return;
+            }
+
+            // Create a minimal note (empty content) with the tag
+            const noteData = {
+                book: this.currentBook,
+                chapter: this.currentChapter,
+                startVerse: verseNum,
+                endVerse: verseNum,
+                content: ''
+            };
+            try {
+                let savedNoteId;
+                if (this.authUser && window.SupabaseAuth) {
+                    const savedNote = await window.SupabaseAuth.saveUserNote(noteData);
+                    this.notes.unshift(savedNote);
+                    savedNoteId = savedNote.id;
+                } else {
+                    const note = {
+                        id: Date.now(),
+                        ...noteData,
+                        created_at: new Date().toISOString(),
+                        synced: false
+                    };
+                    this.notes.unshift(note);
+                    localStorage.setItem('bible-notes', JSON.stringify(this.notes));
+                    savedNoteId = note.id;
+                }
+                await this.toggleNoteTag(savedNoteId, tag.id);
+            } catch (err) {
+                console.error('Failed to create highlight:', err);
+            }
+        },
+
+        async removeVerseHighlight(verseNum) {
+            // Remove all tag-only (empty content) notes on this verse
+            const toRemove = this.notes.filter(n =>
+                n.book === this.currentBook &&
+                n.chapter === this.currentChapter &&
+                n.startVerse === verseNum &&
+                (n.endVerse || n.startVerse) === verseNum &&
+                !n.content?.trim()
+            );
+            for (const note of toRemove) {
+                await this.deleteNote(note.id);
+            }
+            this.showHighlightPicker = null;
+        },
+
+        // ========== EXPORT NOTES ==========
+
+        exportNotes() {
+            const relevant = this.getRelevantNotes();
+            if (relevant.length === 0) {
+                this.showToast('No notes to export', 'info');
+                return;
+            }
+            const header = this.combinedPlanReading
+                ? `Study Notes — ${this.currentPlan?.name || 'Reading Plan'} Day ${this.planDay}`
+                : `Study Notes — ${this.currentBook} ${this.currentChapter}`;
+
+            let text = header + '\n' + '='.repeat(header.length) + '\n\n';
+            for (const note of relevant) {
+                const ref = this.formatNoteReference(note);
+                text += `[${ref}]\n`;
+                text += note.content + '\n';
+                const tags = this.getNoteTagObjects(note.id);
+                if (tags.length > 0) {
+                    text += 'Tags: ' + tags.map(t => t.name).join(', ') + '\n';
+                }
+                text += '\n';
+            }
+            text += `Exported from In the Word — ${new Date().toLocaleDateString()}\n`;
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(text).then(() => {
+                this.showToast('Notes copied to clipboard', 'success');
+            }).catch(() => {
+                // Fallback: download as file
+                const blob = new Blob([text], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `notes-${this.currentBook || 'study'}-${this.currentChapter || ''}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+                this.showToast('Notes downloaded', 'success');
+            });
+        },
+
+        // ========== SCRIPTURE MEMORY ==========
+
+        addToMemory(verseNum) {
+            if (!this.currentBook || !this.currentChapter) return;
+            const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+            if (this.memoryVerses.some(m => m.reference === ref)) {
+                this.showToast('Already in memory verses', 'info');
+                return;
+            }
+            const verseObj = this.verses.find(v => v.verse === verseNum);
+            if (!verseObj) return;
+            this.memoryVerses.push({
+                reference: ref,
+                text: verseObj.text,
+                translation: this.translation,
+                addedAt: Date.now(),
+                // SM-2 spaced repetition fields
+                interval: 1,      // days until next review
+                ease: 2.5,        // easiness factor
+                nextReview: Date.now(),  // due now
+                reviewCount: 0
+            });
+            this.saveMemoryVerses();
+            this.showToast('Added to memory verses', 'success');
+        },
+
+        isInMemory(verseNum) {
+            if (!this.currentBook || !this.currentChapter) return false;
+            const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+            return this.memoryVerses.some(m => m.reference === ref);
+        },
+
+        removeFromMemory(reference) {
+            this.memoryVerses = this.memoryVerses.filter(m => m.reference !== reference);
+            this.saveMemoryVerses();
+        },
+
+        saveMemoryVerses() {
+            localStorage.setItem('memoryVerses', JSON.stringify(this.memoryVerses));
+        },
+
+        openMemoryTool() {
+            this.showMemoryTool = true;
+            this.showSideMenu = false;
+            this.computeDueCards();
+            this.memoryActiveCard = null;
+            this.memoryStage = 'prompt';
+            this.memoryShowAnswer = false;
+        },
+
+        computeDueCards() {
+            const now = Date.now();
+            this.memoryDueCards = this.memoryVerses.filter(m => m.nextReview <= now);
+        },
+
+        startMemoryReview() {
+            this.computeDueCards();
+            if (this.memoryDueCards.length === 0) {
+                this.showToast('No verses due for review!', 'info');
+                return;
+            }
+            this.memoryActiveCard = 0;
+            this.memoryStage = 'prompt';
+            this.memoryShowAnswer = false;
+        },
+
+        getCurrentMemoryCard() {
+            if (this.memoryActiveCard === null || !this.memoryDueCards.length) return null;
+            return this.memoryDueCards[this.memoryActiveCard];
+        },
+
+        getMemoryDisplay() {
+            const card = this.getCurrentMemoryCard();
+            if (!card) return '';
+            const text = card.text;
+            switch (this.memoryStage) {
+                case 'prompt':
+                    return '';  // show nothing — just the reference
+                case 'firstLetters':
+                    return text.split(/\s+/).map(w => {
+                        if (!w) return '';
+                        const first = w[0];
+                        return first + w.slice(1).replace(/[a-zA-Z]/g, '_');
+                    }).join(' ');
+                case 'blanks':
+                    return text.split(/\s+/).map(w => {
+                        return w.replace(/[a-zA-Z]/g, '_');
+                    }).join(' ');
+                case 'reveal':
+                    return text;
+                default:
+                    return '';
+            }
+        },
+
+        advanceMemoryStage() {
+            const stages = ['prompt', 'firstLetters', 'blanks', 'reveal'];
+            const idx = stages.indexOf(this.memoryStage);
+            if (idx < stages.length - 1) {
+                this.memoryStage = stages[idx + 1];
+            }
+        },
+
+        // SM-2 rating: 0 = forgot, 1 = hard, 2 = good, 3 = easy
+        rateMemoryCard(quality) {
+            const card = this.getCurrentMemoryCard();
+            if (!card) return;
+            // Find in main array
+            const mainCard = this.memoryVerses.find(m => m.reference === card.reference);
+            if (!mainCard) return;
+
+            mainCard.reviewCount++;
+            if (quality < 1) {
+                // Failed — reset
+                mainCard.interval = 1;
+                mainCard.ease = Math.max(1.3, mainCard.ease - 0.2);
+            } else {
+                if (mainCard.reviewCount === 1) {
+                    mainCard.interval = 1;
+                } else if (mainCard.reviewCount === 2) {
+                    mainCard.interval = 3;
+                } else {
+                    mainCard.interval = Math.round(mainCard.interval * mainCard.ease);
+                }
+                // Adjust ease
+                mainCard.ease = Math.max(1.3, mainCard.ease + (quality === 3 ? 0.15 : quality === 2 ? 0 : -0.15));
+            }
+            mainCard.nextReview = Date.now() + (mainCard.interval * 86400000);
+            this.saveMemoryVerses();
+
+            // Advance to next card
+            if (this.memoryActiveCard < this.memoryDueCards.length - 1) {
+                this.memoryActiveCard++;
+                this.memoryStage = 'prompt';
+                this.memoryShowAnswer = false;
+            } else {
+                // Done with review
+                this.memoryActiveCard = null;
+                this.memoryStage = 'prompt';
+                this.computeDueCards();
+                this.showToast('Review complete!', 'success');
+            }
+        },
+
+        getMemoryStats() {
+            const now = Date.now();
+            const due = this.memoryVerses.filter(m => m.nextReview <= now).length;
+            const total = this.memoryVerses.length;
+            const mastered = this.memoryVerses.filter(m => m.interval >= 21).length;
+            return { due, total, mastered };
+        },
+
+        // ========== READING HISTORY ==========
+
+        addToHistory(reference, translation) {
+            if (!reference) return;
+            const entry = {
+                reference,
+                translation: translation || this.translation,
+                timestamp: Date.now()
+            };
+            // Remove duplicate if exists
+            this.readingHistory = this.readingHistory.filter(h => h.reference !== reference);
+            // Add to front
+            this.readingHistory.unshift(entry);
+            // Keep max 50 entries
+            if (this.readingHistory.length > 50) this.readingHistory = this.readingHistory.slice(0, 50);
+            localStorage.setItem('readingHistory', JSON.stringify(this.readingHistory));
+        },
+
+        clearHistory() {
+            this.readingHistory = [];
+            localStorage.setItem('readingHistory', JSON.stringify([]));
+        },
+
+        getRecentHistory(limit = 10) {
+            return this.readingHistory.slice(0, limit);
+        },
+
+        formatHistoryTime(timestamp) {
+            const diff = Date.now() - timestamp;
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'Just now';
+            if (mins < 60) return mins + 'm ago';
+            const hours = Math.floor(mins / 60);
+            if (hours < 24) return hours + 'h ago';
+            const days = Math.floor(hours / 24);
+            if (days < 7) return days + 'd ago';
+            return new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        },
+
+        // ========== BOOKMARKS ==========
+
+        toggleBookmark(verseNum) {
+            if (!this.currentBook || !this.currentChapter) return;
+            const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+            const existing = this.bookmarks.findIndex(b => b.reference === ref);
+            if (existing !== -1) {
+                this.bookmarks.splice(existing, 1);
+                this.showToast('Bookmark removed', 'info');
+            } else {
+                const verseObj = this.verses.find(v => v.verse === verseNum);
+                this.bookmarks.unshift({
+                    reference: ref,
+                    book: this.currentBook,
+                    chapter: this.currentChapter,
+                    verse: verseNum,
+                    preview: (verseObj?.text || '').substring(0, 80),
+                    translation: this.translation,
+                    timestamp: Date.now()
+                });
+                this.showToast('Verse bookmarked', 'success');
+            }
+            localStorage.setItem('bible-bookmarks', JSON.stringify(this.bookmarks));
+        },
+
+        isBookmarked(verseNum) {
+            if (!this.currentBook || !this.currentChapter) return false;
+            const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+            return this.bookmarks.some(b => b.reference === ref);
+        },
+
+        removeBookmark(reference) {
+            this.bookmarks = this.bookmarks.filter(b => b.reference !== reference);
+            localStorage.setItem('bible-bookmarks', JSON.stringify(this.bookmarks));
+        },
+
+        goToBookmark(bookmark) {
+            this.loadReference(bookmark.reference);
         }
     };
 }
