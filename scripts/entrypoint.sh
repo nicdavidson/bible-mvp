@@ -25,8 +25,8 @@ sync_db() {
 
         if [ "$IMAGE_SHA" != "$VOLUME_SHA" ]; then
             echo "DB updated — syncing to volume..."
-            echo "  Image:  ${IMAGE_SHA:0:16}..."
-            echo "  Volume: ${VOLUME_SHA:0:16}..."
+            echo "  Image:  $(printf '%.16s' "$IMAGE_SHA")..."
+            echo "  Volume: $(printf '%.16s' "$VOLUME_SHA")..."
             cp "$IMAGE_DB" "$VOLUME_DB"
             cp "$IMAGE_MANIFEST" "$VOLUME_MANIFEST"
             echo "Done. DB size: $(du -h "$VOLUME_DB" | cut -f1)"
