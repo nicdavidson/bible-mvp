@@ -204,7 +204,8 @@ async def get_commentary(reference: str):
                 SELECT source, content, reference_start, reference_end
                 FROM commentary_entries
                 WHERE book = ? AND chapter = ?
-                      AND reference_start <= ? AND reference_end >= ?
+                      AND reference_start <= ?
+                      AND COALESCE(reference_end, reference_start) >= ?
                 ORDER BY reference_start, source
             """, (book, chapter, verse_end, verse_start))
 
@@ -361,8 +362,9 @@ async def search(
                 fts_query = q.replace('"', '')
         else:
             # Strip FTS5 special operators that could cause syntax errors
+            # Includes: * ( ) { } ^ ~ + - : which are all FTS5 syntax characters
             import re as _re
-            sanitized = _re.sub(r'[*(){}^~]', '', q)
+            sanitized = _re.sub(r'[*(){}^~+\-:]', '', q)
             # Add wildcard for partial matching on last word
             words = sanitized.split()
             if words:
@@ -2145,10 +2147,12 @@ async def search_topics(
                 })
         except Exception:
             # FTS match syntax error — fall back to LIKE
+            # Escape LIKE wildcards (%, _) in user input to prevent pattern injection
+            escaped_q = q.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
             cursor = conn.execute(
                 "SELECT id, topic, section FROM naves_topics "
-                "WHERE topic LIKE ? OR entry_text LIKE ? LIMIT ?",
-                (f'%{q}%', f'%{q}%', limit)
+                "WHERE topic LIKE ? ESCAPE '\\' OR entry_text LIKE ? ESCAPE '\\' LIMIT ?",
+                (f'%{escaped_q}%', f'%{escaped_q}%', limit)
             )
             for row in cursor.fetchall():
                 if exact and row["id"] == exact["id"]:
