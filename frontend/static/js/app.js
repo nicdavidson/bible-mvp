@@ -187,8 +187,17 @@ const BIBLE_REF_REGEX = new RegExp(
 );
 
 // Function to linkify Bible references in text
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
 function linkifyBibleReferences(text) {
     if (!text) return '';
+
+    // Escape HTML first to prevent XSS from user-provided content
+    text = escapeHtml(text);
 
     return text.replace(BIBLE_REF_REGEX, (match, bookPart, chapter, verseStart, verseEnd) => {
         // Normalize the book name
@@ -2550,9 +2559,11 @@ function bibleApp() {
             if (this.ttsPlaying && !this.ttsPaused) {
                 // speechSynthesis.pause() is unreliable in Chrome/Chromium
                 // Instead, cancel and track position so we can resume from same verse
-                speechSynthesis.cancel();
+                // Set ttsPaused BEFORE cancel() to prevent the onend handler from
+                // advancing to the next verse (onend can fire synchronously in some browsers)
                 this.ttsPaused = true;
                 this.ttsPlaying = true;  // still "playing" (paused state)
+                speechSynthesis.cancel();
             }
         },
 
