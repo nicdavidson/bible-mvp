@@ -73,6 +73,30 @@ async def add_cache_headers(request: Request, call_next):
     return response
 
 
+@app.get("/api/health")
+async def health():
+    """Health check with database stats."""
+    conn = get_db_connection()
+    try:
+        stats = {}
+        for table, label in [
+            ("verses", "verses"),
+            ("cross_references", "cross_references"),
+            ("commentary_entries", "commentary_entries"),
+            ("lexicon", "lexicon_entries"),
+            ("word_alignments", "word_alignments"),
+            ("devotionals", "devotionals"),
+        ]:
+            try:
+                row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+                stats[label] = row[0]
+            except Exception:
+                stats[label] = 0
+        return {"status": "ok", "database": str(DATABASE_PATH), "stats": stats}
+    finally:
+        conn.close()
+
+
 @app.get("/")
 async def root():
     """Serve the main application page."""
