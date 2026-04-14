@@ -131,7 +131,8 @@
                 </button>
                 <div class="autocomplete-wrapper">
                     <input
-                        type="text"
+                        type="search"
+                        enterkeyhint="go"
                         x-model="referenceInput"
                         x-ref="referenceInput"
                         @input="updateSuggestions"
@@ -427,7 +428,7 @@
                     </template>
                 </div>
 
-                <div x-show="!loading && !error && verses.length > 0 && !parallelMode" class="verses" :class="{ 'selection-mode': noteEditMode || shareMode }">
+                <div x-show="!loading && !error && verses.length > 0 && !parallelMode" class="verses" :class="{ 'selection-mode': noteEditMode || shareMode }" @touchstart="readingTouchStart($event)" @touchend="readingTouchEnd($event)">
                     <template x-for="(verse, verseIdx) in verses" :key="'v-' + verseIdx">
                         <div class="verse-wrapper" :class="{ 'has-section-header': verse._chapterStart && combinedPlanReading }">
                             <!-- Section/Chapter header for combined plan reading -->
@@ -448,6 +449,9 @@
                                 }"
                                 :style="getVerseHighlightColor(verse.verse) ? 'background-color: ' + getVerseHighlightColor(verse.verse) : ''"
                                 @click="shareMode ? toggleShareVerse(verse.verse) : handleVerseBoxClick($event, verse.verse, verseIdx)"
+                                @touchstart="startLongPress(verse.verse, verseIdx)"
+                                @touchmove="cancelLongPress()"
+                                @touchend="cancelLongPress()"
                             >
                             <!-- Tag indicator dots -->
                             <span class="verse-tag-dots" x-show="getVerseTagColors(verse.verse).length > 0">
@@ -476,57 +480,19 @@
                                     </span>
                                 </template>
                             </div>
-                            <div class="verse-actions" x-show="!shareMode">
-                                <button
-                                    class="btn-highlight-toggle"
-                                    @click.stop="toggleHighlightPicker(verse.verse)"
-                                    :title="getVerseHighlightColor(verse.verse) ? 'Change highlight' : 'Highlight verse'"
-                                    :class="{ 'has-highlight': getVerseHighlightColor(verse.verse) }"
-                                    :style="getVerseHighlightColor(verse.verse) ? 'color: ' + getVerseHighlightColor(verse.verse) : ''"
-                                >●</button>
-                                <button
-                                    class="btn-memorize"
-                                    @click.stop="addToMemory(verse.verse)"
-                                    x-show="!isInMemory(verse.verse)"
-                                    title="Add to memory verses"
-                                >🧠</button>
-                                <button
-                                    class="btn-memorize in-memory"
-                                    @click.stop
-                                    x-show="isInMemory(verse.verse)"
-                                    title="In memory verses"
-                                >✓</button>
-                                <button
-                                    class="btn-bookmark"
-                                    @click.stop="toggleBookmark(verse.verse)"
-                                    :title="isBookmarked(verse.verse) ? 'Remove bookmark' : 'Bookmark verse'"
-                                    :class="{ 'bookmarked': isBookmarked(verse.verse) }"
-                                >
-                                    <span x-show="!isBookmarked(verse.verse)">🔖</span>
-                                    <span x-show="isBookmarked(verse.verse)">★</span>
-                                </button>
-                                <button
-                                    class="btn-copy"
-                                    @click.stop="copyVerse(verse)"
-                                    :title="copyFeedback === verse.verse ? 'Copied!' : 'Copy verse'"
-                                >
-                                    <span x-show="copyFeedback !== verse.verse">📋</span>
-                                    <span x-show="copyFeedback === verse.verse">✓</span>
-                                </button>
-                            </div>
                             <!-- Highlight color picker (creates tag-based notes) -->
                             <div class="highlight-picker" x-show="showHighlightPicker === verse.verse" @click.outside="showHighlightPicker = null" x-transition>
                                 <template x-for="(hc, hIdx) in highlightColors" :key="'hc-' + hIdx">
                                     <button
                                         class="highlight-color-btn"
                                         :style="'background-color: ' + hc"
-                                        @click.stop="quickHighlight(verse.verse, hc)"
+                                        @click.stop="highlightSelectedVerses(hc)"
                                         :class="{ 'active': getVerseHighlightColor(verse.verse) === hc }"
                                     ></button>
                                 </template>
                                 <button
                                     class="highlight-color-btn highlight-clear"
-                                    @click.stop="removeVerseHighlight(verse.verse)"
+                                    @click.stop="removeHighlightSelected()"
                                     x-show="getVerseHighlightColor(verse.verse)"
                                     title="Remove highlight"
                                 >✕</button>
@@ -534,6 +500,49 @@
                             </div>
                         </div>
                     </template>
+                </div>
+            </div>
+
+            <!-- Floating Verse Action Bar -->
+            <div
+                class="verse-action-bar"
+                x-show="highlightedVerses.length > 0 && !shareMode && !noteEditMode"
+                x-transition:enter="action-bar-enter"
+                x-transition:enter-start="action-bar-enter-start"
+                x-transition:enter-end="action-bar-enter-end"
+                x-transition:leave="action-bar-leave"
+                x-transition:leave-start="action-bar-leave-start"
+                x-transition:leave-end="action-bar-leave-end"
+                @click.outside="if (!$event.target.closest('.verse-box') && !$event.target.closest('.highlight-picker')) clearVerseSelection()"
+                x-ref="actionBar"
+            >
+                <div class="action-bar-label" x-text="getSelectionLabel()"></div>
+                <div class="action-bar-buttons">
+                    <!-- Highlight: highlighter marker -->
+                    <button class="action-bar-btn" @click.stop="toggleHighlightPicker(highlightedVerses[0])" title="Highlight">
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L8 20H4v-4L15.5 4.5z"/><path d="M4 22h16" stroke-width="2.5"/><path d="M12.5 7.5l4 4" opacity="0.5"/></svg>
+                        <span class="action-bar-text">Highlight</span>
+                    </button>
+                    <!-- Note: chat bubble with pen -->
+                    <button class="action-bar-btn" @click.stop="openNoteForSelected()" title="Note">
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg>
+                        <span class="action-bar-text">Note</span>
+                    </button>
+                    <!-- Memorize: heart with plus (commit to heart) -->
+                    <button class="action-bar-btn" @click.stop="memorizeSelected()" title="Memorize">
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.3l7.8-7.8 1-1.1a5.5 5.5 0 0 0 0-7.8z"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
+                        <span class="action-bar-text">Memorize</span>
+                    </button>
+                    <!-- Copy: two pages -->
+                    <button class="action-bar-btn" @click.stop="copySelected()" :title="copyFeedback ? 'Copied!' : 'Copy'">
+                        <svg x-show="!copyFeedback" class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <svg x-show="copyFeedback" class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span class="action-bar-text" x-text="copyFeedback ? 'Copied!' : 'Copy'"></span>
+                    </button>
+                    <!-- Dismiss -->
+                    <button class="action-bar-btn action-bar-dismiss" @click.stop="clearVerseSelection()" title="Dismiss">
+                        <svg class="action-bar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                 </div>
             </div>
         </section>

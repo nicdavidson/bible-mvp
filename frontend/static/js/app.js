@@ -337,6 +337,9 @@ function bibleApp() {
         immersiveControlsTimeout: null,
         immersiveTouchStartX: 0,
         immersiveHintShown: false,
+        // Swipe navigation in normal reading mode
+        _swipeStartX: 0,
+        _swipeStartY: 0,
 
         // Single Verse View (reusable component)
         singleVerseMode: false,
@@ -912,6 +915,9 @@ function bibleApp() {
         // Load a passage
         async loadPassage() {
             if (!this.referenceInput.trim()) return;
+
+            // Dismiss mobile keyboard
+            this.$refs.referenceInput?.blur();
 
             // Stop TTS when navigating to new passage
             if (this.ttsPlaying) this.ttsStop();
@@ -1602,6 +1608,12 @@ function bibleApp() {
 
         // Handle click on verse box - select verse unless clicking a word
         async handleVerseBoxClick(event, verseNum, verseIdx) {
+            // Skip if long-press just fired (prevents double-action)
+            if (this._longPressTriggered) {
+                this._longPressTriggered = false;
+                return;
+            }
+
             // In note edit mode, handle verse selection for multi-verse notes
             if (this.noteEditMode) {
                 this.handleVerseSelection(verseNum, event);
@@ -1798,39 +1810,126 @@ function bibleApp() {
             return truncated.substring(0, lastSpace > 60 ? lastSpace : 100).trim() + '...';
         },
 
-        // Select a specific verse (click on verse box) - toggles off if already selected
+        // Clear verse selection (dismiss action bar)
+        clearVerseSelection() {
+            if (this.highlightedVerses.length === 0) return;
+            this.highlightedVerses = [];
+            this.selectedWord = null;
+            this.showHighlightPicker = null;
+            document.querySelectorAll('.word.selected').forEach(el => el.classList.remove('selected'));
+
+            if (this.combinedPlanReading) {
+                this.currentBook = null;
+                this.currentChapter = null;
+                this.currentReference = null;
+                this.crossRefs = this.combinedCrossRefs;
+                this.commentary = this.combinedCommentary;
+            } else if (this.currentBook && this.currentChapter) {
+                this.currentReference = `${this.currentBook} ${this.currentChapter}`;
+                this.referenceInput = this.currentReference;
+                this.updateURL();
+            }
+        },
+
+        // Get label for the floating action bar (e.g. "v3" or "v3-5" or "v1, v4")
+        getSelectionLabel() {
+            const vv = [...this.highlightedVerses].sort((a, b) => a - b);
+            if (vv.length === 0) return '';
+            if (vv.length === 1) return `v${vv[0]}`;
+            // Check if contiguous range
+            const isContiguous = vv.every((v, i) => i === 0 || v === vv[i - 1] + 1);
+            if (isContiguous) return `v${vv[0]}-${vv[vv.length - 1]}`;
+            return vv.map(v => `v${v}`).join(', ');
+        },
+
+        // Open the notes panel with selected verses pre-filled
+        openNoteForSelected() {
+            const vv = [...this.highlightedVerses].sort((a, b) => a - b);
+            if (vv.length === 0) return;
+
+            // Switch to notes tab and expand the resources panel
+            this.activeTab = 'notes';
+            this.resourcesPanelExpanded = true;
+
+            // Pre-fill the verse selection for the note
+            this.noteEditMode = true;
+            this.selectedVerses = vv;
+
+            // Focus the textarea after panel animates open
+            this.$nextTick(() => {
+                const ta = document.querySelector('.note-textarea');
+                if (ta) ta.focus();
+            });
+        },
+
+        // Add all selected verses to memory
+        memorizeSelected() {
+            this.highlightedVerses.forEach(v => {
+                if (!this.isInMemory(v)) this.addToMemory(v);
+            });
+        },
+
+        // Copy all selected verses as a block
+        copySelected() {
+            const vv = [...this.highlightedVerses].sort((a, b) => a - b);
+            const lines = vv.map(vNum => {
+                const verse = this.verses.find(v => v.verse === vNum);
+                if (!verse) return '';
+                const text = verse.text.replace(/<[^>]*>/g, '');
+                return `${vNum} ${text}`;
+            }).filter(Boolean);
+            const ref = vv.length === 1
+                ? `${this.currentBook} ${this.currentChapter}:${vv[0]}`
+                : `${this.currentBook} ${this.currentChapter}:${vv[0]}-${vv[vv.length - 1]}`;
+            const fullText = `${ref}\n${lines.join('\n')}`;
+            navigator.clipboard.writeText(fullText).then(() => {
+                this.copyFeedback = true;
+                setTimeout(() => { this.copyFeedback = false; }, 2000);
+            });
+        },
+
+        // Highlight all selected verses with a color
+        async highlightSelectedVerses(color) {
+            for (const v of this.highlightedVerses) {
+                await this.quickHighlight(v, color);
+            }
+            this.showHighlightPicker = null;
+        },
+
+        // Remove highlight from all selected verses
+        async removeHighlightSelected() {
+            for (const v of this.highlightedVerses) {
+                await this.removeVerseHighlight(v);
+            }
+            this.showHighlightPicker = null;
+        },
+
+        // Select a specific verse (click on verse box) - supports multi-select
         // verseIdx is optional and used in combined mode to identify the exact verse
         async selectVerse(verseNum, verseIdx) {
             // If this verse is already the only highlighted verse, deselect it
             if (this.highlightedVerses.length === 1 && this.highlightedVerses[0] === verseNum) {
-                this.highlightedVerses = [];
-                this.selectedWord = null;
-
-                // Remove previous word selections
-                document.querySelectorAll('.word.selected').forEach(el => {
-                    el.classList.remove('selected');
-                });
-
-                // In combined mode, restore the full combined data
-                if (this.combinedPlanReading) {
-                    this.currentBook = null;
-                    this.currentChapter = null;
-                    this.currentReference = null;
-                    // Restore combined cross-refs and commentary
-                    this.crossRefs = this.combinedCrossRefs;
-                    this.commentary = this.combinedCommentary;
-                } else if (this.currentBook && this.currentChapter) {
-                    // Update reference display to chapter level
-                    this.currentReference = `${this.currentBook} ${this.currentChapter}`;
-                    this.referenceInput = this.currentReference;
-                    this.updateURL();
-                }
+                this.clearVerseSelection();
                 return;
             }
 
-            // Update highlighted verses without reloading the whole passage
+            // Multi-select: if already have selection, add/remove this verse
+            if (this.highlightedVerses.length > 0 && this.highlightedVerses.includes(verseNum)) {
+                // Remove from selection
+                this.highlightedVerses = this.highlightedVerses.filter(v => v !== verseNum);
+                return;
+            }
+
+            if (this.highlightedVerses.length > 0) {
+                // Add to selection
+                this.highlightedVerses = [...this.highlightedVerses, verseNum];
+                return;
+            }
+
+            // New single selection
             this.highlightedVerses = [verseNum];
-            this.selectedWord = null; // Clear word selection
+            this.selectedWord = null;
+            this.showHighlightPicker = null;
 
             // Remove previous word selections
             document.querySelectorAll('.word.selected').forEach(el => {
@@ -2409,6 +2508,45 @@ function bibleApp() {
             if (Math.abs(diff) > 80) {
                 if (diff > 0) this.previousChapter();
                 else this.nextChapter();
+            }
+        },
+
+        // Swipe navigation for normal reading mode
+        readingTouchStart(e) {
+            this._swipeStartX = e.changedTouches[0].screenX;
+            this._swipeStartY = e.changedTouches[0].screenY;
+        },
+
+        readingTouchEnd(e) {
+            if (!this.currentReference || this.highlightedVerses.length > 0) return;
+            const dx = e.changedTouches[0].screenX - this._swipeStartX;
+            const dy = e.changedTouches[0].screenY - this._swipeStartY;
+            // Only trigger on horizontal swipes (dx > dy) with enough distance
+            if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                if (dx > 0) this.previousChapter();
+                else this.nextChapter();
+            }
+        },
+
+        // Long-press on verse — selects verse and shows action bar
+        _longPressTimer: null,
+        _longPressTriggered: false,
+
+        startLongPress(verseNum, verseIdx) {
+            this._longPressTriggered = false;
+            this._longPressTimer = setTimeout(() => {
+                this._longPressTriggered = true;
+                // Vibrate if available
+                if (navigator.vibrate) navigator.vibrate(30);
+                // Select the verse (shows action bar)
+                this.selectVerse(verseNum, verseIdx);
+            }, 500);
+        },
+
+        cancelLongPress() {
+            if (this._longPressTimer) {
+                clearTimeout(this._longPressTimer);
+                this._longPressTimer = null;
             }
         },
 

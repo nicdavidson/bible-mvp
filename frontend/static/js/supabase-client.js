@@ -269,6 +269,16 @@ async function addTagToNote(noteId, tagId) {
     const user = await getUser();
     if (!user) throw new Error('Not authenticated');
 
+    // Verify the note belongs to the current user
+    const { data: note, error: noteError } = await supabaseClient
+        .from('user_notes')
+        .select('id')
+        .eq('id', noteId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (noteError || !note) throw new Error('Note not found');
+
     const { error } = await supabaseClient
         .from('note_tags')
         .insert({
@@ -283,6 +293,16 @@ async function removeTagFromNote(noteId, tagId) {
     const user = await getUser();
     if (!user) throw new Error('Not authenticated');
 
+    // Verify the note belongs to the current user
+    const { data: note, error: noteError } = await supabaseClient
+        .from('user_notes')
+        .select('id')
+        .eq('id', noteId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (noteError || !note) throw new Error('Note not found');
+
     const { error } = await supabaseClient
         .from('note_tags')
         .delete()
@@ -295,6 +315,16 @@ async function removeTagFromNote(noteId, tagId) {
 async function fetchNoteTagIds(noteId) {
     const user = await getUser();
     if (!user) return [];
+
+    // Verify the note belongs to the current user
+    const { data: note, error: noteError } = await supabaseClient
+        .from('user_notes')
+        .select('id')
+        .eq('id', noteId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (noteError || !note) return [];
 
     const { data, error } = await supabaseClient
         .from('note_tags')
@@ -310,9 +340,21 @@ async function fetchAllNoteTags() {
     const user = await getUser();
     if (!user) return {};
 
+    // Join through user_notes to scope to current user's notes only
+    const { data: userNotes, error: notesError } = await supabaseClient
+        .from('user_notes')
+        .select('id')
+        .eq('user_id', user.id);
+
+    if (notesError) throw notesError;
+
+    const noteIds = userNotes.map(n => n.id);
+    if (noteIds.length === 0) return {};
+
     const { data, error } = await supabaseClient
         .from('note_tags')
-        .select('note_id, tag_id');
+        .select('note_id, tag_id')
+        .in('note_id', noteIds);
 
     if (error) throw error;
 
@@ -330,6 +372,16 @@ async function fetchAllNoteTags() {
 async function setNoteTagIds(noteId, tagIds) {
     const user = await getUser();
     if (!user) throw new Error('Not authenticated');
+
+    // Verify the note belongs to the current user
+    const { data: note, error: noteError } = await supabaseClient
+        .from('user_notes')
+        .select('id')
+        .eq('id', noteId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (noteError || !note) throw new Error('Note not found');
 
     // Delete all existing tags for this note
     const { error: deleteError } = await supabaseClient
@@ -597,7 +649,25 @@ async function uploadBugScreenshot(file) {
     const user = await getUser();
     if (!user) throw new Error('Not authenticated');
 
-    const fileExt = file.name.split('.').pop();
+    // Validate file size (max 5 MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+        throw new Error('File too large (max 5 MB)');
+    }
+
+    // Validate file type
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+        throw new Error('Invalid file type. Allowed: JPEG, PNG, GIF, WebP');
+    }
+
+    // Validate file extension
+    const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const fileExt = (file.name.split('.').pop() || '').toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(fileExt)) {
+        throw new Error('Invalid file extension');
+    }
+
     const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
     const { data, error } = await supabaseClient
@@ -605,7 +675,8 @@ async function uploadBugScreenshot(file) {
         .from('bug-screenshots')
         .upload(fileName, file, {
             cacheControl: '3600',
-            upsert: false
+            upsert: false,
+            contentType: file.type
         });
 
     if (error) throw error;

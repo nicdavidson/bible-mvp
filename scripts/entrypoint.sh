@@ -51,5 +51,10 @@ else
     echo "Warning: No DB in image. Using existing volume DB."
 fi
 
-# Start the app
-exec uvicorn backend.main:app --host 0.0.0.0 --port 8000
+# Drop privileges and start the app as non-root user
+if command -v gosu > /dev/null 2>&1; then
+    chown -R appuser:appuser /data 2>/dev/null || true
+    exec gosu appuser uvicorn backend.main:app --host 0.0.0.0 --port 8000
+else
+    exec uvicorn backend.main:app --host 0.0.0.0 --port 8000
+fi

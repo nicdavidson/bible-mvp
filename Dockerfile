@@ -17,8 +17,13 @@ COPY . .
 ARG SW_VERSION=dev
 RUN sed -i "s/__SW_VERSION__/${SW_VERSION}/g" frontend/static/sw.js
 
+# Create non-root user for runtime
+RUN adduser --disabled-password --gecos '' --home /home/appuser appuser && \
+    apt-get update && apt-get install -y --no-install-recommends gosu && \
+    rm -rf /var/lib/apt/lists/*
+
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Entrypoint syncs the DB from image to persistent volume, then starts uvicorn
+# Entrypoint runs as root for DB sync, then drops to appuser for uvicorn
 CMD ["sh", "scripts/entrypoint.sh"]

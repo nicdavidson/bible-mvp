@@ -11,8 +11,10 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
-from .database import get_db_connection, init_db
+from .database import get_db_connection, init_db, DATABASE_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+def _get_client_ip(request: Request) -> str:
+    """Extract real client IP from X-Forwarded-For (set by Fly.io proxy)."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+# Rate limiter — keyed by real client IP behind reverse proxy
+limiter = Limiter(key_func=_get_client_ip)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.mount("/static", StaticFiles(directory=frontend_path / "static"), name="static")
 
 # Bible text is immutable - set aggressive cache headers on API endpoints.
@@ -58,6 +73,25 @@ _CACHEABLE_PREFIXES = (
     "/api/path-to-christ/", "/api/search", "/api/topics/",
 )
 _SHORT_CACHE_PREFIXES = ("/api/devotional",)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Add security headers to all responses."""
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co; "
+        "font-src 'self'; "
+        "frame-ancestors 'none'"
+    )
+    return response
 
 
 @app.middleware("http")
@@ -76,23 +110,25 @@ async def add_cache_headers(request: Request, call_next):
 @app.get("/api/health")
 async def health():
     """Health check with database stats."""
+    # Table name -> label mapping (hardcoded allowlist, never from user input)
+    _STAT_TABLES = {
+        "verses": "verses",
+        "cross_references": "cross_references",
+        "commentary_entries": "commentary_entries",
+        "lexicon": "lexicon_entries",
+        "word_alignments": "word_alignments",
+        "devotionals": "devotionals",
+    }
     conn = get_db_connection()
     try:
         stats = {}
-        for table, label in [
-            ("verses", "verses"),
-            ("cross_references", "cross_references"),
-            ("commentary_entries", "commentary_entries"),
-            ("lexicon", "lexicon_entries"),
-            ("word_alignments", "word_alignments"),
-            ("devotionals", "devotionals"),
-        ]:
+        for table, label in _STAT_TABLES.items():
             try:
                 row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
                 stats[label] = row[0]
             except Exception:
                 stats[label] = 0
-        return {"status": "ok", "database": str(DATABASE_PATH), "stats": stats}
+        return {"status": "ok", "database_exists": DATABASE_PATH.exists(), "stats": stats}
     finally:
         conn.close()
 
@@ -284,7 +320,9 @@ async def get_single_verse(
 
 
 @app.get("/api/search")
+@limiter.limit("30/minute")
 async def search(
+    request: Request,
     q: str = Query(..., min_length=2, description="Search query"),
     scope: str = Query(default="all", description="Search scope: bible, ot, nt, book:BookName, commentary, all")
 ):
@@ -1057,7 +1095,9 @@ def get_speaker_verses(conn, book: str, chapter: int) -> list:
 # ========== OFFLINE DATA EXPORT ENDPOINTS ==========
 
 @app.get("/api/offline/chapter")
+@limiter.limit("20/minute")
 async def get_chapter_offline_data(
+    request: Request,
     book: str,
     chapter: int,
     translation: str = Query(default="BSB")
@@ -1138,7 +1178,8 @@ async def get_chapter_offline_data(
 
 
 @app.get("/api/offline/lexicon")
-async def get_lexicon_offline():
+@limiter.limit("5/minute")
+async def get_lexicon_offline(request: Request):
     """Get the complete lexicon for offline use."""
     conn = get_db_connection()
     try:
@@ -1155,7 +1196,9 @@ async def get_lexicon_offline():
 
 
 @app.get("/api/offline/book")
+@limiter.limit("5/minute")
 async def get_book_offline_data(
+    request: Request,
     book: str,
     translation: str = Query(default="BSB"),
     include_alignments: bool = Query(default=True),
@@ -1246,7 +1289,8 @@ async def get_book_offline_data(
 
 
 @app.get("/api/offline/commentary")
-async def get_commentary_offline_data(book: str):
+@limiter.limit("10/minute")
+async def get_commentary_offline_data(request: Request, book: str):
     """Get all commentary entries for a book for offline use."""
     conn = get_db_connection()
     try:
@@ -1263,7 +1307,8 @@ async def get_commentary_offline_data(book: str):
 
 
 @app.get("/api/offline/crossrefs")
-async def get_crossrefs_offline_data(book: str):
+@limiter.limit("10/minute")
+async def get_crossrefs_offline_data(request: Request, book: str):
     """Get all cross-references for a book for offline use."""
     conn = get_db_connection()
     try:
@@ -1281,7 +1326,8 @@ async def get_crossrefs_offline_data(book: str):
 
 
 @app.get("/api/offline/stats")
-async def get_offline_stats():
+@limiter.limit("10/minute")
+async def get_offline_stats(request: Request):
     """Get statistics about available data for offline download planning."""
     conn = get_db_connection()
     try:
@@ -1355,7 +1401,8 @@ async def get_offline_stats():
 
 
 @app.get("/api/offline/devotionals")
-async def get_devotionals_offline(source: Optional[str] = None):
+@limiter.limit("5/minute")
+async def get_devotionals_offline(request: Request, source: Optional[str] = None):
     """Get all devotionals for offline use."""
     conn = get_db_connection()
     try:

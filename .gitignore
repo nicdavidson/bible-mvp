@@ -78,3 +78,4 @@ data/sources/
 
 # Source data bundle
 data/sources.tar.zst
+*.db.bak
