@@ -76,6 +76,16 @@ _SHORT_CACHE_PREFIXES = ("/api/devotional",)
 
 
 @app.middleware("http")
+async def clear_site_data_nuke(request: Request, call_next):
+    """Temporary: force browsers to clear stale SW caches. Remove after 2026-04-26."""
+    response: Response = await call_next(request)
+    path = request.url.path
+    if path == "/" or (not path.startswith("/api/") and not path.startswith("/static/")):
+        response.headers["Clear-Site-Data"] = '"cache", "storage"'
+    return response
+
+
+@app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     """Add security headers to all responses."""
     response: Response = await call_next(request)
