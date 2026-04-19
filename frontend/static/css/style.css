@@ -2995,12 +2995,20 @@ textarea:focus:not(:focus-visible) {
         -webkit-tap-highlight-color: transparent;
     }
 
-    /* Hide interlinear and progress on mobile — declutter */
+    /* Compact header controls on mobile — keep interlinear toggle, hide progress */
     .header-controls {
-        display: none;
+        margin: 0;
+        gap: 0.375rem;
+        width: 100%;
+        order: 5;
     }
 
     .reading-progress {
+        display: none;
+    }
+
+    /* Hide source text label on mobile to save space */
+    .source-text-label {
         display: none;
     }
 
