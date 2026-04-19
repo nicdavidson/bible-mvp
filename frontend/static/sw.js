@@ -6,6 +6,7 @@
 
 // __SW_VERSION__ is replaced at Docker build time with the git commit hash.
 // To bust caches locally, change this to any unique string.
+// Cache bust: 2026-04-19
 const SW_VERSION = '__SW_VERSION__';
 const CACHE_NAME = `biblemvp-${SW_VERSION}`;
 const STATIC_CACHE = `biblemvp-static-${SW_VERSION}`;
