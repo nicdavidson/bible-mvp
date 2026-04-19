@@ -2606,6 +2606,19 @@
         const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         const isSecure = location.protocol === 'https:';
 
+        // One-time cache nuke: force old SW out and clear stale caches
+        const CACHE_NUKE_VERSION = '2026-04-19';
+        if ('serviceWorker' in navigator && localStorage.getItem('cache_nuke') !== CACHE_NUKE_VERSION) {
+            console.log('[Main] Nuking old service worker and caches');
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) { await reg.unregister(); }
+            const keys = await caches.keys();
+            for (const key of keys) { await caches.delete(key); }
+            localStorage.setItem('cache_nuke', CACHE_NUKE_VERSION);
+            location.reload();
+            return; // stop execution, page will reload fresh
+        }
+
         if ('serviceWorker' in navigator && (isLocalhost || isSecure)) {
             navigator.serviceWorker.register('/static/sw.js')
                 .then(reg => {

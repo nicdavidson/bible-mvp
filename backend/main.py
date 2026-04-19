@@ -100,7 +100,10 @@ async def add_cache_headers(request: Request, call_next):
     response: Response = await call_next(request)
     path = request.url.path
     if response.status_code == 200:
-        if any(path.startswith(p) for p in _CACHEABLE_PREFIXES):
+        # Service worker must never be cached — browser needs to fetch fresh to detect updates
+        if path == "/static/sw.js":
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        elif any(path.startswith(p) for p in _CACHEABLE_PREFIXES):
             response.headers["Cache-Control"] = CACHE_LONG
         elif any(path.startswith(p) for p in _SHORT_CACHE_PREFIXES):
             response.headers["Cache-Control"] = CACHE_SHORT
