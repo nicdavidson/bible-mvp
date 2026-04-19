@@ -90,26 +90,33 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Static assets - cache first
-    event.respondWith(cacheFirst(event.request));
+    // Static assets - stale-while-revalidate (fast + stays fresh)
+    event.respondWith(staleWhileRevalidate(event.request));
 });
 
-// Cache-first strategy for static assets
-async function cacheFirst(request) {
-    const cached = await caches.match(request);
-    if (cached) return cached;
+// Stale-while-revalidate: serve cached version instantly, fetch fresh copy in background
+async function staleWhileRevalidate(request) {
+    const cache = await caches.open(STATIC_CACHE);
+    const cached = await cache.match(request);
 
-    try {
-        const response = await fetch(request);
+    // Fetch fresh copy in background regardless
+    const fetchPromise = fetch(request).then(response => {
         if (response.ok) {
-            const cache = await caches.open(STATIC_CACHE);
             cache.put(request, response.clone());
         }
         return response;
-    } catch (error) {
-        // Return offline fallback if available
-        return caches.match('/');
-    }
+    }).catch(() => null);
+
+    // Return cached immediately if available, otherwise wait for network
+    if (cached) return cached;
+
+    try {
+        const response = await fetchPromise;
+        if (response) return response;
+    } catch (error) { /* fall through */ }
+
+    // Fully offline, no cache — return offline fallback
+    return caches.match('/');
 }
 
 // Network-only strategy (no caching)
