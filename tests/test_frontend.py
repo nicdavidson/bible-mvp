@@ -144,6 +144,12 @@ class TestJS:
         """Long press should trigger vibration."""
         assert "navigator.vibrate" in js
 
+    def test_study_tab_methods_exist(self, js):
+        assert "activeTab: 'study'" in js
+        assert "getStudyCommentaryGroups" in js
+        assert "getCommentarySourceTabs" in js
+        assert "return sources.length > 1 ? ['All', ...sources] : sources" in js
+
 
 # ========== HTML INTEGRITY ==========
 
@@ -189,3 +195,8 @@ class TestHTML:
 
     def test_manifest_link(self, html):
         assert 'rel="manifest"' in html
+
+    def test_study_tab_markup_exists(self, html):
+        assert "activeTab === 'study'" in html
+        assert "study-commentary-compare" in html
+        assert "getStudyCommentaryGroups()" in html

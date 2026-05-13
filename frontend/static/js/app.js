@@ -255,7 +255,7 @@ function bibleApp() {
         error: null,
         darkMode: false,
         currentTheme: 'light',
-        activeTab: 'commentary',
+        activeTab: 'study',
         showSearch: false,
         searchQuery: '',
         searchScope: 'all',
@@ -432,7 +432,7 @@ function bibleApp() {
         combinedNotes: [],  // Store notes for combined reading chapters
 
         // Commentary grouping state
-        activeCommentarySource: null,  // Currently selected source tab
+        activeCommentarySource: 'All',  // Currently selected commentary source tab
         expandedCommentarySources: {},  // { source: boolean }
         expandedCommentaryChapters: {},  // { chapterRef: boolean } for combined plan reading
 
@@ -1664,20 +1664,75 @@ function bibleApp() {
             return sources;
         },
 
+        getCommentarySourceTabs() {
+            const sources = this.getCommentarySources();
+            return sources.length > 1 ? ['All', ...sources] : sources;
+        },
+
+        // Commentary grouped by source for the active verse/study panel.
+        getStudyCommentaryGroups() {
+            const activeVerse = this.getActiveVerse();
+            const bySource = {};
+            for (const entry of this.commentary) {
+                const start = entry.reference_start || 1;
+                const end = entry.reference_end || start;
+                if (activeVerse && !(activeVerse >= start && activeVerse <= end)) {
+                    continue;
+                }
+                const source = entry.source || 'Unknown';
+                if (!bySource[source]) bySource[source] = [];
+                bySource[source].push(entry);
+            }
+
+            // If a verse has no exact match, fall back to the first entries from each source
+            // so the Study tab still exposes available commentators for the chapter.
+            if (Object.keys(bySource).length === 0) {
+                for (const source of this.getCommentarySources()) {
+                    bySource[source] = this.commentary
+                        .filter(entry => (entry.source || 'Unknown') === source)
+                        .slice(0, 2);
+                }
+            }
+            return this.getCommentarySources()
+                .filter(source => bySource[source]?.length > 0)
+                .map(source => ({ source, entries: bySource[source] }));
+        },
+
+        getStudyReferenceLabel() {
+            const activeVerse = this.getActiveVerse();
+            if (!this.currentBook || !this.currentChapter) return 'Study';
+            return activeVerse
+                ? `${this.currentBook} ${this.currentChapter}:${activeVerse}`
+                : `${this.currentBook} ${this.currentChapter}`;
+        },
+
+        getStudyCrossRefs(limit = 6) {
+            return this.getFilteredCrossRefs().slice(0, limit);
+        },
+
+        openStudySection(tab) {
+            this.activeTab = tab;
+            if (tab === 'topics') this.initTopicSections();
+        },
+
         // Get the currently active commentary source (defaults to first)
         getActiveCommentarySource() {
             const sources = this.getCommentarySources();
             if (sources.length === 0) return null;
+            if (this.activeCommentarySource === 'All' && sources.length > 1) {
+                return 'All';
+            }
             if (this.activeCommentarySource && sources.includes(this.activeCommentarySource)) {
                 return this.activeCommentarySource;
             }
-            return sources[0];
+            return sources.length > 1 ? 'All' : sources[0];
         },
 
         // Get commentary entries for the active source tab
         getActiveSourceEntries() {
             const activeSource = this.getActiveCommentarySource();
             if (!activeSource) return [];
+            if (activeSource === 'All') return this.commentary;
             return this.commentary.filter(e => (e.source || 'Unknown') === activeSource);
         },
 

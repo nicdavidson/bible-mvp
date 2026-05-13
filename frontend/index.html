@@ -573,6 +573,11 @@
                     aria-label="Close panel"
                 >×</button>
                 <button
+                    @click="activeTab = 'study'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
+                    :class="{ 'active': activeTab === 'study', 'has-content': commentary.length > 0 || crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0 }"
+                    class="tab-btn"
+                >Study<span x-show="commentary.length > 0 || crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0" class="tab-indicator">&#x25CF;</span></button>
+                <button
                     @click="activeTab = 'commentary'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'commentary', 'has-content': commentary.length > 0 }"
                     class="tab-btn"
@@ -595,6 +600,10 @@
             </div>
             <!-- Collapsed sidebar icons (tablet/desktop only) -->
             <div class="sidebar-collapsed-icons">
+                <button @click="activeTab = 'study'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'study' }" title="Study">
+                    <span class="collapsed-icon-label">S</span>
+                    <span class="collapsed-icon-dot" x-show="commentary.length > 0 || crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0"></span>
+                </button>
                 <button @click="activeTab = 'commentary'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'commentary' }" title="Commentary">
                     <span class="collapsed-icon-label">C</span>
                     <span class="collapsed-icon-dot" x-show="commentary.length > 0"></span>
@@ -613,6 +622,90 @@
                 </button>
             </div>
             <div class="panel-body">
+                <!-- Study Tab -->
+                <div x-show="activeTab === 'study'" class="tab-content study-tab">
+                    <template x-if="!currentReference">
+                        <div class="empty-state">
+                            <span class="empty-state-icon">📖</span>
+                            <span class="empty-state-title">Select a passage</span>
+                            <span class="empty-state-hint">Study resources will appear here</span>
+                        </div>
+                    </template>
+
+                    <template x-if="currentReference">
+                        <div class="study-stack">
+                            <div class="study-heading">
+                                <span class="study-heading-label" x-text="getStudyReferenceLabel()"></span>
+                                <span class="study-heading-meta" x-text="getCommentarySources().length + ' commentators'"></span>
+                            </div>
+
+                            <section class="study-section" x-show="commentary.length > 0">
+                                <div class="study-section-header">
+                                    <h3>Commentary</h3>
+                                    <button class="study-link-btn" @click="openStudySection('commentary')">Full</button>
+                                </div>
+                                <div class="study-commentary-compare">
+                                    <template x-for="group in getStudyCommentaryGroups()" :key="'study-comm-' + group.source">
+                                        <article class="study-commentary-card">
+                                            <div class="study-source-title">
+                                                <span x-text="group.source"></span>
+                                                <span class="study-source-count" x-text="group.entries.length"></span>
+                                            </div>
+                                            <template x-for="(entry, idx) in group.entries.slice(0, 2)" :key="'study-entry-' + group.source + '-' + idx">
+                                                <div class="study-commentary-entry">
+                                                    <button
+                                                        class="commentary-verse-ref"
+                                                        x-show="entry.reference_start"
+                                                        @click="selectVerseFromRef(entry.reference_start)"
+                                                        x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
+                                                    ></button>
+                                                    <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
+                                                </div>
+                                            </template>
+                                        </article>
+                                    </template>
+                                </div>
+                            </section>
+
+                            <section class="study-section" x-show="getRelevantNotes().length > 0">
+                                <div class="study-section-header">
+                                    <h3>Notes</h3>
+                                    <button class="study-link-btn" @click="openStudySection('notes')">Edit</button>
+                                </div>
+                                <template x-for="note in getRelevantNotes().slice(0, 3)" :key="'study-note-' + note.id">
+                                    <div class="study-note-card">
+                                        <button class="note-verse-ref" @click="selectVerseFromRef(note.startVerse)" x-text="formatNoteReference(note)"></button>
+                                        <div class="note-content" x-html="formatNoteContent(note.content)" @click="handleNoteRefClick($event)"></div>
+                                    </div>
+                                </template>
+                            </section>
+
+                            <section class="study-section" x-show="crossRefs.length > 0 || verseTopics.length > 0">
+                                <div class="study-section-header">
+                                    <h3>Links</h3>
+                                    <button class="study-link-btn" @click="openStudySection('crossrefs')" x-show="crossRefs.length > 0">Cross-Refs</button>
+                                </div>
+                                <div class="study-ref-grid" x-show="crossRefs.length > 0">
+                                    <template x-for="(ref, idx) in getStudyCrossRefs()" :key="'study-xref-' + idx">
+                                        <a href="#"
+                                           @click.prevent="loadReference(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse)"
+                                           x-text="ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse"></a>
+                                    </template>
+                                </div>
+                                <div class="topic-chip-list study-topic-list" x-show="verseTopics.length > 0">
+                                    <template x-for="t in verseTopics.slice(0, 8)" :key="'study-topic-' + t.id">
+                                        <button class="topic-chip" @click="openStudySection('topics'); viewTopic(t.id)" x-text="t.topic"></button>
+                                    </template>
+                                </div>
+                            </section>
+
+                            <div class="empty-state" x-show="!loadingCommentary && commentary.length === 0 && crossRefs.length === 0 && getRelevantNotes().length === 0 && verseTopics.length === 0">
+                                <span class="empty-state-hint">No linked study resources for this selection yet</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
                 <!-- Commentary Tab -->
                 <div x-show="activeTab === 'commentary'" class="tab-content">
                     <template x-if="loadingCommentary">
@@ -639,7 +732,7 @@
                         <div>
                             <!-- Source tabs (only when multiple sources available) -->
                             <div class="commentary-source-tabs" x-show="getCommentarySources().length > 1">
-                                <template x-for="source in getCommentarySources()" :key="'comm-tab-' + source">
+                                <template x-for="source in getCommentarySourceTabs()" :key="'comm-tab-' + source">
                                     <button
                                         class="commentary-source-tab"
                                         :class="{ 'active': getActiveCommentarySource() === source }"
@@ -666,6 +759,10 @@
                                             <span class="commentary-verse-ref-label"
                                                 x-show="entry.reference_start"
                                                 x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
+                                            ></span>
+                                            <span class="commentary-entry-source-label"
+                                                x-show="getActiveCommentarySource() === 'All'"
+                                                x-text="entry.source || 'Unknown'"
                                             ></span>
                                             <span class="commentary-entry-preview" x-show="!isCommentaryEntryExpanded(entry, idx)" x-text="getCommentaryEntryPreview(entry)"></span>
                                             <span class="commentary-entry-toggle" x-text="isCommentaryEntryExpanded(entry, idx) ? '▼' : '▶'"></span>
