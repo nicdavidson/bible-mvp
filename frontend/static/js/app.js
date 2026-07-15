@@ -278,6 +278,13 @@ function bibleApp() {
         homePickerBook: null,
         showChapterJump: false,
 
+        // Bottom sheet drag state
+        sheetDragStyle: '',
+        _sheetStartY: 0,
+        _sheetStartHeight: 0,
+        _sheetDragging: false,
+        sheetSnap: 'collapsed', // 'collapsed' | 'half' | 'full'
+
         // Verse preview tooltip
         versePreview: {
             show: false,
@@ -937,6 +944,85 @@ function bibleApp() {
         getChaptersArray(book) {
             const count = this.getChapterCount(book);
             return Array.from({ length: count }, (_, i) => i + 1);
+        },
+
+        // Bottom sheet drag for mobile resources panel
+        sheetTouchStart(e) {
+            if (window.innerWidth > 600) return;
+            const panel = this.$refs.resourcesPanel;
+            if (!panel) return;
+            this._sheetDragging = true;
+            this._sheetStartY = e.touches[0].clientY;
+            this._sheetStartHeight = panel.offsetHeight;
+            panel.style.transition = 'none';
+        },
+
+        sheetTouchMove(e) {
+            if (!this._sheetDragging || window.innerWidth > 600) return;
+            const dy = this._sheetStartY - e.touches[0].clientY;
+            const newHeight = Math.max(48, Math.min(window.innerHeight - 40, this._sheetStartHeight + dy));
+            const panel = this.$refs.resourcesPanel;
+            if (!panel) return;
+            panel.style.transform = 'none';
+            panel.style.height = newHeight + 'px';
+            panel.style.maxHeight = 'none';
+            this.sheetDragStyle = '';
+        },
+
+        sheetTouchEnd() {
+            if (!this._sheetDragging || window.innerWidth > 600) return;
+            this._sheetDragging = false;
+            const panel = this.$refs.resourcesPanel;
+            if (!panel) return;
+            const h = panel.offsetHeight;
+            const vh = window.innerHeight;
+            // Snap points: collapsed (48px), half (50vh), full (90vh)
+            const stops = [48, vh * 0.5, vh * 0.9];
+            let closest = stops[0], dist = Math.abs(h - stops[0]);
+            for (let i = 1; i < stops.length; i++) {
+                const d = Math.abs(h - stops[i]);
+                if (d < dist) { closest = stops[i]; dist = d; }
+            }
+            panel.style.transition = '';
+            panel.style.transform = '';
+            panel.style.maxHeight = '';
+            if (closest <= 48) {
+                this.resourcesPanelExpanded = false;
+                this.sheetSnap = 'collapsed';
+                panel.style.height = '';
+                this.sheetDragStyle = '';
+            } else {
+                this.resourcesPanelExpanded = true;
+                this.sheetSnap = closest > vh * 0.7 ? 'full' : 'half';
+                panel.style.height = '';
+                this.sheetDragStyle = 'max-height: ' + closest + 'px; transform: translateY(0)';
+            }
+        },
+
+        sheetExpand() {
+            if (window.innerWidth <= 600) {
+                this.sheetSnap = 'half';
+                this.sheetDragStyle = 'max-height: 50vh; transform: translateY(0)';
+            }
+        },
+
+        sheetToggle() {
+            if (window.innerWidth > 600) {
+                this.resourcesPanelExpanded = !this.resourcesPanelExpanded;
+                return;
+            }
+            if (!this.resourcesPanelExpanded || this.sheetSnap === 'collapsed') {
+                this.resourcesPanelExpanded = true;
+                this.sheetSnap = 'half';
+                this.sheetDragStyle = 'max-height: 50vh; transform: translateY(0)';
+            } else if (this.sheetSnap === 'half') {
+                this.sheetSnap = 'full';
+                this.sheetDragStyle = 'max-height: 90vh; transform: translateY(0)';
+            } else {
+                this.resourcesPanelExpanded = false;
+                this.sheetSnap = 'collapsed';
+                this.sheetDragStyle = '';
+            }
         },
 
         // Load a passage

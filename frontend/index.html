@@ -569,7 +569,7 @@
         </section>
 
         <!-- Resources Panel -->
-        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed }">
+        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed }" :style="sheetDragStyle" x-ref="resourcesPanel">
             <!-- Sidebar toggle button (tablet/desktop only) -->
             <button
                 class="btn-sidebar-toggle"
@@ -579,10 +579,10 @@
             >
                 <span x-text="sidebarCollapsed ? '&#x00BB;' : '&#x00AB;'"></span>
             </button>
-            <div class="panel-tabs">
+            <div class="panel-tabs" @touchstart="sheetTouchStart($event)" @touchmove.prevent="sheetTouchMove($event)" @touchend="sheetTouchEnd($event)">
                 <button
                     class="tab-drag-handle"
-                    @click="resourcesPanelExpanded = !resourcesPanelExpanded"
+                    @click="sheetToggle()"
                     aria-label="Toggle resources panel"
                 >
                     <span class="drag-indicator"></span>
@@ -594,27 +594,27 @@
                     aria-label="Close panel"
                 >×</button>
                 <button
-                    @click="activeTab = 'study'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
+                    @click="activeTab = 'study'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'study', 'has-content': commentary.length > 0 || crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0 }"
                     class="tab-btn"
                 >Study<span x-show="commentary.length > 0 || crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0" class="tab-indicator">&#x25CF;</span></button>
                 <button
-                    @click="activeTab = 'commentary'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
+                    @click="activeTab = 'commentary'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'commentary', 'has-content': commentary.length > 0 }"
                     class="tab-btn"
                 >Commentary<span x-show="commentary.length > 0" class="tab-indicator">&#x25CF;</span></button>
                 <button
-                    @click="activeTab = 'notes'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
+                    @click="activeTab = 'notes'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'notes', 'has-content': getRelevantNotes().length > 0 }"
                     class="tab-btn"
                 >Notes<span x-show="getRelevantNotes().length > 0" class="tab-indicator" x-text="'(' + getRelevantNotes().length + ')'"></span></button>
                 <button
-                    @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar()"
+                    @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'crossrefs', 'has-content': crossRefs.length > 0 }"
                     class="tab-btn"
                 >Cross-Refs<span x-show="crossRefs.length > 0" class="tab-indicator" x-text="'(' + crossRefs.length + ')'"></span></button>
                 <button
-                    @click="activeTab = 'topics'; resourcesPanelExpanded = true; sidebarCollapsed && toggleSidebar(); initTopicSections()"
+                    @click="activeTab = 'topics'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar(); initTopicSections()"
                     :class="{ 'active': activeTab === 'topics', 'has-content': verseTopics.length > 0 }"
                     class="tab-btn"
                 >Topics<span x-show="verseTopics.length > 0" class="tab-indicator" x-text="'(' + verseTopics.length + ')'"></span></button>
