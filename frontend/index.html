@@ -236,7 +236,7 @@
         <!-- Bible Text Panel -->
         <section class="panel panel-text">
             <div class="panel-header">
-                <h2 x-text="currentReference || 'Select a passage'"></h2>
+                <h2 @click="currentReference && toggleChapterJump()" x-text="currentReference || 'Select a passage'" :class="{ 'clickable-ref': currentReference }" :title="currentReference ? 'Tap to jump to chapter' : ''"></h2>
                 <div class="header-controls" x-show="currentReference">
                     <label class="interlinear-toggle-header" x-show="combinedPlanReading || otBooks.includes(currentBook) || ntBooks.includes(currentBook)" title="Show Hebrew/Greek text">
                         <input type="checkbox" x-model="showInterlinear">
@@ -253,6 +253,15 @@
                     <button @click="previousVerse" class="btn-nav" title="Previous verse" :disabled="!canGoPrevVerse()">← V</button>
                     <button @click="nextVerse" class="btn-nav" title="Next verse" :disabled="!canGoNextVerse()">V →</button>
                     <button @click="nextChapter" class="btn-nav" title="Next chapter">Ch →</button>
+                </div>
+            </div>
+
+            <!-- Chapter Jump Grid -->
+            <div class="chapter-jump-grid" x-show="showChapterJump && currentReference" x-transition @click.outside="showChapterJump = false">
+                <div class="picker-chapter-grid">
+                    <template x-for="ch in getChaptersArray(currentBook)" :key="'jump-' + ch">
+                        <button @click="jumpToChapter(ch)" class="picker-chapter-btn" :class="{ 'current-chapter': ch === currentChapter }" x-text="ch"></button>
+                    </template>
                 </div>
             </div>
 
@@ -362,20 +371,32 @@
                         </div>
                     </div>
 
-                    <p class="book-selector-intro">Select a book to begin reading:</p>
-                    <div class="book-section">
-                        <h3>Old Testament</h3>
-                        <div class="book-grid">
-                            <template x-for="book in otBooks" :key="book">
-                                <button @click="loadReference(book + ' 1')" class="book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
+                    <p class="book-selector-intro" x-show="!homePickerBook">Select a book to begin reading:</p>
+                    <!-- Chapter picker for selected book -->
+                    <div class="home-chapter-picker" x-show="homePickerBook">
+                        <div class="home-chapter-header">
+                            <button @click="homePickerBook = null" class="picker-back-btn">← Books</button>
+                            <span class="picker-book-title" x-text="homePickerBook"></span>
+                        </div>
+                        <div class="picker-chapter-grid">
+                            <template x-for="ch in getChaptersArray(homePickerBook)" :key="'home-ch-' + ch">
+                                <button @click="selectHomeChapter(ch)" class="picker-chapter-btn" x-text="ch"></button>
                             </template>
                         </div>
                     </div>
-                    <div class="book-section">
+                    <div class="book-section" x-show="!homePickerBook">
+                        <h3>Old Testament</h3>
+                        <div class="book-grid">
+                            <template x-for="book in otBooks" :key="book">
+                                <button @click="selectHomeBook(book)" class="book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="book-section" x-show="!homePickerBook">
                         <h3>New Testament</h3>
                         <div class="book-grid">
                             <template x-for="book in ntBooks" :key="book">
-                                <button @click="loadReference(book + ' 1')" class="book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
+                                <button @click="selectHomeBook(book)" class="book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
                             </template>
                         </div>
                     </div>
@@ -980,7 +1001,7 @@
                         </template>
                         <template x-if="getRelevantNotes().length === 0 && (currentBook || combinedPlanReading)">
                             <div class="empty-state" style="padding: 1rem;">
-                                <span class="empty-state-hint" x-text="combinedPlanReading ? 'No notes for today\\'s readings' : 'No notes for this passage yet'"></span>
+                                <span class="empty-state-hint" x-text="combinedPlanReading ? 'No notes for these readings yet' : 'No notes for this passage yet'"></span>
                             </div>
                         </template>
                     </div>
@@ -2017,6 +2038,7 @@
                     <p style="font-size:0.6875rem;color:var(--color-text-muted);text-align:center;margin-top:1rem;opacity:0.7;">Cross-references from Treasury of Scripture Knowledge (public domain). 41,649 connections with community vote scores.</p>
                 </div>
             </div>
+            </div>
         </div>
     </div>
 
@@ -2030,7 +2052,7 @@
             <div class="modal-body">
                 <!-- Preview text -->
                 <div class="share-preview-text">
-                    <p class="share-verse-text" x-text="'\"' + getShareVerseText() + '\"'"></p>
+                    <p class="share-verse-text" x-text="'&quot;' + getShareVerseText() + '&quot;'"></p>
                     <p class="share-verse-ref" x-text="'— ' + getShareReference() + ' (' + translation + ')'"></p>
                 </div>
 

@@ -275,6 +275,8 @@ function bibleApp() {
         showBookPicker: false,
         pickerSelectedBook: null,
         bookChapters: BOOK_CHAPTERS,
+        homePickerBook: null,
+        showChapterJump: false,
 
         // Verse preview tooltip
         versePreview: {
@@ -903,6 +905,31 @@ function bibleApp() {
             this.loadReference(ref);
         },
 
+        selectHomeBook(book) {
+            const chapters = BOOK_CHAPTERS[book] || 1;
+            if (chapters === 1) {
+                this.homePickerBook = null;
+                this.loadReference(book + ' 1');
+            } else {
+                this.homePickerBook = book;
+            }
+        },
+
+        selectHomeChapter(ch) {
+            const ref = this.homePickerBook + ' ' + ch;
+            this.homePickerBook = null;
+            this.loadReference(ref);
+        },
+
+        toggleChapterJump() {
+            this.showChapterJump = !this.showChapterJump;
+        },
+
+        jumpToChapter(ch) {
+            this.showChapterJump = false;
+            this.loadReference(this.currentBook + ' ' + ch);
+        },
+
         getChapterCount(book) {
             return this.bookChapters[book] || 1;
         },
@@ -918,6 +945,7 @@ function bibleApp() {
 
             // Dismiss mobile keyboard
             this.$refs.referenceInput?.blur();
+            this.showChapterJump = false;
 
             // Stop TTS when navigating to new passage
             if (this.ttsPlaying) this.ttsStop();
@@ -1117,6 +1145,7 @@ function bibleApp() {
 
         // Load a reference (from cross-ref click, etc.)
         async loadReference(ref) {
+            this.showChapterJump = false;
             // Exit combined plan reading mode when navigating to a different reference
             // but remember we were in it so user can return
             if (this.combinedPlanReading) {
