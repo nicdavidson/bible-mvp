@@ -2486,6 +2486,10 @@
                         <button @click="goToTodaysPlanDay()" class="btn-go-today" x-show="getTodaysPlanDay(currentPlan.id) !== planDay">
                             Go to Today (Day <span x-text="getTodaysPlanDay(currentPlan.id)"></span>)
                         </button>
+                        <!-- Catch up button -->
+                        <button @click="markAllUpToToday()" class="btn-catch-up" x-show="getCompletedDaysCount() < getTodaysPlanDay(currentPlan.id)">
+                            Mark Days 1&ndash;<span x-text="getTodaysPlanDay(currentPlan.id)"></span> Complete
+                        </button>
 
                         <!-- Day's readings -->
                         <div class="plan-day-readings" x-show="getPlanDayReadings(planDay)">

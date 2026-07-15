@@ -5134,6 +5134,38 @@ function bibleApp() {
             }
         },
 
+        async markAllUpToToday() {
+            if (!this.currentPlan) return;
+            const planId = this.currentPlan.id;
+            const today = this.getTodaysPlanDay(planId);
+            if (!today) return;
+
+            if (!this.planProgress[planId]) {
+                this.planProgress[planId] = { completedDays: [] };
+            }
+            if (!this.planProgress[planId].completedDays) {
+                this.planProgress[planId].completedDays = [];
+            }
+
+            const newDays = [];
+            for (let i = 1; i <= today; i++) {
+                if (!this.planProgress[planId].completedDays.includes(i)) {
+                    this.planProgress[planId].completedDays.push(i);
+                    newDays.push(i);
+                }
+            }
+            this.savePlanProgress();
+
+            const userPlanId = this.planProgress[planId].userPlanId;
+            if (this.authUser && userPlanId && window.SupabaseAuth?.bulkMarkDaysComplete && newDays.length) {
+                try {
+                    await window.SupabaseAuth.bulkMarkDaysComplete(userPlanId, newDays);
+                } catch (err) {
+                    console.warn('Failed to sync bulk completion to Supabase:', err);
+                }
+            }
+        },
+
         getCompletedDaysCount() {
             if (!this.currentPlan) return 0;
             const planId = this.currentPlan.id;
