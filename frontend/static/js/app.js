@@ -1737,9 +1737,16 @@ function bibleApp() {
                 return;
             }
 
-            // On touch devices, always select the verse (don't trigger word lookup)
-            // Word lookup is a power feature better suited for desktop
+            // On touch: if this verse is already selected, check for word tap
             if (this.isTouchDevice) {
+                if (this.highlightedVerses.length === 1 && this.highlightedVerses[0] === verseNum) {
+                    const wordEl = event.target.closest('.word');
+                    if (wordEl) {
+                        // ponytail: two-level tap — verse selected, now word tapped
+                        await this.handleWordClick(event);
+                        return;
+                    }
+                }
                 await this.selectVerse(verseNum, verseIdx);
                 return;
             }
@@ -2035,6 +2042,15 @@ function bibleApp() {
         },
 
         // Add all selected verses to memory
+        openStudyForSelected() {
+            this.activeTab = 'study';
+            this.resourcesPanelExpanded = true;
+            this.sheetExpand();
+            if (this.sidebarCollapsed) this.toggleSidebar();
+            const v = this.highlightedVerses[0];
+            if (v) this.$nextTick(() => this.scrollCommentaryToVerse(v));
+        },
+
         memorizeSelected() {
             this.highlightedVerses.forEach(v => {
                 if (!this.isInMemory(v)) this.addToMemory(v);

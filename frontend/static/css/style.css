@@ -964,6 +964,16 @@ textarea:focus:not(:focus-visible) {
     padding: 0 2px;
 }
 
+/* ponytail: hint that words are tappable inside a selected verse on touch */
+@media (pointer: coarse) {
+    .verse-box.verse-highlighted .verse-text .word {
+        text-decoration-line: underline;
+        text-decoration-style: dotted;
+        text-decoration-color: var(--color-text-secondary);
+        text-underline-offset: 3px;
+    }
+}
+
 /* Red Letter - Words of God/Jesus */
 .verse-text.red-letter {
     color: #c0392b;
