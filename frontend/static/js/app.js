@@ -5038,7 +5038,8 @@ function bibleApp() {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
-            const daysDiff = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+            // ponytail: Math.round not Math.floor — DST spring-forward loses 1h, floor truncates to wrong day
+            const daysDiff = Math.round((today - startDate) / (1000 * 60 * 60 * 24));
 
             // If the start date is in the past (more than 0 days ago), show catch-up prompt
             if (daysDiff > 0) {
@@ -5054,7 +5055,7 @@ function bibleApp() {
             const startDate = new Date(this.planStartDate + 'T00:00:00');
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            return Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+            return Math.round((today - startDate) / (1000 * 60 * 60 * 24));
         },
 
         formatStartDate(dateStr) {
@@ -5169,7 +5170,7 @@ function bibleApp() {
             const today = new Date();
             startDate.setHours(0, 0, 0, 0);
             today.setHours(0, 0, 0, 0);
-            const daysDiff = Math.floor((today - startDate) / (1000 * 60 * 60 * 24)) + 1;
+            const daysDiff = Math.round((today - startDate) / (1000 * 60 * 60 * 24)) + 1;
             return Math.max(1, Math.min(daysDiff, 365));
         },
 
@@ -5682,6 +5683,15 @@ function bibleApp() {
             const dateStr = this.planProgress[planId].startDate;
             const date = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        },
+
+        getPlanDayDate(day) {
+            const planId = this.currentPlan?.id;
+            if (!planId || !this.planProgress[planId]?.startDate) return '';
+            const dateStr = this.planProgress[planId].startDate;
+            const start = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+            start.setDate(start.getDate() + (day - 1));
+            return start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         },
 
         // ========== VERSE HIGHLIGHTING (via tags) ==========

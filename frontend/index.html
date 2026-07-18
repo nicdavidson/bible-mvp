@@ -287,7 +287,7 @@
 
             <!-- "Return to Plan" bar (shown when navigated away from plan reading) - sticky below header -->
             <div x-show="wasInPlanReading && currentPlan && !combinedPlanReading" class="plan-return-bar">
-                <span class="return-hint">You were reading Day <span x-text="planDay"></span> of <span x-text="currentPlan?.name"></span></span>
+                <span class="return-hint">You were reading Day <span x-text="planDay"></span><span x-show="getPlanDayDate(planDay)" x-text="' (' + getPlanDayDate(planDay) + ')'"></span> of <span x-text="currentPlan?.name"></span></span>
                 <button @click="returnToPlanReading()" class="btn-return-plan">Return to Plan Reading</button>
                 <button @click="wasInPlanReading = false" class="btn-dismiss-return" title="Dismiss">×</button>
             </div>
@@ -298,7 +298,7 @@
                 <div class="plan-reading-info">
                     <div class="plan-title-row">
                         <span class="plan-name" x-text="currentPlan?.name"></span>
-                        <span class="plan-day-label" x-text="'Day ' + planDay"></span>
+                        <span class="plan-day-label" x-text="'Day ' + planDay + (getPlanDayDate(planDay) ? ' — ' + getPlanDayDate(planDay) : '')"></span>
                     </div>
                     <div class="plan-readings-subtitle" x-show="getPlanDayReadings(planDay)">
                         <span x-text="getPlanDayReadings(planDay)?.chronological"></span>
@@ -2484,7 +2484,7 @@
 
                         <!-- Today button -->
                         <button @click="goToTodaysPlanDay()" class="btn-go-today" x-show="getTodaysPlanDay(currentPlan.id) !== planDay">
-                            Go to Today (Day <span x-text="getTodaysPlanDay(currentPlan.id)"></span>)
+                            Go to Today (Day <span x-text="getTodaysPlanDay(currentPlan.id)"></span><span x-show="getPlanDayDate(getTodaysPlanDay(currentPlan.id))" x-text="' — ' + getPlanDayDate(getTodaysPlanDay(currentPlan.id))"></span>)
                         </button>
                         <!-- Catch up button -->
                         <button @click="markAllUpToToday()" class="btn-catch-up" x-show="getCompletedDaysCount() < getTodaysPlanDay(currentPlan.id)">
@@ -2494,7 +2494,7 @@
                         <!-- Day's readings -->
                         <div class="plan-day-readings" x-show="getPlanDayReadings(planDay)">
                             <div class="day-header">
-                                <span class="day-label" x-text="'Day ' + planDay"></span>
+                                <span class="day-label" x-text="'Day ' + planDay + (getPlanDayDate(planDay) ? ' — ' + getPlanDayDate(planDay) : '')"></span>
                                 <label class="day-complete-toggle">
                                     <input type="checkbox" :checked="isDayCompleted(planDay)" @change="toggleDayComplete(planDay)">
                                     <span x-text="isDayCompleted(planDay) ? 'Completed' : 'Mark complete'"></span>
