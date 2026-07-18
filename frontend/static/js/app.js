@@ -715,13 +715,15 @@ function bibleApp() {
                     case 'ArrowLeft':
                         if (this.currentReference) {
                             e.preventDefault();
-                            this.previousChapter();
+                            if (this.immersiveMode && this.combinedPlanReading) this.immersivePlanPrev();
+                            else this.previousChapter();
                         }
                         break;
                     case 'ArrowRight':
                         if (this.currentReference) {
                             e.preventDefault();
-                            this.nextChapter();
+                            if (this.immersiveMode && this.combinedPlanReading) this.immersivePlanNext();
+                            else this.nextChapter();
                         }
                         break;
                     case 'ArrowUp':
@@ -2676,8 +2678,26 @@ function bibleApp() {
         immersiveTouchEnd(e) {
             const diff = e.changedTouches[0].screenX - this.immersiveTouchStartX;
             if (Math.abs(diff) > 80) {
-                if (diff > 0) this.previousChapter();
-                else this.nextChapter();
+                if (this.combinedPlanReading) {
+                    if (diff > 0) this.immersivePlanPrev();
+                    else this.immersivePlanNext();
+                } else {
+                    if (diff > 0) this.previousChapter();
+                    else this.nextChapter();
+                }
+            }
+        },
+
+        immersivePlanPrev() {
+            if (this.planDay > 1) {
+                this.planDay--;
+                this.startPlanReading();
+            }
+        },
+
+        immersivePlanNext() {
+            if (this.planDay < (this.currentPlan?.duration_days || 365)) {
+                this.markPlanDayAndContinue();
             }
         },
 

@@ -1261,7 +1261,7 @@
     <!-- Immersive Reading Mode -->
     <div class="immersive-overlay" x-show="immersiveMode" x-cloak
          x-ref="immersiveOverlay"
-         x-effect="if (immersiveMode && currentChapter) { $nextTick(() => { $refs.immersiveOverlay && ($refs.immersiveOverlay.scrollTop = 0) }) }"
+         x-effect="if (immersiveMode && (currentChapter || combinedPlanReading)) { $nextTick(() => { $refs.immersiveOverlay && ($refs.immersiveOverlay.scrollTop = 0) }) }"
          @keydown.escape.window="immersiveMode && exitImmersiveMode()">
 
         <!-- Top controls bar (hidden by default, shown on tap) -->
@@ -1271,8 +1271,8 @@
             <button @click.stop="exitImmersiveMode()" class="immersive-btn immersive-exit-btn" title="Exit (Esc)">
                 <span class="immersive-exit-icon">&times;</span> Exit
             </button>
-            <span class="immersive-reference" x-text="currentBook + ' ' + currentChapter"></span>
-            <span class="immersive-translation" x-text="translation"></span>
+            <span class="immersive-reference" x-text="combinedPlanReading ? (currentPlan?.name + ' — Day ' + planDay) : (currentBook + ' ' + currentChapter)"></span>
+            <span class="immersive-translation" x-text="combinedPlanReading ? getPlanDayDate(planDay) : translation"></span>
         </div>
 
         <!-- Main reading area -->
@@ -1280,16 +1280,33 @@
              @click="toggleImmersiveControls()"
              @touchstart="immersiveTouchStart($event)"
              @touchend="immersiveTouchEnd($event)">
-            <div class="immersive-book-title" x-text="currentBook"></div>
-            <div class="immersive-chapter-num" x-text="'Chapter ' + currentChapter"></div>
+            <template x-if="!combinedPlanReading">
+                <div>
+                    <div class="immersive-book-title" x-text="currentBook"></div>
+                    <div class="immersive-chapter-num" x-text="'Chapter ' + currentChapter"></div>
+                </div>
+            </template>
+            <template x-if="combinedPlanReading">
+                <div class="immersive-plan-title">
+                    <div class="immersive-book-title" x-text="'Day ' + planDay + (getPlanDayDate(planDay) ? ' — ' + getPlanDayDate(planDay) : '')"></div>
+                </div>
+            </template>
             <div class="immersive-verses">
-                <template x-for="verse in verses" :key="verse.verse">
-                    <p class="immersive-verse">
-                        <sup class="immersive-verse-num" x-text="verse.verse"></sup>
-                        <span class="immersive-verse-text"
-                              :class="{ 'red-letter': isRedLetterVerse(verse.verse) }"
-                              x-text="verse.text"></span>
-                    </p>
+                <template x-for="(verse, idx) in verses" :key="idx">
+                    <div>
+                        <template x-if="combinedPlanReading && verse._sectionLabel">
+                            <div class="immersive-section-label" x-text="verse._sectionLabel"></div>
+                        </template>
+                        <template x-if="combinedPlanReading && verse._chapterStart && verse._chapterRef">
+                            <div class="immersive-chapter-ref" x-text="verse._chapterRef"></div>
+                        </template>
+                        <p class="immersive-verse">
+                            <sup class="immersive-verse-num" x-text="verse.verse"></sup>
+                            <span class="immersive-verse-text"
+                                  :class="{ 'red-letter': isRedLetterVerse(verse.verse) }"
+                                  x-text="verse.text"></span>
+                        </p>
+                    </div>
                 </template>
             </div>
             <div class="immersive-chapter-end">&#8226; &#8226; &#8226;</div>
@@ -1299,11 +1316,11 @@
         <div class="immersive-controls-bottom"
              x-show="immersiveControlsVisible"
              x-transition.opacity.duration.200ms>
-            <button @click.stop="previousChapter()" class="immersive-nav-btn">
-                &larr; Previous
+            <button @click.stop="combinedPlanReading ? immersivePlanPrev() : previousChapter()" class="immersive-nav-btn" :disabled="combinedPlanReading && planDay <= 1">
+                &larr; <span x-text="combinedPlanReading ? 'Prev Day' : 'Previous'"></span>
             </button>
-            <button @click.stop="nextChapter()" class="immersive-nav-btn">
-                Next &rarr;
+            <button @click.stop="combinedPlanReading ? immersivePlanNext() : nextChapter()" class="immersive-nav-btn" :disabled="combinedPlanReading && planDay >= (currentPlan?.duration_days || 365)">
+                <span x-text="combinedPlanReading ? 'Next Day' : 'Next'"></span> &rarr;
             </button>
         </div>
 
