@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -50,7 +51,8 @@ def _get_client_ip(request: Request) -> str:
     """Extract real client IP from X-Forwarded-For (set by Fly.io proxy)."""
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        # Last entry is appended by Fly's proxy; leftmost entries are client-controlled
+        return forwarded.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -58,6 +60,8 @@ def _get_client_ip(request: Request) -> str:
 limiter = Limiter(key_func=_get_client_ip)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.mount("/static", StaticFiles(directory=frontend_path / "static"), name="static")
 
@@ -106,12 +110,16 @@ async def add_cache_headers(request: Request, call_next):
         elif any(path.startswith(p) for p in _CACHEABLE_PREFIXES):
             response.headers["Cache-Control"] = CACHE_LONG
         elif any(path.startswith(p) for p in _SHORT_CACHE_PREFIXES):
-            response.headers["Cache-Control"] = CACHE_SHORT
+            # Only cache when the date is explicit in the URL — the no-date form
+            # resolves "today" server-side, and a cached copy would serve
+            # yesterday's devotional after midnight (cache key has no date).
+            if "date=" in request.url.query:
+                response.headers["Cache-Control"] = CACHE_SHORT
     return response
 
 
 @app.get("/api/health")
-async def health():
+def health():
     """Health check with database stats."""
     # Table name -> label mapping (hardcoded allowlist, never from user input)
     _STAT_TABLES = {
@@ -137,13 +145,13 @@ async def health():
 
 
 @app.get("/")
-async def root():
+def root():
     """Serve the main application page."""
     return FileResponse(frontend_path / "index.html")
 
 
 @app.get("/api/passage/{reference}")
-async def get_passage(
+def get_passage(
     reference: str,
     translation: str = Query(default="WEB", description="Bible translation")
 ):
@@ -202,7 +210,7 @@ async def get_passage(
 
 
 @app.get("/api/passage/{reference}/parallel")
-async def get_parallel_passage(
+def get_parallel_passage(
     reference: str,
     translations: str = Query(default="BSB,KJV,WEB", description="Comma-separated translation IDs")
 ):
@@ -243,7 +251,7 @@ async def get_parallel_passage(
 
 
 @app.get("/api/passage/{reference}/commentary")
-async def get_commentary(reference: str):
+def get_commentary(reference: str):
     """Get commentary entries for a passage."""
     conn = get_db_connection()
     try:
@@ -279,7 +287,7 @@ async def get_commentary(reference: str):
 
 
 @app.get("/api/passage/{reference}/crossrefs")
-async def get_crossrefs(reference: str):
+def get_crossrefs(reference: str):
     """Get cross-references for a passage."""
     conn = get_db_connection()
     try:
@@ -295,7 +303,7 @@ async def get_crossrefs(reference: str):
 
 
 @app.get("/api/verse/{reference}")
-async def get_single_verse(
+def get_single_verse(
     reference: str,
     translation: str = Query(default="WEB", description="Bible translation")
 ):
@@ -324,7 +332,7 @@ async def get_single_verse(
 
 @app.get("/api/search")
 @limiter.limit("30/minute")
-async def search(
+def search(
     request: Request,
     q: str = Query(..., min_length=2, description="Search query"),
     scope: str = Query(default="all", description="Search scope: bible, ot, nt, book:BookName, commentary, all")
@@ -436,6 +444,11 @@ async def search(
                 words[-1] = words[-1] + '*'
                 fts_query = ' '.join(words)
 
+        # Scope MATCH to the text column — the FTS tables also index book/chapter/verse
+        # metadata, so a bare match on "john" returns every verse in the books of John.
+        verses_query = f"text: ({fts_query})"
+        commentary_query = f"searchable_text: ({fts_query})"
+
         try:
             if scope in ("all", "bible"):
                 if book_filter:
@@ -446,7 +459,7 @@ async def search(
                         WHERE verses_fts MATCH ? AND book = ?
                         ORDER BY rank
                         LIMIT 50
-                    """, (fts_query, book_filter))
+                    """, (verses_query, book_filter))
                 elif testament_filter:
                     placeholders = ','.join('?' * len(testament_filter))
                     cursor = conn.execute(f"""
@@ -456,7 +469,7 @@ async def search(
                         WHERE verses_fts MATCH ? AND book IN ({placeholders})
                         ORDER BY rank
                         LIMIT 50
-                    """, (fts_query, *testament_filter))
+                    """, (verses_query, *testament_filter))
                 else:
                     cursor = conn.execute("""
                         SELECT 'verse' as type, book, chapter, verse,
@@ -465,7 +478,7 @@ async def search(
                         WHERE verses_fts MATCH ?
                         ORDER BY rank
                         LIMIT 50
-                    """, (fts_query,))
+                    """, (verses_query,))
                 results.extend([dict(r) for r in cursor.fetchall()])
 
             if scope in ("all", "commentary"):
@@ -476,7 +489,7 @@ async def search(
                     WHERE commentary_fts MATCH ?
                     ORDER BY rank
                     LIMIT 50
-                """, (fts_query,))
+                """, (commentary_query,))
                 results.extend([dict(r) for r in cursor.fetchall()])
         except sqlite3.OperationalError as e:
             # Malformed FTS query - return empty results rather than 500
@@ -488,7 +501,7 @@ async def search(
 
 
 @app.get("/api/word-alignment")
-async def get_word_alignment(
+def get_word_alignment(
     book: str,
     chapter: int,
     verse: int,
@@ -554,7 +567,7 @@ async def get_word_alignment(
 
 
 @app.get("/api/word/{strong_number}")
-async def get_word(strong_number: str):
+def get_word(strong_number: str):
     """Get lexicon entry and all occurrences for a Strong's number."""
     conn = get_db_connection()
     try:
@@ -653,7 +666,7 @@ async def get_word(strong_number: str):
 
 
 @app.get("/api/passage/{reference}/interlinear")
-async def get_passage_interlinear(
+def get_passage_interlinear(
     reference: str,
     translation: str = Query(default="WEB", description="Bible translation")
 ):
@@ -776,7 +789,7 @@ async def get_passage_interlinear(
 
 
 @app.get("/api/devotional")
-async def get_devotional(
+def get_devotional(
     date: Optional[str] = None,
     time_of_day: Optional[str] = None
 ):
@@ -837,7 +850,7 @@ async def get_devotional(
 
 
 @app.get("/api/devotional/sources")
-async def get_devotional_sources():
+def get_devotional_sources():
     """Get available devotional sources and their entry counts."""
     conn = get_db_connection()
     try:
@@ -856,7 +869,7 @@ async def get_devotional_sources():
 # ========== READING PLAN ENDPOINTS ==========
 
 @app.get("/api/reading-plans")
-async def get_reading_plans():
+def get_reading_plans():
     """Get list of available reading plans."""
     import json
     data_path = Path(__file__).parent.parent / "data"
@@ -877,7 +890,7 @@ async def get_reading_plans():
 
 
 @app.get("/api/reading-plans/{plan_id}")
-async def get_reading_plan(plan_id: str):
+def get_reading_plan(plan_id: str):
     """Get full reading plan with all days."""
     import json
     import re as _re
@@ -895,7 +908,7 @@ async def get_reading_plan(plan_id: str):
 
 
 @app.get("/api/reading-plans/{plan_id}/day/{day}")
-async def get_reading_plan_day(plan_id: str, day: int):
+def get_reading_plan_day(plan_id: str, day: int):
     """Get a specific day's reading from a plan."""
     import json
     import re as _re
@@ -1099,7 +1112,7 @@ def get_speaker_verses(conn, book: str, chapter: int) -> list:
 
 @app.get("/api/offline/chapter")
 @limiter.limit("20/minute")
-async def get_chapter_offline_data(
+def get_chapter_offline_data(
     request: Request,
     book: str,
     chapter: int,
@@ -1182,7 +1195,7 @@ async def get_chapter_offline_data(
 
 @app.get("/api/offline/lexicon")
 @limiter.limit("5/minute")
-async def get_lexicon_offline(request: Request):
+def get_lexicon_offline(request: Request):
     """Get the complete lexicon for offline use."""
     conn = get_db_connection()
     try:
@@ -1200,7 +1213,7 @@ async def get_lexicon_offline(request: Request):
 
 @app.get("/api/offline/book")
 @limiter.limit("5/minute")
-async def get_book_offline_data(
+def get_book_offline_data(
     request: Request,
     book: str,
     translation: str = Query(default="BSB"),
@@ -1293,7 +1306,7 @@ async def get_book_offline_data(
 
 @app.get("/api/offline/commentary")
 @limiter.limit("10/minute")
-async def get_commentary_offline_data(request: Request, book: str):
+def get_commentary_offline_data(request: Request, book: str):
     """Get all commentary entries for a book for offline use."""
     conn = get_db_connection()
     try:
@@ -1311,7 +1324,7 @@ async def get_commentary_offline_data(request: Request, book: str):
 
 @app.get("/api/offline/crossrefs")
 @limiter.limit("10/minute")
-async def get_crossrefs_offline_data(request: Request, book: str):
+def get_crossrefs_offline_data(request: Request, book: str):
     """Get all cross-references for a book for offline use."""
     conn = get_db_connection()
     try:
@@ -1330,7 +1343,7 @@ async def get_crossrefs_offline_data(request: Request, book: str):
 
 @app.get("/api/offline/stats")
 @limiter.limit("10/minute")
-async def get_offline_stats(request: Request):
+def get_offline_stats(request: Request):
     """Get statistics about available data for offline download planning."""
     conn = get_db_connection()
     try:
@@ -1405,7 +1418,7 @@ async def get_offline_stats(request: Request):
 
 @app.get("/api/offline/devotionals")
 @limiter.limit("5/minute")
-async def get_devotionals_offline(request: Request, source: Optional[str] = None):
+def get_devotionals_offline(request: Request, source: Optional[str] = None):
     """Get all devotionals for offline use."""
     conn = get_db_connection()
     try:
@@ -1533,7 +1546,7 @@ def _parse_seed_ids(seeds_str: str):
 
 
 @app.get("/api/crossref-map/presets")
-async def get_crossref_presets():
+def get_crossref_presets():
     """Return available seed verse presets with their verse lists and text."""
     conn = get_db_connection()
     try:
@@ -1569,7 +1582,7 @@ async def get_crossref_presets():
 
 
 @app.get("/api/crossref-map/christological")
-async def get_crossref_map_christological(
+def get_crossref_map_christological(
     method: str = Query(default="gospel-peaks", description="Calculation method"),
     verse: str = Query(default=None, description="Verse for find-path mode"),
     depth: int = Query(default=2, ge=1, le=5, description="BFS depth from seeds"),
@@ -1843,7 +1856,7 @@ async def get_crossref_map_christological(
 
 
 @app.get("/api/path-to-christ/{reference}")
-async def get_path_to_christ(
+def get_path_to_christ(
     reference: str,
     translation: str = Query(default="BSB", description="Translation for verse text"),
 ):
@@ -2003,7 +2016,7 @@ async def get_path_to_christ(
 
 
 @app.get("/api/crossref-map/{reference}")
-async def get_crossref_map(
+def get_crossref_map(
     reference: str,
     depth: int = Query(default=1, ge=1, le=7, description="How many hops to follow"),
     per_verse: int = Query(default=5, ge=1, le=50, description="Top N connections per verse"),
@@ -2171,7 +2184,7 @@ async def get_crossref_map(
 
 
 @app.get("/api/topics/search")
-async def search_topics(
+def search_topics(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(default=50, le=200)
 ):
@@ -2243,7 +2256,7 @@ async def search_topics(
 
 
 @app.get("/api/topics/for-verse")
-async def get_topics_for_verse(
+def get_topics_for_verse(
     book: str = Query(...),
     chapter: int = Query(...),
     verse: int = Query(...)
@@ -2269,7 +2282,7 @@ async def get_topics_for_verse(
 
 
 @app.get("/api/topics/browse")
-async def browse_topics(
+def browse_topics(
     section: str = Query(default=None, description="Filter by section letter (A-Z)"),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=50, le=200)
@@ -2318,7 +2331,7 @@ async def browse_topics(
 
 
 @app.get("/api/topics/{topic_id}")
-async def get_topic(topic_id: int):
+def get_topic(topic_id: int):
     """Get a single Nave's topic with full entry text and verse references."""
     conn = get_db_connection()
     try:
@@ -2371,7 +2384,7 @@ def _get_topic_refs(conn, topic_id):
 
 
 @app.get("/map")
-async def serve_map():
+def serve_map():
     """Serve the cross-reference mapper visualization page."""
     return FileResponse(frontend_path / "map.html")
 
@@ -2379,7 +2392,7 @@ async def serve_map():
 # Route for reading plan URLs (e.g., /plan/chronological-year/45)
 # Must be registered before the catch-all book/chapter routes
 @app.get("/plan/{plan_id}/{day}")
-async def serve_app_with_plan(plan_id: str, day: int):
+def serve_app_with_plan(plan_id: str, day: int):
     """Serve main app for reading plan URLs - JS handles the routing."""
     return FileResponse(frontend_path / "index.html")
 
@@ -2388,6 +2401,6 @@ async def serve_app_with_plan(plan_id: str, day: int):
 # Must be registered last to not override other routes
 @app.get("/{book}/{chapter}")
 @app.get("/{book}/{chapter}/{verse}")
-async def serve_app_with_reference(book: str, chapter: int, verse: int = None):
+def serve_app_with_reference(book: str, chapter: int, verse: int = None):
     """Serve main app for clean URLs - JS handles the routing."""
     return FileResponse(frontend_path / "index.html")
