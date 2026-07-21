@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from .database import get_db_connection, init_db, DATABASE_PATH
+from .database import get_db_connection, get_writable_db_connection, init_db, DATABASE_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,8 @@ async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     init_db()
     # Create indexes needed for bidirectional cross-reference lookups
-    conn = get_db_connection()
+    # (get_db_connection is read-only; index creation needs a writable one)
+    conn = get_writable_db_connection()
     try:
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_crossref_target
@@ -573,8 +574,11 @@ def get_word_alignment(
 
 
 @app.get("/api/word/{strong_number}")
-def get_word(strong_number: str):
-    """Get lexicon entry and all occurrences for a Strong's number."""
+def get_word(
+    strong_number: str,
+    offset: int = Query(default=0, ge=0, description="Occurrence pagination offset"),
+):
+    """Get lexicon entry and occurrences (capped at 500/page) for a Strong's number."""
     conn = get_db_connection()
     try:
         # Get word details from lexicon
@@ -613,11 +617,18 @@ def get_word(strong_number: str):
         padded_strong = f"{prefix}{num.zfill(4)}"
 
         cursor = conn.execute("""
+            SELECT COUNT(*) FROM word_alignments WHERE strong_number IN (?, ?)
+        """, (strong_number, padded_strong))
+        total = cursor.fetchone()[0]
+
+        # Cap the payload — frequent words (e.g. H3068) have 6,000+ occurrences
+        cursor = conn.execute("""
             SELECT book, chapter, verse, word_position as position, english_gloss as translation
             FROM word_alignments
             WHERE strong_number IN (?, ?)
             ORDER BY book, chapter, verse, word_position
-        """, (strong_number, padded_strong))
+            LIMIT 500 OFFSET ?
+        """, (strong_number, padded_strong, offset))
         occurrences = cursor.fetchall()
 
         # Get translation variants (how the word is rendered in English)
@@ -651,6 +662,8 @@ def get_word(strong_number: str):
             "word": word_dict,
             "occurrences": [dict(o) for o in occurrences],
             "count": len(occurrences),
+            "total": total,
+            "offset": offset,
             "glosses": glosses,
             "book_frequency": book_frequency
         }
@@ -1182,69 +1195,84 @@ def get_book_offline_data(
             "chapters": {}
         }
 
-        # Get all chapters for this book
+        # One whole-book query per data type (instead of 5 queries per
+        # chapter), grouped by chapter in Python. Row shapes and per-chapter
+        # ordering match the old per-chapter queries exactly; the leading
+        # chapter column is popped before output.
+        def _group_by_chapter(cursor, chapter_col):
+            grouped = {}
+            for row in cursor:
+                d = dict(row)
+                grouped.setdefault(d.pop(chapter_col), []).append(d)
+            return grouped
+
+        # Verses (always included) — also defines which chapters exist
         cursor = conn.execute("""
-            SELECT DISTINCT chapter FROM verses
+            SELECT chapter, verse, text FROM verses
             WHERE book = ? AND translation_id = ?
-            ORDER BY chapter
+            ORDER BY chapter, verse
         """, (book, translation))
-        chapters = [row['chapter'] for row in cursor.fetchall()]
+        verses_by_ch = _group_by_chapter(cursor, "chapter")
+        chapters = list(verses_by_ch.keys())  # insertion order = chapter order
+
+        alignments_by_ch = {}
+        if include_alignments:
+            cursor = conn.execute("""
+                SELECT e.chapter, e.verse, e.english_word_position as position,
+                       e.english_word as word, e.original_word_position,
+                       w.hebrew_text as original_text, w.strong_number,
+                       l.definition, l.language
+                FROM english_word_alignments e
+                JOIN word_alignments w ON w.book = e.book AND w.chapter = e.chapter
+                     AND w.verse = e.verse AND w.word_position = e.original_word_position
+                LEFT JOIN lexicon l ON l.strong_number = CASE
+                    WHEN w.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
+                    WHEN w.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
+                    ELSE w.strong_number END
+                WHERE e.translation_id = ? AND e.book = ?
+                ORDER BY e.chapter, e.verse, e.english_word_position
+            """, (translation, book))
+            alignments_by_ch = _group_by_chapter(cursor, "chapter")
+
+        interlinear_by_ch = {}
+        if include_interlinear:
+            cursor = conn.execute("""
+                SELECT chapter, verse, word_position as position, hebrew_text as original_text,
+                       transliteration, english_gloss as gloss, strong_number
+                FROM word_alignments
+                WHERE book = ?
+                ORDER BY chapter, verse, word_position
+            """, (book,))
+            interlinear_by_ch = _group_by_chapter(cursor, "chapter")
+
+        crossrefs_by_ch = {}
+        if include_crossrefs:
+            cursor = conn.execute("""
+                SELECT source_chapter, source_verse, target_book, target_chapter, target_verse
+                FROM cross_references
+                WHERE source_book = ?
+            """, (book,))
+            crossrefs_by_ch = _group_by_chapter(cursor, "source_chapter")
+
+        commentary_by_ch = {}
+        if include_commentary:
+            cursor = conn.execute("""
+                SELECT chapter, source, reference_start, reference_end, content
+                FROM commentary_entries
+                WHERE book = ?
+            """, (book,))
+            commentary_by_ch = _group_by_chapter(cursor, "chapter")
 
         for chapter in chapters:
-            chapter_data = {"verses": []}
-
-            # Verses (always included)
-            cursor = conn.execute("""
-                SELECT verse, text FROM verses
-                WHERE book = ? AND chapter = ? AND translation_id = ?
-                ORDER BY verse
-            """, (book, chapter, translation))
-            chapter_data["verses"] = [dict(v) for v in cursor.fetchall()]
-
+            chapter_data = {"verses": verses_by_ch[chapter]}
             if include_alignments:
-                cursor = conn.execute("""
-                    SELECT e.verse, e.english_word_position as position,
-                           e.english_word as word, e.original_word_position,
-                           w.hebrew_text as original_text, w.strong_number,
-                           l.definition, l.language
-                    FROM english_word_alignments e
-                    JOIN word_alignments w ON w.book = e.book AND w.chapter = e.chapter
-                         AND w.verse = e.verse AND w.word_position = e.original_word_position
-                    LEFT JOIN lexicon l ON l.strong_number = CASE
-                        WHEN w.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
-                        WHEN w.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
-                        ELSE w.strong_number END
-                    WHERE e.translation_id = ? AND e.book = ? AND e.chapter = ?
-                    ORDER BY e.verse, e.english_word_position
-                """, (translation, book, chapter))
-                chapter_data["alignments"] = [dict(a) for a in cursor.fetchall()]
-
+                chapter_data["alignments"] = alignments_by_ch.get(chapter, [])
             if include_interlinear:
-                cursor = conn.execute("""
-                    SELECT verse, word_position as position, hebrew_text as original_text,
-                           transliteration, english_gloss as gloss, strong_number
-                    FROM word_alignments
-                    WHERE book = ? AND chapter = ?
-                    ORDER BY verse, word_position
-                """, (book, chapter))
-                chapter_data["interlinear"] = [dict(i) for i in cursor.fetchall()]
-
+                chapter_data["interlinear"] = interlinear_by_ch.get(chapter, [])
             if include_crossrefs:
-                cursor = conn.execute("""
-                    SELECT source_verse, target_book, target_chapter, target_verse
-                    FROM cross_references
-                    WHERE source_book = ? AND source_chapter = ?
-                """, (book, chapter))
-                chapter_data["crossRefs"] = [dict(c) for c in cursor.fetchall()]
-
+                chapter_data["crossRefs"] = crossrefs_by_ch.get(chapter, [])
             if include_commentary:
-                cursor = conn.execute("""
-                    SELECT source, reference_start, reference_end, content
-                    FROM commentary_entries
-                    WHERE book = ? AND chapter = ?
-                """, (book, chapter))
-                chapter_data["commentary"] = [dict(c) for c in cursor.fetchall()]
-
+                chapter_data["commentary"] = commentary_by_ch.get(chapter, [])
             result["chapters"][chapter] = chapter_data
 
         return result
@@ -1424,22 +1452,10 @@ PRESET_META = {
 }
 
 
-def _get_neighbors(conn, book: str, chapter: int, verse: int, limit: int,
-                   focus_books: list = None):
-    """Top cross-reference neighbors of a verse (bidirectional), best votes first.
-
-    Returns rows of (book, chapter, verse, votes). When focus_books is given,
-    neighbors in those books sort ahead of everything else.
-    """
-    if focus_books:
-        placeholders = ",".join("?" for _ in focus_books)
-        order_by = (f"CASE WHEN target_book IN ({placeholders}) "
-                    "THEN 0 ELSE 1 END, MAX(votes) DESC")
-        extra_params = tuple(focus_books)
-    else:
-        order_by = "MAX(votes) DESC"
-        extra_params = ()
-    cursor = conn.execute(f"""
+# Bidirectional top-N neighbor query. Kept as a single template so the
+# one-verse and batched-frontier paths run byte-identical SQL per verse
+# (same query plan, same tie-breaking, same row order).
+_NEIGHBOR_SQL = """
         SELECT target_book, target_chapter, target_verse, votes
         FROM (
             SELECT target_book, target_chapter, target_verse, votes
@@ -1453,42 +1469,116 @@ def _get_neighbors(conn, book: str, chapter: int, verse: int, limit: int,
         GROUP BY target_book, target_chapter, target_verse
         ORDER BY {order_by}
         LIMIT ?
-    """, (book, chapter, verse, book, chapter, verse, *extra_params, limit))
+"""
+
+
+def _neighbor_order(focus_books):
+    """ORDER BY clause + extra params for the neighbor query."""
+    if focus_books:
+        placeholders = ",".join("?" for _ in focus_books)
+        return (f"CASE WHEN target_book IN ({placeholders}) "
+                "THEN 0 ELSE 1 END, MAX(votes) DESC", tuple(focus_books))
+    return "MAX(votes) DESC", ()
+
+
+def _get_neighbors(conn, book: str, chapter: int, verse: int, limit: int,
+                   focus_books: list = None):
+    """Top cross-reference neighbors of a verse (bidirectional), best votes first.
+
+    Returns rows of (book, chapter, verse, votes). When focus_books is given,
+    neighbors in those books sort ahead of everything else.
+    """
+    order_by, extra_params = _neighbor_order(focus_books)
+    cursor = conn.execute(
+        _NEIGHBOR_SQL.format(order_by=order_by),
+        (book, chapter, verse, book, chapter, verse, *extra_params, limit))
     return cursor.fetchall()
 
 
-def _enrich_nodes(conn, nodes: dict):
-    """Add verse text preview and book metadata (testament, book_order) to nodes."""
-    for key, node in nodes.items():
-        if node.get("isChrist"):
-            continue
-        cursor = conn.execute("""
-            SELECT text FROM verses
-            WHERE book = ? AND chapter = ? AND verse = ? AND translation_id = 'BSB'
-            LIMIT 1
-        """, (node["book"], node["chapter"], node["verse"]))
-        row = cursor.fetchone()
-        if row:
-            text = row[0]
-            node["text"] = text
-        else:
-            node["text"] = ""
+def _get_neighbors_batch(conn, frontier, limit: int, focus_books: list = None):
+    """Fetch neighbors for a whole BFS frontier level in one query per chunk.
 
-    book_meta_cache = {}
-    for key, node in nodes.items():
-        if node.get("isChrist"):
-            continue
-        b = node["book"]
-        if b not in book_meta_cache:
-            cursor = conn.execute(
-                "SELECT book_order, testament FROM books WHERE name = ?", (b,)
-            )
-            row = cursor.fetchone()
-            if row:
-                book_meta_cache[b] = {"book_order": row[0], "testament": row[1]}
-            else:
-                book_meta_cache[b] = {"book_order": 0, "testament": "OT"}
-        meta = book_meta_cache[b]
+    frontier: iterable of (book, chapter, verse) triples. Returns a dict
+    mapping each triple to its ordered neighbor rows. Each frontier verse gets
+    its own subquery (the exact _NEIGHBOR_SQL with its own ORDER BY/LIMIT),
+    concatenated with UNION ALL, so per-verse top-N semantics and row order
+    match _get_neighbors exactly — one round-trip instead of N.
+    """
+    order_by, extra_params = _neighbor_order(focus_books)
+    uniq = list(dict.fromkeys(frontier))
+    result = {t: [] for t in uniq}
+    if len(uniq) <= 4:
+        # Tiny frontier: per-verse queries are cheaper than parsing a
+        # multi-arm compound statement. Same SQL per verse, same results.
+        for t in uniq:
+            result[t] = [tuple(r) for r in
+                         _get_neighbors(conn, *t, limit, focus_books=focus_books)]
+        return result
+    arm_sql = ("SELECT ? AS src_idx, * FROM ("
+               + _NEIGHBOR_SQL.format(order_by=order_by) + ")")
+    CHUNK = 50  # keep well under SQLITE_MAX_COMPOUND_SELECT (500)
+    for start in range(0, len(uniq), CHUNK):
+        chunk = uniq[start:start + CHUNK]
+        sql = "\nUNION ALL\n".join([arm_sql] * len(chunk))
+        params = []
+        for offset, (b, c, v) in enumerate(chunk):
+            params.extend((start + offset, b, c, v, b, c, v,
+                           *extra_params, limit))
+        for row in conn.execute(sql, params):
+            result[uniq[row[0]]].append(tuple(row)[1:])
+    return result
+
+
+def _fetch_verse_texts(conn, triples, translation: str = "BSB"):
+    """Batch-fetch verse text for (book, chapter, verse) triples.
+
+    Returns {(book, chapter, verse): text}; missing verses are absent.
+    """
+    texts = {}
+    uniq = list(dict.fromkeys(triples))
+    CHUNK = 300  # 900 bound params per statement, well under SQLite's limit
+    for start in range(0, len(uniq), CHUNK):
+        chunk = uniq[start:start + CHUNK]
+        values = ",".join("(?,?,?)" for _ in chunk)
+        params = [x for t in chunk for x in t]
+        params.append(translation)
+        # VALUES-list joined against verses: the planner does one full index
+        # seek per triple (a bare row-value IN clause degrades to per-book
+        # range scans — measured ~12x slower).
+        cursor = conn.execute(f"""
+            WITH t(b, c, v) AS (VALUES {values})
+            SELECT vs.book, vs.chapter, vs.verse, vs.text
+            FROM t JOIN verses vs
+              ON vs.book = t.b AND vs.chapter = t.c AND vs.verse = t.v
+             AND vs.translation_id = ?
+        """, params)
+        for row in cursor:
+            texts[(row[0], row[1], row[2])] = row[3]
+    return texts
+
+
+def _enrich_nodes(conn, nodes: dict):
+    """Add verse text preview and book metadata (testament, book_order) to nodes.
+
+    Two batched queries total (verses + books) instead of one query per node.
+    """
+    real_nodes = [n for n in nodes.values() if not n.get("isChrist")]
+    if not real_nodes:
+        return
+
+    texts = _fetch_verse_texts(
+        conn, [(n["book"], n["chapter"], n["verse"]) for n in real_nodes])
+    for node in real_nodes:
+        node["text"] = texts.get((node["book"], node["chapter"], node["verse"]), "")
+
+    books = list(dict.fromkeys(n["book"] for n in real_nodes))
+    placeholders = ",".join("?" for _ in books)
+    cursor = conn.execute(
+        f"SELECT name, book_order, testament FROM books WHERE name IN ({placeholders})",
+        books)
+    book_meta = {row[0]: {"book_order": row[1], "testament": row[2]} for row in cursor}
+    for node in real_nodes:
+        meta = book_meta.get(node["book"], {"book_order": 0, "testament": "OT"})
         node["testament"] = meta["testament"]
         node["book_order"] = meta["book_order"]
 
@@ -1514,48 +1604,67 @@ def _bfs_to_seeds(conn, book: str, chapter: int, verse: int, seed_ids: set,
     found_seed = None
 
     while queue and not found_seed:
-        src_book, src_chapter, src_verse, current_depth = queue.pop(0)
-        src_key = f"{src_book}.{src_chapter}.{src_verse}"
-        if src_key in visited:
-            continue
-        visited.add(src_key)
+        # Queue depths are non-decreasing, so the front run of equal-depth
+        # entries is a whole frontier level: prefetch its neighbors in one
+        # batched query, then replay the per-node logic in original order.
+        current_depth = queue[0][3]
+        level = []
+        while queue and queue[0][3] == current_depth:
+            level.append(queue.pop(0))
 
-        if src_key in seed_ids and src_key != start_key:
-            found_seed = src_key
-            break
+        neighbors = {}
+        if current_depth < max_depth:
+            neighbors = _get_neighbors_batch(
+                conn,
+                [(b, c, v) for b, c, v, _ in level
+                 if f"{b}.{c}.{v}" not in visited],
+                per_hop)
 
-        if current_depth >= max_depth:
-            continue
+        for src_book, src_chapter, src_verse, _ in level:
+            src_key = f"{src_book}.{src_chapter}.{src_verse}"
+            if src_key in visited:
+                continue
+            visited.add(src_key)
 
-        for row in _get_neighbors(conn, src_book, src_chapter, src_verse, per_hop):
-            tgt_book, tgt_chapter, tgt_verse, votes = row
-            tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
-
-            edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
-            if edge_key not in edge_set:
-                edge_set.add(edge_key)
-                edges.append({
-                    "source": src_key, "target": tgt_key, "votes": votes
-                })
-
-            if tgt_key not in nodes:
-                nodes[tgt_key] = {
-                    "id": tgt_key, "book": tgt_book,
-                    "chapter": tgt_chapter, "verse": tgt_verse,
-                    "depth": current_depth + 1,
-                    "isSeed": tgt_key in seed_ids,
-                }
-            # Record the first (shortest) parent even when the node is already
-            # known; recording only on node creation reconstructed false paths.
-            if tgt_key not in parent and tgt_key != start_key:
-                parent[tgt_key] = src_key
-
-            if tgt_key in seed_ids:
-                found_seed = tgt_key
+            if src_key in seed_ids and src_key != start_key:
+                found_seed = src_key
                 break
 
-            if tgt_key not in visited:
-                queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+            if current_depth >= max_depth:
+                continue
+
+            for row in neighbors[(src_book, src_chapter, src_verse)]:
+                tgt_book, tgt_chapter, tgt_verse, votes = row
+                tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+
+                edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
+                if edge_key not in edge_set:
+                    edge_set.add(edge_key)
+                    edges.append({
+                        "source": src_key, "target": tgt_key, "votes": votes
+                    })
+
+                if tgt_key not in nodes:
+                    nodes[tgt_key] = {
+                        "id": tgt_key, "book": tgt_book,
+                        "chapter": tgt_chapter, "verse": tgt_verse,
+                        "depth": current_depth + 1,
+                        "isSeed": tgt_key in seed_ids,
+                    }
+                # Record the first (shortest) parent even when the node is already
+                # known; recording only on node creation reconstructed false paths.
+                if tgt_key not in parent and tgt_key != start_key:
+                    parent[tgt_key] = src_key
+
+                if tgt_key in seed_ids:
+                    found_seed = tgt_key
+                    break
+
+                if tgt_key not in visited:
+                    queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+
+            if found_seed:
+                break
 
     path_keys = []
     if found_seed:
@@ -1611,15 +1720,10 @@ def get_crossref_presets():
         for key, meta in PRESET_META.items():
             seeds = (CHRISTOLOGICAL_SEEDS.get(key)
                      or (_get_red_letter_seeds(conn) if key == "red-letter" else []))
+            texts = _fetch_verse_texts(conn, seeds)
             seed_list = []
             for book, chapter, v in seeds:
-                cursor = conn.execute(
-                    "SELECT text FROM verses WHERE book = ? AND chapter = ? "
-                    "AND verse = ? AND translation_id = 'BSB' LIMIT 1",
-                    (book, chapter, v)
-                )
-                row = cursor.fetchone()
-                text = row[0] if row else ""
+                text = texts.get((book, chapter, v), "")
                 if len(text) > 120:
                     text = text[:120] + "..."
                 seed_list.append({
@@ -1773,34 +1877,43 @@ def get_crossref_map_christological(
             edge_set.add(("__CHRIST__", key))
             queue.append((s_book, s_chapter, s_verse, 1))
 
-        # BFS outward from seeds
+        # BFS outward from seeds, one batched neighbor query per frontier level
         while queue and len(nodes) < limit:
-            src_book, src_chapter, src_verse, current_depth = queue.pop(0)
-            src_key = f"{src_book}.{src_chapter}.{src_verse}"
+            current_depth = queue[0][3]
+            level = []
+            while queue and queue[0][3] == current_depth:
+                level.append(queue.pop(0))
 
-            hop_limit = per_verse
             if current_depth >= depth:
                 continue
 
-            for row in _get_neighbors(conn, src_book, src_chapter, src_verse, hop_limit):
-                tgt_book, tgt_chapter, tgt_verse, votes = row
-                tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+            neighbors = _get_neighbors_batch(
+                conn, [(b, c, v) for b, c, v, _ in level], per_verse)
 
-                edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
-                if edge_key not in edge_set:
-                    edge_set.add(edge_key)
-                    edges.append({
-                        "source": src_key, "target": tgt_key, "votes": votes
-                    })
+            for src_book, src_chapter, src_verse, _ in level:
+                if len(nodes) >= limit:
+                    break
+                src_key = f"{src_book}.{src_chapter}.{src_verse}"
 
-                if tgt_key not in nodes and len(nodes) < limit:
-                    nodes[tgt_key] = {
-                        "id": tgt_key, "book": tgt_book,
-                        "chapter": tgt_chapter, "verse": tgt_verse,
-                        "depth": current_depth + 1,
-                    }
-                    if current_depth + 1 < depth:
-                        queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+                for row in neighbors[(src_book, src_chapter, src_verse)]:
+                    tgt_book, tgt_chapter, tgt_verse, votes = row
+                    tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+
+                    edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
+                    if edge_key not in edge_set:
+                        edge_set.add(edge_key)
+                        edges.append({
+                            "source": src_key, "target": tgt_key, "votes": votes
+                        })
+
+                    if tgt_key not in nodes and len(nodes) < limit:
+                        nodes[tgt_key] = {
+                            "id": tgt_key, "book": tgt_book,
+                            "chapter": tgt_chapter, "verse": tgt_verse,
+                            "depth": current_depth + 1,
+                        }
+                        if current_depth + 1 < depth:
+                            queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
 
         _enrich_nodes(conn, nodes)
 
@@ -1980,12 +2093,13 @@ def get_crossref_map(
         # diminish mode: each hop gets fewer connections (tapers outward)
         # normal mode: deeper hops get slightly more connections
         while queue and len(nodes) < limit:
-            src_book, src_chapter, src_verse, current_depth = queue.pop(0)
-            src_key = f"{src_book}.{src_chapter}.{src_verse}"
-
-            if src_key in visited:
-                continue
-            visited.add(src_key)
+            # Queue depths are non-decreasing: the front run of equal-depth
+            # entries is one frontier level. hop_limit depends only on depth,
+            # so the whole level shares one batched neighbor query.
+            current_depth = queue[0][3]
+            level = []
+            while queue and queue[0][3] == current_depth:
+                level.append(queue.pop(0))
 
             if diminish:
                 # Each hop gets ~60% of the previous hop's connections (min 2)
@@ -1993,36 +2107,50 @@ def get_crossref_map(
             else:
                 hop_limit = per_verse + min(per_verse, current_depth * 2)
 
-            # Get top cross-refs for this verse (bidirectional), ordered by votes
+            # Get top cross-refs per verse (bidirectional), ordered by votes
             # When focus_books is set, prioritize those books in the sort order
-            for row in _get_neighbors(conn, src_book, src_chapter, src_verse,
-                                      hop_limit, focus_books=focus_list or None):
-                tgt_book, tgt_chapter, tgt_verse, votes = row
-                tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+            neighbors = _get_neighbors_batch(
+                conn,
+                [(b, c, v) for b, c, v, _ in level
+                 if f"{b}.{c}.{v}" not in visited],
+                hop_limit, focus_books=focus_list or None)
 
-                # Add edge (deduplicate with set)
-                edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
-                if edge_key not in edge_set:
-                    edge_set.add(edge_key)
-                    edges.append({
-                        "source": src_key,
-                        "target": tgt_key,
-                        "votes": votes
-                    })
+            for src_book, src_chapter, src_verse, _ in level:
+                if len(nodes) >= limit:
+                    break
+                src_key = f"{src_book}.{src_chapter}.{src_verse}"
 
-                # Add node if new
-                if tgt_key not in nodes and len(nodes) < limit:
-                    nodes[tgt_key] = {
-                        "id": tgt_key,
-                        "book": tgt_book,
-                        "chapter": tgt_chapter,
-                        "verse": tgt_verse,
-                        "depth": current_depth + 1
-                    }
+                if src_key in visited:
+                    continue
+                visited.add(src_key)
 
-                    # Queue for next depth level
-                    if current_depth + 1 < depth:
-                        queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+                for row in neighbors[(src_book, src_chapter, src_verse)]:
+                    tgt_book, tgt_chapter, tgt_verse, votes = row
+                    tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+
+                    # Add edge (deduplicate with set)
+                    edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
+                    if edge_key not in edge_set:
+                        edge_set.add(edge_key)
+                        edges.append({
+                            "source": src_key,
+                            "target": tgt_key,
+                            "votes": votes
+                        })
+
+                    # Add node if new
+                    if tgt_key not in nodes and len(nodes) < limit:
+                        nodes[tgt_key] = {
+                            "id": tgt_key,
+                            "book": tgt_book,
+                            "chapter": tgt_chapter,
+                            "verse": tgt_verse,
+                            "depth": current_depth + 1
+                        }
+
+                        # Queue for next depth level
+                        if current_depth + 1 < depth:
+                            queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
 
         _enrich_nodes(conn, nodes)
 
@@ -2204,17 +2332,31 @@ def get_topic(topic_id: int):
 
         refs = _get_topic_refs(conn, topic_id)
 
-        # Get verse text previews for up to 20 refs
-        ref_previews = []
-        for ref in refs[:20]:
-            ve = ref["verse_end"] if ref["verse_end"] is not None else ref["verse_start"]
+        # Get verse text previews for up to 20 refs — one batched query
+        # covering every ref's verse range, then slice per ref in Python.
+        preview_refs = refs[:20]
+        verses_by_bc = {}
+        if preview_refs:
+            conds = " OR ".join(
+                "(book = ? AND chapter = ? AND verse BETWEEN ? AND ?)"
+                for _ in preview_refs)
+            params = []
+            for ref in preview_refs:
+                ve = ref["verse_end"] if ref["verse_end"] is not None else ref["verse_start"]
+                params.extend((ref["book"], ref["chapter"], ref["verse_start"], ve))
             cursor = conn.execute(
-                "SELECT text FROM verses WHERE book = ? AND chapter = ? "
-                "AND verse >= ? AND verse <= ? AND translation_id = 'BSB' "
-                "ORDER BY verse LIMIT 3",
-                (ref["book"], ref["chapter"], ref["verse_start"], ve)
-            )
-            texts = [r["text"] for r in cursor.fetchall()]
+                f"SELECT book, chapter, verse, text FROM verses "
+                f"WHERE translation_id = 'BSB' AND ({conds})", params)
+            for r in cursor:
+                verses_by_bc.setdefault((r[0], r[1]), []).append((r[2], r[3]))
+            for v in verses_by_bc.values():
+                v.sort()
+
+        ref_previews = []
+        for ref in preview_refs:
+            ve = ref["verse_end"] if ref["verse_end"] is not None else ref["verse_start"]
+            texts = [t for vnum, t in verses_by_bc.get((ref["book"], ref["chapter"]), [])
+                     if ref["verse_start"] <= vnum <= ve][:3]
             preview = " ".join(texts)
             if len(preview) > 150:
                 preview = preview[:147] + "..."

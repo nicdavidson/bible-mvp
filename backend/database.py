@@ -15,7 +15,20 @@ DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.paren
 
 
 def get_db_connection() -> sqlite3.Connection:
-    """Get a database connection with row factory enabled."""
+    """Read-only connection for request handlers (Bible data is immutable).
+
+    mode=ro guarantees handlers can never write; mmap_size lets SQLite serve
+    reads straight from the OS page cache without copying into its own heap.
+    """
+    conn = sqlite3.connect(f"file:{DATABASE_PATH}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA mmap_size=268435456")  # 256 MB
+    conn.execute("PRAGMA cache_size=-64000")    # 64 MB page cache
+    return conn
+
+
+def get_writable_db_connection() -> sqlite3.Connection:
+    """Writable connection — startup only (schema creation, migrations, indexes)."""
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -27,8 +40,8 @@ def init_db():
     logger.info(f"Database exists: {DATABASE_PATH.exists()}")
 
     if DATABASE_PATH.exists():
-        # Check if it has data
-        conn = get_db_connection()
+        # Check if it has data (migrations may write, so use a writable connection)
+        conn = get_writable_db_connection()
         try:
             cursor = conn.execute("SELECT COUNT(*) FROM verses")
             count = cursor.fetchone()[0]
@@ -44,7 +57,7 @@ def init_db():
     else:
         logger.warning("Database file not found! Creating empty schema...")
         DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = get_db_connection()
+        conn = get_writable_db_connection()
         try:
             conn.executescript(SCHEMA)
             conn.commit()
