@@ -30,6 +30,23 @@
     --transition-normal: 0.25s ease;
     --transition-slow: 0.35s ease;
 
+    /* z-index ladder (CODE_REVIEW_2026-07-21 Part 3 §2.3) — every layered
+       component maps to one tier. Order (low→high): raised chrome, panel
+       header, action bar, panels/sheets, sticky header, dropdowns, preview
+       tooltip, side menu, modals (ABOVE side menu), fullscreen overlays,
+       toasts. Tooltip sits below modals by design. */
+    --z-raised: 10;
+    --z-panel-header: 40;
+    --z-overlay-bar: 45;
+    --z-panel: 50;
+    --z-sticky: 100;
+    --z-dropdown: 150;
+    --z-tooltip: 300;
+    --z-side-menu: 1000;
+    --z-modal: 1050;
+    --z-fullscreen-overlay: 1100;
+    --z-toast: 1200;
+
     /* Genre colors (defaults - overridden by JS) */
     --genre-law: #3b82f6;
     --genre-history: #22c55e;
@@ -184,7 +201,7 @@ textarea:focus:not(:focus-visible) {
     border-bottom: 1px solid var(--color-border);
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: var(--z-sticky);
     transition: background var(--transition-normal), border-color var(--transition-normal);
 }
 
@@ -254,7 +271,7 @@ textarea:focus:not(:focus-visible) {
     list-style: none;
     max-height: 240px;
     overflow-y: auto;
-    z-index: 150;
+    z-index: var(--z-dropdown);
     box-shadow: var(--shadow-lg);
 }
 
@@ -344,7 +361,7 @@ textarea:focus:not(:focus-visible) {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    z-index: 100;
+    z-index: var(--z-sticky); /* tie with .header preserved; lives inside .header stacking context */
     overflow: hidden;
 }
 
@@ -804,7 +821,7 @@ textarea:focus:not(:focus-visible) {
     border-bottom: 1px solid var(--color-border);
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: var(--z-raised);
     flex-wrap: wrap;
 }
 
@@ -1294,7 +1311,7 @@ textarea:focus:not(:focus-visible) {
         cursor: pointer;
         font-size: 1rem;
         color: var(--color-text-secondary);
-        z-index: 10;
+        z-index: var(--z-raised);
         box-shadow: var(--shadow-sm);
         transition: background 0.2s, color 0.2s;
     }
@@ -2213,7 +2230,7 @@ textarea:focus:not(:focus-visible) {
 /* Verse Preview Tooltip */
 .verse-preview-tooltip {
     position: absolute;
-    z-index: 300;
+    z-index: var(--z-tooltip);
     max-width: 320px;
     padding: 0.75rem 1rem;
     background: var(--color-surface);
@@ -2246,7 +2263,8 @@ textarea:focus:not(:focus-visible) {
     max-height: 300px;
     border-radius: var(--radius) var(--radius) 0 0;
     box-shadow: var(--shadow-md);
-    z-index: 50;
+    z-index: var(--z-panel);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .btn-close {
@@ -2451,7 +2469,7 @@ textarea:focus:not(:focus-visible) {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 200;
+    z-index: var(--z-modal);
     backdrop-filter: blur(2px);
 }
 
@@ -2937,7 +2955,7 @@ textarea:focus:not(:focus-visible) {
         gap: 0.375rem;
         position: sticky;
         top: 0;
-        z-index: 40;
+        z-index: var(--z-panel-header);
         background: var(--color-surface);
         border-bottom: 1px solid var(--color-border);
     }
@@ -3036,7 +3054,8 @@ textarea:focus:not(:focus-visible) {
         height: auto;
         border-radius: 1rem 1rem 0 0;
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-        z-index: 50;
+        z-index: var(--z-panel);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
         transform: translateY(calc(100% - 48px));
         transition: transform 0.3s ease, max-height 0.3s ease;
         display: flex;
@@ -4178,7 +4197,7 @@ textarea:focus:not(:focus-visible) {
     position: fixed;
     bottom: 1rem;
     right: 1rem;
-    z-index: 1000;
+    z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -4224,7 +4243,7 @@ textarea:focus:not(:focus-visible) {
     position: fixed;
     bottom: 1rem;
     right: 1rem;
-    z-index: 1100;
+    z-index: calc(var(--z-toast) + 1);
     padding: 0.5rem 0.875rem;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -4519,7 +4538,7 @@ textarea:focus:not(:focus-visible) {
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
-    z-index: 200;
+    z-index: var(--z-dropdown);
     overflow: hidden;
 }
 
@@ -5167,7 +5186,7 @@ textarea:focus:not(:focus-visible) {
     position: fixed;
     inset: 0;
     background: var(--color-bg);
-    z-index: 1000;
+    z-index: var(--z-fullscreen-overlay);
     display: flex;
     flex-direction: column;
 }
@@ -5303,7 +5322,9 @@ textarea:focus:not(:focus-visible) {
         margin: 0;
         border-radius: 0;
         height: 100vh;
+        height: 100dvh;
         max-height: 100vh;
+        max-height: 100dvh;
     }
 
     .plan-reading-header {
@@ -5487,7 +5508,7 @@ textarea:focus:not(:focus-visible) {
     border-bottom: 1px solid var(--color-primary);
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: var(--z-raised);
 }
 
 .plan-return-bar .return-hint {
@@ -5535,7 +5556,7 @@ textarea:focus:not(:focus-visible) {
     border-bottom: 1px solid var(--color-border);
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: var(--z-raised);
 }
 
 .btn-exit-plan {
@@ -5882,7 +5903,7 @@ textarea:focus:not(:focus-visible) {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
+    z-index: calc(var(--z-side-menu) - 1);
 }
 
 .side-menu {
@@ -5892,9 +5913,10 @@ textarea:focus:not(:focus-visible) {
     width: 280px;
     max-width: 85vw;
     height: 100vh;
+    height: 100dvh;
     background: var(--color-surface);
     border-right: 1px solid var(--color-border);
-    z-index: 1000;
+    z-index: var(--z-side-menu);
     display: flex;
     flex-direction: column;
     transform: translateX(-100%);
@@ -6326,7 +6348,7 @@ textarea:focus:not(:focus-visible) {
     right: 0;
     bottom: 0;
     background: var(--color-bg);
-    z-index: 1000;
+    z-index: var(--z-fullscreen-overlay);
     display: flex;
     flex-direction: column;
 }
@@ -6517,7 +6539,7 @@ textarea:focus:not(:focus-visible) {
     border-bottom: 1px solid var(--color-border);
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: var(--z-raised);
 }
 
 .single-verse-passage-info {
@@ -6640,11 +6662,12 @@ textarea:focus:not(:focus-visible) {
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 45;
+    z-index: var(--z-overlay-bar);
     background: var(--color-surface);
     border-top: 1px solid var(--color-border);
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
     padding: 0.5rem 0.75rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -7036,7 +7059,7 @@ svg.action-bar-icon {
 .immersive-overlay {
     position: fixed;
     inset: 0;
-    z-index: 1000;
+    z-index: var(--z-fullscreen-overlay);
     background: var(--color-bg);
     overflow-y: auto;
     display: flex;
@@ -7050,7 +7073,7 @@ svg.action-bar-icon {
     top: 0;
     left: 0;
     right: 0;
-    z-index: 1001;
+    z-index: calc(var(--z-fullscreen-overlay) + 1);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -7108,6 +7131,7 @@ svg.action-bar-icon {
     padding: 4rem 2rem 6rem;
     cursor: default;
     min-height: 100vh;
+    min-height: 100dvh;
 }
 
 .immersive-book-title {
@@ -7227,13 +7251,14 @@ svg.action-bar-icon {
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 1001;
+    z-index: calc(var(--z-fullscreen-overlay) + 1);
     display: flex;
     justify-content: center;
     gap: 1rem;
     padding: 1rem 1.5rem;
     background: linear-gradient(transparent, var(--color-bg) 30%);
     padding-top: 2rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
     transition: opacity 0.2s ease, transform 0.2s ease; /* Alpine transition helper */
 }
 
@@ -7270,7 +7295,7 @@ svg.action-bar-icon {
     box-shadow: var(--shadow-md);
     border: 1px solid var(--color-border);
     white-space: nowrap;
-    z-index: 1002;
+    z-index: calc(var(--z-fullscreen-overlay) + 2);
     opacity: 1;
     transition: opacity 1s ease;
 }
@@ -8110,7 +8135,7 @@ svg.action-bar-icon {
     position: absolute;
     right: 0;
     top: 100%;
-    z-index: 10;
+    z-index: var(--z-raised);
 }
 
 .highlight-color-btn {
