@@ -145,38 +145,6 @@ async function updateUserNote(noteId, updates) {
     };
 }
 
-async function syncLocalNotesToSupabase(localNotes) {
-    const user = await getUser();
-    if (!user) return { synced: 0, errors: [] };
-
-    let synced = 0;
-    const errors = [];
-
-    for (const note of localNotes) {
-        // Skip already synced notes (they have numeric IDs from Supabase)
-        if (note.synced) continue;
-
-        try {
-            await supabaseClient
-                .from('user_notes')
-                .insert({
-                    user_id: user.id,
-                    book: note.book,
-                    chapter: note.chapter,
-                    start_verse: note.startVerse,
-                    end_verse: note.endVerse || note.startVerse,
-                    content: note.content,
-                    created_at: note.created_at
-                });
-            synced++;
-        } catch (err) {
-            errors.push({ note, error: err.message });
-        }
-    }
-
-    return { synced, errors };
-}
-
 // Tag sync functions
 async function fetchUserTags() {
     const user = await getUser();
@@ -312,30 +280,6 @@ async function removeTagFromNote(noteId, tagId) {
     if (error) throw error;
 }
 
-async function fetchNoteTagIds(noteId) {
-    const user = await getUser();
-    if (!user) return [];
-
-    // Verify the note belongs to the current user
-    const { data: note, error: noteError } = await supabaseClient
-        .from('user_notes')
-        .select('id')
-        .eq('id', noteId)
-        .eq('user_id', user.id)
-        .single();
-
-    if (noteError || !note) return [];
-
-    const { data, error } = await supabaseClient
-        .from('note_tags')
-        .select('tag_id')
-        .eq('note_id', noteId);
-
-    if (error) throw error;
-
-    return data.map(row => row.tag_id);
-}
-
 async function fetchAllNoteTags() {
     const user = await getUser();
     if (!user) return {};
@@ -367,41 +311,6 @@ async function fetchAllNoteTags() {
         noteTagsMap[row.note_id].push(row.tag_id);
     }
     return noteTagsMap;
-}
-
-async function setNoteTagIds(noteId, tagIds) {
-    const user = await getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    // Verify the note belongs to the current user
-    const { data: note, error: noteError } = await supabaseClient
-        .from('user_notes')
-        .select('id')
-        .eq('id', noteId)
-        .eq('user_id', user.id)
-        .single();
-
-    if (noteError || !note) throw new Error('Note not found');
-
-    // Delete all existing tags for this note
-    const { error: deleteError } = await supabaseClient
-        .from('note_tags')
-        .delete()
-        .eq('note_id', noteId);
-
-    if (deleteError) throw deleteError;
-
-    // Insert new tags
-    if (tagIds.length > 0) {
-        const { error: insertError } = await supabaseClient
-            .from('note_tags')
-            .insert(tagIds.map(tagId => ({
-                note_id: noteId,
-                tag_id: tagId
-            })));
-
-        if (insertError) throw insertError;
-    }
 }
 
 // Listen for auth state changes
@@ -473,21 +382,6 @@ async function unsubscribeFromReadingPlan(planId) {
         .eq('plan_id', planId);
 
     if (error) throw error;
-}
-
-// Fetch progress for a specific plan
-async function fetchPlanProgress(userPlanId) {
-    const user = await getUser();
-    if (!user) return [];
-
-    const { data, error } = await supabaseClient
-        .from('reading_plan_progress')
-        .select('day_number, completed_at')
-        .eq('user_plan_id', userPlanId);
-
-    if (error) throw error;
-
-    return data.map(p => p.day_number);
 }
 
 // Fetch all progress for all user's plans
@@ -683,21 +577,6 @@ async function uploadBugScreenshot(file) {
     return data.path;
 }
 
-// Fetch user's own bug reports (for viewing history)
-async function fetchUserBugReports() {
-    const user = await getUser();
-    if (!user) return [];
-
-    const { data, error } = await supabaseClient
-        .from('bug_reports')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data;
-}
-
 // Export for use in app.js
 window.SupabaseAuth = {
     getUser,
@@ -709,7 +588,6 @@ window.SupabaseAuth = {
     saveUserNote,
     updateUserNote,
     deleteUserNote,
-    syncLocalNotesToSupabase,
     onAuthStateChange,
     // Tag functions
     fetchUserTags,
@@ -718,14 +596,11 @@ window.SupabaseAuth = {
     deleteUserTag,
     addTagToNote,
     removeTagFromNote,
-    fetchNoteTagIds,
     fetchAllNoteTags,
-    setNoteTagIds,
     // Reading plan functions
     fetchUserReadingPlans,
     subscribeToReadingPlan,
     unsubscribeFromReadingPlan,
-    fetchPlanProgress,
     fetchAllPlanProgress,
     markDayComplete,
     unmarkDayComplete,
@@ -733,6 +608,5 @@ window.SupabaseAuth = {
     syncLocalPlanProgress,
     // Bug report functions
     submitBugReport,
-    uploadBugScreenshot,
-    fetchUserBugReports
+    uploadBugScreenshot
 };

@@ -120,11 +120,6 @@ class OfflineStorage {
         });
     }
 
-    async hasChapterVerses(translation, book, chapter) {
-        const meta = await this.getMeta(`verses:${translation}:${book}:${chapter}`);
-        return meta?.cached === true;
-    }
-
     // ========== ALIGNMENTS ==========
 
     async saveChapterAlignments(translation, book, chapter, alignments) {
@@ -149,6 +144,7 @@ class OfflineStorage {
         });
     }
 
+    // ponytail: unused until offline word study wired up (see CODE_REVIEW_2026-07-21.md R4)
     async getWordAlignment(translation, book, chapter, verse, position) {
         await this.ready;
         const tx = this.db.transaction(STORES.ALIGNMENTS, 'readonly');
@@ -159,11 +155,6 @@ class OfflineStorage {
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
-    }
-
-    async hasChapterAlignments(translation, book, chapter) {
-        const meta = await this.getMeta(`alignments:${translation}:${book}:${chapter}`);
-        return meta?.cached === true;
     }
 
     // ========== LEXICON ==========
@@ -184,6 +175,7 @@ class OfflineStorage {
         });
     }
 
+    // ponytail: unused until offline word study wired up (see CODE_REVIEW_2026-07-21.md R4)
     async getLexiconEntry(strongNumber) {
         await this.ready;
         const tx = this.db.transaction(STORES.LEXICON, 'readonly');
@@ -194,11 +186,6 @@ class OfflineStorage {
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
-    }
-
-    async hasLexicon() {
-        const meta = await this.getMeta('lexicon');
-        return meta?.cached === true;
     }
 
     // ========== CROSS-REFERENCES ==========
@@ -428,16 +415,6 @@ class OfflineStorage {
         });
     }
 
-    async clearStore(storeName) {
-        await this.ready;
-        const tx = this.db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).clear();
-
-        return new Promise((resolve, reject) => {
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
-        });
-    }
 }
 
 // Export singleton instance

@@ -427,12 +427,6 @@ function bibleApp() {
         scrollActiveVerse: null,  // Verse number most visible in viewport
         scrollObserver: null,  // IntersectionObserver instance
 
-        // Devotional state (kept for offline downloads)
-        devotional: { entries: [], month: 0, day: 0 },
-        loadingDevotional: false,
-        devotionalMonth: new Date().getMonth() + 1,
-        devotionalDay: new Date().getDate(),
-
         // Reading Plan state
         showReadingPlan: false,
         readingPlans: [],  // Available plans
@@ -466,10 +460,6 @@ function bibleApp() {
             verses: 0,
             lexicon: false,
             estimatedSize: 0
-        },
-        downloadOptions: {
-            lexicon: false,
-            currentBook: false
         },
         downloadSelections: {
             translations: {
@@ -1642,11 +1632,6 @@ function bibleApp() {
             }
         },
 
-        // Get first highlighted verse or 1
-        getCurrentVerse() {
-            return this.highlightedVerses.length > 0 ? this.highlightedVerses[0] : 1;
-        },
-
         // Check if can go to previous verse
         canGoPrevVerse() {
             return this.highlightedVerses.length > 0 && this.highlightedVerses[0] > 1;
@@ -1662,7 +1647,7 @@ function bibleApp() {
 
         // Navigate to previous verse (within same chapter - no reload)
         previousVerse() {
-            const currentVerse = this.getCurrentVerse();
+            const currentVerse = this.getNoteStartVerse();
             if (currentVerse > 1) {
                 this.navigateToVerse(currentVerse - 1);
             }
@@ -1885,19 +1870,6 @@ function bibleApp() {
             }
         },
 
-        // Group commentary entries by source (kept for combined plan reading mode)
-        getGroupedCommentary() {
-            const grouped = {};
-            for (const entry of this.commentary) {
-                const source = entry.source || 'Unknown';
-                if (!grouped[source]) {
-                    grouped[source] = [];
-                }
-                grouped[source].push(entry);
-            }
-            return grouped;
-        },
-
         // Group commentary by chapter first, then by source (for combined plan reading)
         getGroupedCommentaryByChapter() {
             const byChapter = {};
@@ -1957,21 +1929,6 @@ function bibleApp() {
         // Toggle a commentary source's expanded state
         toggleCommentarySource(source) {
             this.expandedCommentarySources[source] = !this.expandedCommentarySources[source];
-        },
-
-        // Get a preview of the commentary (first 1-2 sentences)
-        getCommentaryPreview(entries) {
-            if (!entries || entries.length === 0) return '';
-            // Get the first entry's content, strip HTML, and take first ~150 chars
-            const firstContent = entries[0].content || '';
-            const plainText = firstContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            // Find a good break point (end of sentence or word boundary)
-            if (plainText.length <= 150) return plainText;
-            const truncated = plainText.substring(0, 150);
-            const lastPeriod = truncated.lastIndexOf('.');
-            const lastSpace = truncated.lastIndexOf(' ');
-            const breakPoint = lastPeriod > 100 ? lastPeriod + 1 : lastSpace > 0 ? lastSpace : 150;
-            return truncated.substring(0, breakPoint).trim() + '...';
         },
 
         // Check if a commentary entry is expanded (active entries auto-expand)
@@ -2651,13 +2608,6 @@ function bibleApp() {
             this.darkMode = theme === 'dark';
             localStorage.setItem('theme', theme);
             localStorage.setItem('darkMode', this.darkMode);
-        },
-
-        // Save dark mode preference (legacy, kept for compatibility)
-        saveDarkMode() {
-            this.currentTheme = this.darkMode ? 'dark' : 'light';
-            localStorage.setItem('darkMode', this.darkMode);
-            localStorage.setItem('theme', this.currentTheme);
         },
 
         // Save default translation preference
@@ -4442,37 +4392,6 @@ function bibleApp() {
             }
         },
 
-        // Start downloading selected offline content
-        async startDownload() {
-            if (this.downloadProgress.active) return;
-
-            this.downloadProgress.active = true;
-            this.downloadProgress.percent = 0;
-
-            try {
-                // Download lexicon if selected
-                if (this.downloadOptions.lexicon && !this.offlineStats.lexicon) {
-                    await this.downloadLexicon();
-                }
-
-                // Download current book if selected
-                if (this.downloadOptions.currentBook && this.currentBook) {
-                    await this.downloadBook(this.currentBook);
-                }
-
-                this.showToast('Download complete!', 'success');
-                await this.updateOfflineStats();
-
-            } catch (err) {
-                console.error('Download failed:', err);
-                this.showToast('Download failed: ' + err.message, 'error');
-            } finally {
-                this.downloadProgress.active = false;
-                this.downloadOptions.lexicon = false;
-                this.downloadOptions.currentBook = false;
-            }
-        },
-
         // Download the Strong's lexicon
         async downloadLexicon() {
             this.downloadProgress.label = 'Downloading lexicon...';
@@ -4493,60 +4412,6 @@ function bibleApp() {
             } catch (err) {
                 console.error('Lexicon download failed:', err);
                 throw err;
-            }
-        },
-
-        // Download an entire book
-        async downloadBook(book) {
-            const chapterCount = BOOK_CHAPTERS[book] || 1;
-            this.downloadProgress.label = `Downloading ${book}...`;
-
-            for (let ch = 1; ch <= chapterCount; ch++) {
-                this.downloadProgress.status = `Chapter ${ch} of ${chapterCount}`;
-                this.downloadProgress.percent = Math.round((ch / chapterCount) * 100);
-
-                try {
-                    // Use the bulk chapter endpoint
-                    const response = await fetch(
-                        `/api/offline/chapter?book=${encodeURIComponent(book)}&chapter=${ch}&translation=${this.translation}`
-                    );
-
-                    if (!response.ok) continue;
-
-                    const data = await response.json();
-
-                    if (window.offlineStorage) {
-                        // Save verses
-                        if (data.verses?.length > 0) {
-                            await window.offlineStorage.saveChapterVerses(this.translation, book, ch, data.verses);
-                        }
-
-                        // Save alignments
-                        if (data.alignments?.length > 0) {
-                            await window.offlineStorage.saveChapterAlignments(this.translation, book, ch, data.alignments);
-                        }
-
-                        // Save interlinear
-                        if (data.interlinear?.length > 0) {
-                            await window.offlineStorage.saveChapterInterlinear(book, ch, data.interlinear);
-                        }
-
-                        // Save cross-refs (API returns camelCase "crossRefs")
-                        if (data.crossRefs?.length > 0) {
-                            await window.offlineStorage.saveChapterCrossRefs(book, ch, data.crossRefs);
-                        }
-
-                        // Save commentary
-                        if (data.commentary?.length > 0) {
-                            await window.offlineStorage.saveChapterCommentary(book, ch, data.commentary);
-                        }
-                    }
-                } catch (err) {
-                    console.warn(`Failed to download ${book} ${ch}:`, err);
-                }
-
-                // Small delay to avoid hammering the server
-                await new Promise(r => setTimeout(r, 100));
             }
         },
 
@@ -4851,63 +4716,6 @@ function bibleApp() {
                 this.isOnline = navigator.onLine;
                 this.showToast('Online mode restored', 'success');
             }
-        },
-
-        // Check if we should allow network requests
-        canUseNetwork() {
-            return !this.forcedOffline && navigator.onLine;
-        },
-
-        // ========== DEVOTIONAL METHODS ==========
-
-        async loadDevotional(date = null) {
-            if (this.loadingDevotional) return;
-
-            this.loadingDevotional = true;
-            try {
-                let url = '/api/devotional';
-                if (date) {
-                    url += `?date=${date}`;
-                } else {
-                    // Use current devotional date state
-                    const dateStr = `${String(this.devotionalMonth).padStart(2, '0')}-${String(this.devotionalDay).padStart(2, '0')}`;
-                    url += `?date=${dateStr}`;
-                }
-
-                const response = await fetch(url);
-                if (response.ok) {
-                    this.devotional = await response.json();
-                } else {
-                    this.devotional = { entries: [], month: this.devotionalMonth, day: this.devotionalDay };
-                }
-            } catch (err) {
-                console.error('Failed to load devotional:', err);
-                this.devotional = { entries: [], month: this.devotionalMonth, day: this.devotionalDay };
-            } finally {
-                this.loadingDevotional = false;
-            }
-        },
-
-        changeDevotionalDate(delta) {
-            // Create a date object to handle month/day rollover
-            const date = new Date(2024, this.devotionalMonth - 1, this.devotionalDay);
-            date.setDate(date.getDate() + delta);
-
-            this.devotionalMonth = date.getMonth() + 1;
-            this.devotionalDay = date.getDate();
-            this.loadDevotional();
-        },
-
-        formatDevotionalDate(month, day) {
-            const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                           'July', 'August', 'September', 'October', 'November', 'December'];
-            return `${months[month - 1]} ${day}`;
-        },
-
-        formatDevotionalText(text) {
-            if (!text) return '';
-            // Convert newlines to paragraphs and clean up
-            return text.split(/\n\n+/).map(p => `<p>${p.trim()}</p>`).join('');
         },
 
         // ========== READING PLAN METHODS ==========
