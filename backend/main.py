@@ -2401,6 +2401,7 @@ def serve_app_with_plan(plan_id: str, day: int):
 # Must be registered last to not override other routes
 @app.get("/{book}/{chapter}")
 @app.get("/{book}/{chapter}/{verse}")
-def serve_app_with_reference(book: str, chapter: int, verse: int = None):
+def serve_app_with_reference(book: str, chapter: int, verse: str = None):
+    # verse is str, not int: share links use ranges like /John/3/16-18
     """Serve main app for clean URLs - JS handles the routing."""
     return FileResponse(frontend_path / "index.html")

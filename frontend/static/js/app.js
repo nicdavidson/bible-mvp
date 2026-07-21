@@ -46,6 +46,17 @@ const BOOK_CHAPTERS = {
     "Jude": 1, "Revelation": 22
 };
 
+// Parse localStorage JSON without letting one corrupt value throw during
+// Alpine init and blank the whole app.
+function safeParse(key, fallback) {
+    try {
+        return JSON.parse(localStorage.getItem(key)) ?? fallback;
+    } catch (e) {
+        console.warn(`Corrupt localStorage value for ${key}, using fallback`, e);
+        return fallback;
+    }
+}
+
 // Book abbreviation mappings for linkifying Bible references
 const BOOK_ABBREVS = {
     // Old Testament
@@ -433,6 +444,7 @@ function bibleApp() {
         planReadingMode: false,  // True when reading a plan (shows all passages together)
         planReadings: [],  // Passages loaded for current plan day
         combinedPlanReading: false,  // True when showing plan readings in main reader format
+        selectionContext: null,      // {book, chapter} the current selection belongs to (combined plan mode)
         planReadingSections: [],  // Section info for combined reading: [{label, reference, startIndex}]
         planReadingChapters: [],  // Chapters being read in combined mode: [{book, chapter}]
         wasInPlanReading: false,  // True when user navigated away from plan reading (for "return" button)
@@ -492,14 +504,14 @@ function bibleApp() {
         feedbackError: null,
 
         // Reading history state
-        readingHistory: JSON.parse(localStorage.getItem('readingHistory') || '[]'),
+        readingHistory: safeParse('readingHistory', []),
 
         // Bookmarks state
-        bookmarks: JSON.parse(localStorage.getItem('bible-bookmarks') || '[]'),
+        bookmarks: safeParse('bible-bookmarks', []),
 
         // Scripture Memory state
         showMemoryTool: false,
-        memoryVerses: JSON.parse(localStorage.getItem('memoryVerses') || '[]'),
+        memoryVerses: safeParse('memoryVerses', []),
         memoryActiveCard: null,  // index in memoryDueCards
         memoryStage: 'prompt',   // 'prompt', 'firstLetters', 'blanks', 'reveal'
         memoryDueCards: [],      // computed subset of memoryVerses that are due for review
@@ -790,8 +802,8 @@ function bibleApp() {
         // Parse path-based reference from URL (e.g., /John/3/16 or /John/3)
         parsePathReference() {
             const path = window.location.pathname;
-            // Match /Book/Chapter or /Book/Chapter/Verse
-            const match = path.match(/^\/([^\/]+)\/(\d+)(?:\/(\d+))?$/);
+            // Match /Book/Chapter, /Book/Chapter/Verse, or /Book/Chapter/First-Last
+            const match = path.match(/^\/([^\/]+)\/(\d+)(?:\/(\d+(?:-\d+)?))?$/);
             if (match) {
                 const book = decodeURIComponent(match[1]).replace(/-/g, ' ');
                 const chapter = match[2];
@@ -1733,6 +1745,10 @@ function bibleApp() {
 
             // In note edit mode, handle verse selection for multi-verse notes
             if (this.noteEditMode) {
+                // Combined plan mode: notes anchor to one chapter — ignore
+                // clicks on verses outside the selection's chapter
+                if (this.combinedPlanReading && verseIdx !== undefined
+                    && !this.verseInSelectionScope(this.verses[verseIdx])) return;
                 this.handleVerseSelection(verseNum, event);
                 return;
             }
@@ -1993,6 +2009,7 @@ function bibleApp() {
         clearVerseSelection() {
             if (this.highlightedVerses.length === 0) return;
             this.highlightedVerses = [];
+            this.selectionContext = null;
             this.selectedWord = null;
             this.showHighlightPicker = null;
             document.querySelectorAll('.word.selected').forEach(el => el.classList.remove('selected'));
@@ -2095,20 +2112,32 @@ function bibleApp() {
         // Select a specific verse (click on verse box) - supports multi-select
         // verseIdx is optional and used in combined mode to identify the exact verse
         async selectVerse(verseNum, verseIdx) {
+            // Combined plan mode: selection is scoped to one chapter. Clicking a
+            // verse in a different chapter starts a fresh selection there instead
+            // of toggling the same verse number across every chapter.
+            const verseObj = (this.combinedPlanReading && verseIdx !== undefined)
+                ? this.verses[verseIdx] : null;
+            const sameScope = !verseObj || !this.selectionContext
+                || (verseObj._book === this.selectionContext.book
+                    && verseObj._chapter === this.selectionContext.chapter);
+            if (this.combinedPlanReading && !sameScope) {
+                this.highlightedVerses = [];
+            }
+
             // If this verse is already the only highlighted verse, deselect it
-            if (this.highlightedVerses.length === 1 && this.highlightedVerses[0] === verseNum) {
+            if (sameScope && this.highlightedVerses.length === 1 && this.highlightedVerses[0] === verseNum) {
                 this.clearVerseSelection();
                 return;
             }
 
             // Multi-select: if already have selection, add/remove this verse
-            if (this.highlightedVerses.length > 0 && this.highlightedVerses.includes(verseNum)) {
+            if (sameScope && this.highlightedVerses.length > 0 && this.highlightedVerses.includes(verseNum)) {
                 // Remove from selection
                 this.highlightedVerses = this.highlightedVerses.filter(v => v !== verseNum);
                 return;
             }
 
-            if (this.highlightedVerses.length > 0) {
+            if (sameScope && this.highlightedVerses.length > 0) {
                 // Add to selection
                 this.highlightedVerses = [...this.highlightedVerses, verseNum];
                 return;
@@ -2116,6 +2145,8 @@ function bibleApp() {
 
             // New single selection
             this.highlightedVerses = [verseNum];
+            this.selectionContext = verseObj
+                ? { book: verseObj._book, chapter: verseObj._chapter } : null;
             this.selectedWord = null;
             this.showHighlightPicker = null;
 
@@ -3924,10 +3955,14 @@ function bibleApp() {
         },
 
         // Get tag colors for a verse (from notes on that verse)
-        getVerseTagColors(verseNum) {
+        getVerseTagColors(verseNum, verseObj) {
+            // Combined plan mode: each verse carries its own _book/_chapter;
+            // currentBook/currentChapter only track the last selection there.
+            const book = verseObj?._book ?? this.currentBook;
+            const chapter = verseObj?._chapter ?? this.currentChapter;
             const colors = [];
             for (const note of this.notes) {
-                if (note.book !== this.currentBook || note.chapter !== this.currentChapter) continue;
+                if (note.book !== book || note.chapter !== chapter) continue;
                 const start = note.startVerse || 1;
                 const end = note.endVerse || start;
                 if (verseNum >= start && verseNum <= end) {
@@ -4026,9 +4061,18 @@ function bibleApp() {
             return Math.max(...this.selectedVerses);
         },
 
+        // In combined plan mode multiple chapters are concatenated into one
+        // verses array, so a bare verse number is ambiguous — selection is
+        // additionally scoped to the chapter it was made in.
+        verseInSelectionScope(verseObj) {
+            if (!this.combinedPlanReading || !this.selectionContext) return true;
+            return !!verseObj && verseObj._book === this.selectionContext.book
+                && verseObj._chapter === this.selectionContext.chapter;
+        },
+
         // Check if a verse should be highlighted
-        isVerseHighlighted(verseNum) {
-            return this.highlightedVerses.includes(verseNum);
+        isVerseHighlighted(verseNum, verseObj) {
+            return this.highlightedVerses.includes(verseNum) && this.verseInSelectionScope(verseObj);
         },
 
         // Update URL with clean path format (/Book/Chapter/Verse or /plan/PlanId/Day)
@@ -5732,9 +5776,9 @@ function bibleApp() {
 
         // ========== VERSE HIGHLIGHTING (via tags) ==========
 
-        getVerseHighlightColor(verseNum) {
+        getVerseHighlightColor(verseNum, verseObj) {
             // Returns the first tag color on this verse (used for background)
-            const colors = this.getVerseTagColors(verseNum);
+            const colors = this.getVerseTagColors(verseNum, verseObj);
             return colors.length > 0 ? colors[0] : null;
         },
 

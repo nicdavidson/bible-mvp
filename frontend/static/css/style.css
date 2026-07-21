@@ -8455,26 +8455,26 @@ svg.action-bar-icon {
 }
 
 /* Dark mode adjustments */
-[data-theme="dark"] .topic-chip {
+.dark .topic-chip {
     background: rgba(129, 140, 248, 0.12);
     border-color: rgba(129, 140, 248, 0.25);
     color: #818cf8;
 }
-[data-theme="dark"] .topic-az-btn {
+.dark .topic-az-btn {
     background: var(--color-bg-secondary);
 }
-[data-theme="dark"] .topic-search-snippet mark {
+.dark .topic-search-snippet mark {
     background: rgba(251, 191, 36, 0.25);
 }
 
 /* Parchment theme adjustments */
-[data-theme="parchment"] .topic-chip {
+.parchment .topic-chip {
     background: rgba(120, 80, 40, 0.08);
     border-color: rgba(120, 80, 40, 0.2);
     color: #8b6914;
 }
-[data-theme="parchment"] .topic-az-btn.active,
-[data-theme="parchment"] .topic-az-btn:hover:not(:disabled) {
+.parchment .topic-az-btn.active,
+.parchment .topic-az-btn:hover:not(:disabled) {
     background: #8b6914;
     border-color: #8b6914;
 }

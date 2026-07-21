@@ -131,7 +131,7 @@ class TestJS:
     def test_multi_select_in_selectVerse(self, js):
         """selectVerse should support adding to existing selection."""
         idx = js.index("async selectVerse(")
-        snippet = js[idx:idx + 600]
+        snippet = js[idx:idx + 1600]
         assert "highlightedVerses.includes(verseNum)" in snippet
 
     def test_no_copyFeedback_conflict(self, js):

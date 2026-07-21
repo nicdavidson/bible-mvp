@@ -461,22 +461,22 @@
                                 class="verse-box"
                                 :id="'verse-' + verse.verse"
                                 :class="{
-                                    'verse-highlighted': isVerseHighlighted(verse.verse),
+                                    'verse-highlighted': isVerseHighlighted(verse.verse, verse),
                                     'verse-speaking': ttsCurrentVerse === verse.verse,
                                     'has-interlinear': showInterlinear && hasInterlinear(verse.verse, verseIdx),
-                                    'verse-selected-for-note': noteEditMode && isVerseSelectedForNote(verse.verse),
-                                    'verse-selected-for-share': shareMode && shareSelectedVerses.includes(verse.verse),
-                                    'verse-color-highlighted': !!getVerseHighlightColor(verse.verse)
+                                    'verse-selected-for-note': noteEditMode && isVerseSelectedForNote(verse.verse) && verseInSelectionScope(verse),
+                                    'verse-selected-for-share': shareMode && shareSelectedVerses.includes(verse.verse) && verseInSelectionScope(verse),
+                                    'verse-color-highlighted': !!getVerseHighlightColor(verse.verse, verse)
                                 }"
-                                :style="getVerseHighlightColor(verse.verse) ? 'background-color: ' + getVerseHighlightColor(verse.verse) : ''"
+                                :style="getVerseHighlightColor(verse.verse, verse) ? 'background-color: ' + getVerseHighlightColor(verse.verse, verse) : ''"
                                 @click="shareMode ? toggleShareVerse(verse.verse) : handleVerseBoxClick($event, verse.verse, verseIdx)"
                                 @touchstart="startLongPress(verse.verse, verseIdx)"
                                 @touchmove="cancelLongPress()"
                                 @touchend="cancelLongPress()"
                             >
                             <!-- Tag indicator dots -->
-                            <span class="verse-tag-dots" x-show="getVerseTagColors(verse.verse).length > 0">
-                                <template x-for="(color, idx) in getVerseTagColors(verse.verse)" :key="'dot-' + verse.verse + '-' + idx">
+                            <span class="verse-tag-dots" x-show="getVerseTagColors(verse.verse, verse).length > 0">
+                                <template x-for="(color, idx) in getVerseTagColors(verse.verse, verse)" :key="'dot-' + verse.verse + '-' + idx">
                                     <span class="tag-dot" :style="'background-color: ' + color"></span>
                                 </template>
                             </span>
@@ -502,19 +502,19 @@
                                 </template>
                             </div>
                             <!-- Highlight color picker (creates tag-based notes) -->
-                            <div class="highlight-picker" x-show="showHighlightPicker === verse.verse" @click.outside="showHighlightPicker = null" x-transition>
+                            <div class="highlight-picker" x-show="showHighlightPicker === verse.verse && verseInSelectionScope(verse)" @click.outside="showHighlightPicker = null" x-transition>
                                 <template x-for="(hc, hIdx) in highlightColors" :key="'hc-' + hIdx">
                                     <button
                                         class="highlight-color-btn"
                                         :style="'background-color: ' + hc"
                                         @click.stop="highlightSelectedVerses(hc)"
-                                        :class="{ 'active': getVerseHighlightColor(verse.verse) === hc }"
+                                        :class="{ 'active': getVerseHighlightColor(verse.verse, verse) === hc }"
                                     ></button>
                                 </template>
                                 <button
                                     class="highlight-color-btn highlight-clear"
                                     @click.stop="removeHighlightSelected()"
-                                    x-show="getVerseHighlightColor(verse.verse)"
+                                    x-show="getVerseHighlightColor(verse.verse, verse)"
                                     title="Remove highlight"
                                 >✕</button>
                             </div>
