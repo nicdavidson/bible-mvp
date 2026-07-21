@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="Free, open-source Bible study platform with cross-resource linking">
     <meta name="theme-color" content="#2563eb">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -484,7 +484,7 @@
                             <span
                                 class="verse-text"
                                 :class="{ 'red-letter': isRedLetterVerse(verse.verse) }"
-                                x-html="formatVerseText(verse.text)"
+                                x-html="verse.html"
                             ></span>
                             <!-- Interlinear display -->
                             <div x-show="showInterlinear && hasInterlinear(verse.verse, verseIdx)" class="interlinear-row" :class="getInterlinearLanguage(verse.verse, verseIdx)">

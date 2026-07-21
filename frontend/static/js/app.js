@@ -28,6 +28,15 @@ const NT_BOOKS = [
 // All Bible books for autocomplete
 const BIBLE_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
 
+// Shared empty result for getVerseTagColors — avoids allocating a new array
+// per call (it's hit several times per verse per render).
+const EMPTY_COLORS = [];
+
+// getRelevantNotes memo. Module scope (not Alpine state) so cache writes
+// inside render effects don't register as reactive dependencies.
+let _relevantNotesKey = null;
+let _relevantNotesCache = [];
+
 // Chapter counts for each book
 const BOOK_CHAPTERS = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
@@ -338,6 +347,8 @@ function bibleApp() {
         // Interlinear data
         interlinearData: {},  // verse number -> words array
         showInterlinear: false,
+        interlinearLoading: false,  // True while interlinear data is being fetched (lazy load)
+        _interlinearRef: null,  // 'Book Chapter' the loaded interlinearData belongs to (null = not loaded)
         interlinearLanguage: '',  // 'hebrew' or 'greek'
         interlinearSourceText: '',  // Source text label (e.g., "Westminster Leningrad Codex")
         sourceTextWarningDismissed: localStorage.getItem('sourceTextWarningDismissed') === 'true',
@@ -419,6 +430,8 @@ function bibleApp() {
         // Tag state
         tags: [],  // User's tags: { id, name, color, sortOrder, synced }
         noteTags: {},  // Map of noteId -> [tagId, ...]
+        verseColorMap: {},  // Precomputed 'Book|Chapter|Verse' -> [tag colors] (max 3)
+        noteDataVersion: 0,  // Bumped by rebuildVerseColorMap() to invalidate derived-note caches
         editingTag: null,  // Tag being edited in settings
         newTagName: '',
         newTagColor: '#ef4444',
@@ -562,6 +575,10 @@ function bibleApp() {
             this.translation = this.defaultTranslation;
             this.defaultShowInterlinear = localStorage.getItem('defaultShowInterlinear') === 'true';
             this.showInterlinear = this.defaultShowInterlinear;
+            // Interlinear data is lazy-loaded (P3): fetch on first toggle-on
+            this.$watch('showInterlinear', (on) => {
+                if (on) this.ensureInterlinearLoaded();
+            });
             this.autoCacheEnabled = localStorage.getItem('autoCacheEnabled') !== 'false';
             this.forcedOffline = localStorage.getItem('forcedOffline') === 'true';
             this.showRedLetter = localStorage.getItem('showRedLetter') !== 'false';  // Default true
@@ -1080,10 +1097,11 @@ function bibleApp() {
                         this.translation, inputBook, inputChapter
                     );
                     if (cached && cached.length > 0) {
-                        // Show cached data immediately
-                        this.verses = cached.map(v => ({ verse: v.verse, text: v.text }));
+                        // Show cached data immediately (html precomputed once per assignment)
+                        this.verses = cached.map(v => ({ verse: v.verse, text: v.text, html: this.formatVerseText(v.text) }));
                         this.currentReference = `${inputBook} ${inputChapter}`;
                         this.parseCurrentReference();
+                        this.rebuildVerseColorMap();
                         this.crossRefs = [];
                         this.highlightedVerses = [];
                         this.speakerVerses = [];
@@ -1121,13 +1139,15 @@ function bibleApp() {
 
                 const data = await response.json();
                 this.currentReference = data.reference;
-                this.verses = data.verses;
+                // Precompute rendered html once per assignment (P5) instead of per render
+                this.verses = (data.verses || []).map(v => ({ ...v, html: this.formatVerseText(v.text) }));
                 this.crossRefs = data.cross_references || [];
                 this.highlightedVerses = data.highlighted_verses || [];
                 this.speakerVerses = data.speaker_verses || [];
 
                 // Parse reference for navigation
                 this.parseCurrentReference();
+                this.rebuildVerseColorMap();
 
                 // Track in reading history
                 this.addToHistory(this.currentReference, this.translation);
@@ -1138,11 +1158,16 @@ function bibleApp() {
                 // Load commentary
                 await this.loadCommentary();
 
-                // Load interlinear data if available
-                if (OT_BOOKS.includes(this.currentBook) || NT_BOOKS.includes(this.currentBook)) {
+                // Load interlinear data if available. Lazy by default (P3): the
+                // payload is ~50KB/chapter and the feature is off by default.
+                // Eager only when the toggle is already on, or when auto-cache
+                // needs the data for offline storage.
+                if ((this.showInterlinear || this.autoCacheEnabled)
+                        && (OT_BOOKS.includes(this.currentBook) || NT_BOOKS.includes(this.currentBook))) {
                     await this.loadInterlinearData();
                 } else {
                     this.interlinearData = {};
+                    this._interlinearRef = null;
                 }
 
                 // Scroll to highlighted verse if any
@@ -1189,9 +1214,10 @@ function bibleApp() {
                     this.translation, book, chapter
                 );
                 if (cached && cached.length > 0) {
-                    this.verses = cached.map(v => ({ verse: v.verse, text: v.text }));
+                    this.verses = cached.map(v => ({ verse: v.verse, text: v.text, html: this.formatVerseText(v.text) }));
                     this.currentReference = `${book} ${chapter}`;
                     this.parseCurrentReference();
+                    this.rebuildVerseColorMap();
                     this.crossRefs = [];
                     this.highlightedVerses = [];
                     this.speakerVerses = [];
@@ -1204,9 +1230,15 @@ function bibleApp() {
                         if (cachedRefs?.length > 0) this.crossRefs = cachedRefs;
                     } catch (e) { /* silent */ }
 
-                    // Load cached commentary and interlinear
+                    // Load cached commentary and interlinear (interlinear lazy
+                    // unless shown or auto-cache wants it — P3)
                     await this.loadCommentary();
-                    await this.loadInterlinearData();
+                    if (this.showInterlinear || this.autoCacheEnabled) {
+                        await this.loadInterlinearData();
+                    } else {
+                        this.interlinearData = {};
+                        this._interlinearRef = null;
+                    }
 
                     this.error = null;
                     this.showToast('Loaded from offline cache', 'info');
@@ -2101,9 +2133,12 @@ function bibleApp() {
                     this.referenceInput = this.currentReference;
 
                     // Load cross-refs, commentary, and topics for just this verse
-                    await this.loadCrossRefs();
-                    await this.loadCommentary();
-                    this.loadTopicsForVerse(verseNum);
+                    // (independent requests — run concurrently)
+                    await Promise.all([
+                        this.loadCrossRefs(),
+                        this.loadCommentary(),
+                        this.loadTopicsForVerse(verseNum)
+                    ]);
                     this.$nextTick(() => this.scrollCommentaryToVerse(verseNum));
                 }
                 return;
@@ -2116,10 +2151,12 @@ function bibleApp() {
             // Update URL
             this.updateURL();
 
-            // Reload cross-references, commentary, and topics for the selected verse
-            await this.loadCrossRefs();
-            await this.loadCommentary();
-            this.loadTopicsForVerse(verseNum);
+            // Reload cross-references and topics for the selected verse, concurrently.
+            // Commentary is chapter-scoped and already loaded by loadPassage — no refetch (P2).
+            await Promise.all([
+                this.loadCrossRefs(),
+                this.loadTopicsForVerse(verseNum)
+            ]);
             this.$nextTick(() => this.scrollCommentaryToVerse(verseNum));
         },
 
@@ -2231,9 +2268,22 @@ function bibleApp() {
             this.versePreview.show = false;
         },
 
+        // Lazy interlinear (P3): called when the toggle turns on. No-op if the
+        // current chapter's data is already loaded, a load is in flight, or
+        // we're in combined plan reading (which loads interlinear eagerly).
+        async ensureInterlinearLoaded() {
+            if (this.combinedPlanReading || this.interlinearLoading) return;
+            if (!this.currentBook || !this.currentChapter) return;
+            if (this._interlinearRef === `${this.currentBook} ${this.currentChapter}`) return;
+            if (!(OT_BOOKS.includes(this.currentBook) || NT_BOOKS.includes(this.currentBook))) return;
+            await this.loadInterlinearData();
+        },
+
         // Load interlinear data for the entire chapter
         async loadInterlinearData() {
+            this.interlinearLoading = true;
             this.interlinearData = {};
+            this._interlinearRef = null;
 
             const ref = `${this.currentBook} ${this.currentChapter}`;
             const result = await this._fetchOrCache(
@@ -2270,6 +2320,9 @@ function bibleApp() {
                     this.interlinearSourceText = '';
                 }
             }
+            // Mark loaded only on success so a failed fetch retries on next toggle
+            if (result.ok) this._interlinearRef = ref;
+            this.interlinearLoading = false;
         },
 
         // Check if verse has interlinear data
@@ -3487,6 +3540,7 @@ function bibleApp() {
                 const saved = localStorage.getItem('bible-notes');
                 this.notes = saved ? JSON.parse(saved) : [];
             }
+            this.rebuildVerseColorMap();
         },
 
         // Note editing state
@@ -3554,15 +3608,28 @@ function bibleApp() {
             return this.scrollActiveVerse;
         },
 
-        // Get all notes for the current chapter, sorted with active verse notes first
+        // Get all notes for the current chapter, sorted with active verse notes first.
+        // Memoized: called 10+ times per render from templates. The key covers every
+        // input the result depends on; noteDataVersion is bumped on note/tag changes.
         getRelevantNotes() {
+            const key = [
+                this.noteDataVersion,
+                this.getActiveVerse(),
+                this.currentBook,
+                this.currentChapter,
+                this.combinedPlanReading
+                    ? this.planReadingChapters.map(c => `${c.book}|${c.chapter}`).join(',')
+                    : ''
+            ].join('~');
+            if (key === _relevantNotesKey) return _relevantNotesCache;
+
             // Filter to current chapter, exclude highlight-only notes (no content)
             const chapterNotes = this.notes.filter(note =>
                 this.noteInCurrentChapter(note) && (note.content?.trim())
             );
 
             // Sort: active verse notes first, then by verse number
-            return chapterNotes.sort((a, b) => {
+            _relevantNotesCache = chapterNotes.sort((a, b) => {
                 const aActive = this.noteMatchesActiveVerse(a);
                 const bActive = this.noteMatchesActiveVerse(b);
 
@@ -3572,6 +3639,8 @@ function bibleApp() {
                 // Same active status: sort by verse
                 return (a.startVerse || 1) - (b.startVerse || 1);
             });
+            _relevantNotesKey = key;
+            return _relevantNotesCache;
         },
 
         async saveNote() {
@@ -3612,6 +3681,7 @@ function bibleApp() {
                     localStorage.setItem('bible-notes', JSON.stringify(this.notes));
                     savedNoteId = note.id;
                 }
+                this.rebuildVerseColorMap();
 
                 // Apply pending tags to the new note
                 if (this.pendingNoteTags.length > 0 && savedNoteId) {
@@ -3641,6 +3711,7 @@ function bibleApp() {
                 }
                 // Always remove from local state
                 this.notes = this.notes.filter(n => n.id !== noteId);
+                this.rebuildVerseColorMap();
 
                 // Update localStorage for guests
                 if (!this.authUser) {
@@ -3681,6 +3752,7 @@ function bibleApp() {
                 if (noteIndex !== -1) {
                     this.notes[noteIndex].content = updatedContent;
                 }
+                this.rebuildVerseColorMap();  // content changes affect getRelevantNotes (empty-note filter)
 
                 // Update localStorage for guests
                 if (!this.authUser) {
@@ -3723,6 +3795,7 @@ function bibleApp() {
                 const savedTags = localStorage.getItem('bible-tags');
                 this.tags = savedTags ? JSON.parse(savedTags) : [];
             }
+            this.rebuildVerseColorMap();
         },
 
         // Create a new tag
@@ -3771,6 +3844,7 @@ function bibleApp() {
                     localStorage.setItem('bible-tags', JSON.stringify(this.tags));
                 }
                 this.editingTag = null;
+                this.rebuildVerseColorMap();  // tag color may have changed
             } catch (err) {
                 console.error('Failed to update tag:', err);
                 this.showToast('Failed to update tag', 'error');
@@ -3796,6 +3870,7 @@ function bibleApp() {
                     localStorage.setItem('bible-tags', JSON.stringify(this.tags));
                     localStorage.setItem('bible-note-tags', JSON.stringify(this.noteTags));
                 }
+                this.rebuildVerseColorMap();
             } catch (err) {
                 console.error('Failed to delete tag:', err);
                 this.showToast('Failed to delete tag', 'error');
@@ -3832,6 +3907,7 @@ function bibleApp() {
                 if (!this.authUser) {
                     localStorage.setItem('bible-note-tags', JSON.stringify(this.noteTags));
                 }
+                this.rebuildVerseColorMap();
             } catch (err) {
                 console.error('Failed to toggle note tag:', err);
                 this.showToast('Failed to update tags', 'error');
@@ -3858,27 +3934,42 @@ function bibleApp() {
             return this.pendingNoteTags.includes(tagId);
         },
 
-        // Get tag colors for a verse (from notes on that verse)
+        // Rebuild the precomputed verse -> tag colors map. Must be called after
+        // any note/tag/note-tag mutation (and on passage/plan load for safety).
+        // Keys are always 'Book|Chapter|Verse' so combined plan mode (verses
+        // carry their own _book/_chapter) and normal mode share one map, and
+        // highlights paint per-chapter in combined mode.
+        rebuildVerseColorMap() {
+            const map = {};
+            for (const note of this.notes) {
+                const tagIds = this.noteTags[note.id] || [];
+                if (tagIds.length === 0) continue;
+                // Same ordering as getNoteTagObjects: this.tags order
+                const colors = this.tags.filter(t => tagIds.includes(t.id)).map(t => t.color);
+                if (colors.length === 0) continue;
+                const start = note.startVerse || 1;
+                const end = note.endVerse || start;
+                for (let v = start; v <= end; v++) {
+                    const key = `${note.book}|${note.chapter}|${v}`;
+                    let bucket = map[key];
+                    if (!bucket) bucket = map[key] = [];
+                    for (const color of colors) {
+                        if (bucket.length < 3 && !bucket.includes(color)) bucket.push(color); // Max 3 dots
+                    }
+                }
+            }
+            this.verseColorMap = map;  // fresh object → Alpine re-renders dependents
+            this.noteDataVersion++;    // invalidates getRelevantNotes memo
+        },
+
+        // Get tag colors for a verse (from notes on that verse).
+        // O(1) lookup into the precomputed verseColorMap.
         getVerseTagColors(verseNum, verseObj) {
             // Combined plan mode: each verse carries its own _book/_chapter;
             // currentBook/currentChapter only track the last selection there.
             const book = verseObj?._book ?? this.currentBook;
             const chapter = verseObj?._chapter ?? this.currentChapter;
-            const colors = [];
-            for (const note of this.notes) {
-                if (note.book !== book || note.chapter !== chapter) continue;
-                const start = note.startVerse || 1;
-                const end = note.endVerse || start;
-                if (verseNum >= start && verseNum <= end) {
-                    const noteTags = this.getNoteTagObjects(note.id);
-                    for (const tag of noteTags) {
-                        if (!colors.includes(tag.color)) {
-                            colors.push(tag.color);
-                        }
-                    }
-                }
-            }
-            return colors.slice(0, 3); // Max 3 dots
+            return this.verseColorMap[`${book}|${chapter}|${verseNum}`] || EMPTY_COLORS;
         },
 
         // ========== MULTI-VERSE SELECTION METHODS ==========
@@ -5149,6 +5240,9 @@ function bibleApp() {
             // Parse and load each reading
             const readingTypes = ['chronological', 'psalms', 'proverbs'];
 
+            // P4: fire all passage fetches concurrently, then assemble results
+            // in the original section/chapter order.
+            const sectionPlans = [];
             for (const type of readingTypes) {
                 const ref = readings[type];
                 if (!ref) continue;
@@ -5157,15 +5251,31 @@ function bibleApp() {
                 const refs = this.parseReadingReference(ref);
                 const label = type === 'chronological' ? 'Main Reading' : type.charAt(0).toUpperCase() + type.slice(1);
 
+                sectionPlans.push({
+                    type, label, reference: ref,
+                    fetches: refs.map(singleRef =>
+                        fetch(`/api/passage/${encodeURIComponent(singleRef)}?translation=${this.translation}`)
+                            .then(response => response.ok ? response.json() : null)
+                            .then(data => ({ singleRef, data }))
+                            .catch(err => {
+                                console.error(`Failed to load ${type} (${singleRef}):`, err);
+                                return { singleRef, data: null };
+                            })
+                    )
+                });
+            }
+
+            for (const section of sectionPlans) {
+                const { type, label } = section;
+
                 // Track the section start
                 const sectionStartIndex = allVerses.length;
 
                 try {
                     let isFirstChapterInSection = true;
-                    for (const singleRef of refs) {
-                        const response = await fetch(`/api/passage/${encodeURIComponent(singleRef)}?translation=${this.translation}`);
-                        if (response.ok) {
-                            const data = await response.json();
+                    const results = await Promise.all(section.fetches);
+                    for (const { singleRef, data } of results) {
+                        if (data) {
 
                             // Collect cross-references with book/chapter context
                             if (data.cross_references && data.cross_references.length > 0) {
@@ -5210,6 +5320,7 @@ function bibleApp() {
 
                             verses = verses.map((v, idx) => ({
                                 ...v,
+                                html: this.formatVerseText(v.text),  // precomputed render (P5)
                                 _book: verseBook,
                                 _chapter: verseChapter,
                                 // Mark first verse of each chapter for section headers
@@ -5229,7 +5340,7 @@ function bibleApp() {
                     this.planReadingSections.push({
                         type,
                         label,
-                        reference: ref,
+                        reference: section.reference,
                         startIndex: sectionStartIndex
                     });
                 } catch (err) {
@@ -5245,62 +5356,67 @@ function bibleApp() {
             this.combinedCrossRefs = allCrossRefs;  // Store for restoration after verse deselect
             this.commentary = [];
             this.loading = false;
+            this.rebuildVerseColorMap();
 
             // Clear book/chapter since we're in combined mode
             this.currentBook = null;
             this.currentChapter = null;
 
-            // Load commentary for all chapters (deduplicated)
+            // P4: load commentary and interlinear for all chapters (deduplicated)
+            // concurrently — one round-trip of wall clock instead of 2×chapters.
             const uniqueChapters = [...new Map(chaptersToLoadCommentary.map(c => [c.ref, c])).values()];
-            for (const chapterInfo of uniqueChapters) {
-                try {
-                    const commentaryResponse = await fetch(
-                        `/api/passage/${encodeURIComponent(chapterInfo.ref)}/commentary`
-                    );
-                    if (commentaryResponse.ok) {
-                        const commentaryData = await commentaryResponse.json();
-                        if (commentaryData.entries && commentaryData.entries.length > 0) {
-                            // Add book/chapter context to each entry
-                            const entriesWithContext = commentaryData.entries.map(entry => ({
-                                ...entry,
-                                _sourceBook: chapterInfo.book,
-                                _sourceChapter: chapterInfo.chapter,
-                                _sourceRef: chapterInfo.ref
-                            }));
-                            allCommentary = allCommentary.concat(entriesWithContext);
-                        }
-                    }
-                } catch (err) {
-                    console.error(`Failed to load commentary for ${chapterInfo.ref}:`, err);
-                }
+
+            const commentaryPromise = Promise.all(uniqueChapters.map(chapterInfo =>
+                fetch(`/api/passage/${encodeURIComponent(chapterInfo.ref)}/commentary`)
+                    .then(resp => resp.ok ? resp.json() : null)
+                    .then(commentaryData => {
+                        if (!commentaryData?.entries?.length) return [];
+                        // Add book/chapter context to each entry
+                        return commentaryData.entries.map(entry => ({
+                            ...entry,
+                            _sourceBook: chapterInfo.book,
+                            _sourceChapter: chapterInfo.chapter,
+                            _sourceRef: chapterInfo.ref
+                        }));
+                    })
+                    .catch(err => {
+                        console.error(`Failed to load commentary for ${chapterInfo.ref}:`, err);
+                        return [];
+                    })
+            ));
+
+            const interlinearPromise = Promise.all(uniqueChapters.map(chapterInfo =>
+                fetch(`/api/passage/${encodeURIComponent(chapterInfo.ref)}/interlinear?translation=${this.translation}`)
+                    .then(resp => resp.ok ? resp.json() : null)
+                    .then(data => ({ chapterInfo, data }))
+                    .catch(err => {
+                        console.error(`Failed to load interlinear for ${chapterInfo.ref}:`, err);
+                        return { chapterInfo, data: null };
+                    })
+            ));
+
+            this.interlinearData = {};
+            const [commentaryGroups, interlinearResults] = await Promise.all([commentaryPromise, interlinearPromise]);
+
+            for (const entries of commentaryGroups) {
+                allCommentary = allCommentary.concat(entries);
             }
             this.commentary = allCommentary;
             this.combinedCommentary = allCommentary;  // Store for restoration after verse deselect
 
-            // Load interlinear data for all chapters
-            this.interlinearData = {};
-            for (const chapterInfo of uniqueChapters) {
-                try {
-                    const interlinearResponse = await fetch(
-                        `/api/passage/${encodeURIComponent(chapterInfo.ref)}/interlinear?translation=${this.translation}`
-                    );
-                    if (interlinearResponse.ok) {
-                        const interlinearData = await interlinearResponse.json();
-                        if (interlinearData.has_interlinear && interlinearData.verses) {
-                            // Store with compound key: book|chapter|verse
-                            for (const [verseNum, words] of Object.entries(interlinearData.verses)) {
-                                const key = `${chapterInfo.book}|${chapterInfo.chapter}|${verseNum}`;
-                                this.interlinearData[key] = {
-                                    language: interlinearData.language,
-                                    words: words
-                                };
-                            }
-                        }
+            const interlinearMap = {};
+            for (const { chapterInfo, data } of interlinearResults) {
+                if (data?.has_interlinear && data.verses) {
+                    // Store with compound key: book|chapter|verse
+                    for (const [verseNum, words] of Object.entries(data.verses)) {
+                        interlinearMap[`${chapterInfo.book}|${chapterInfo.chapter}|${verseNum}`] = {
+                            language: data.language,
+                            words: words
+                        };
                     }
-                } catch (err) {
-                    console.error(`Failed to load interlinear for ${chapterInfo.ref}:`, err);
                 }
             }
+            this.interlinearData = interlinearMap;
 
             // Setup scroll-based verse tracking
             this.$nextTick(() => {
