@@ -24,6 +24,27 @@ logger = logging.getLogger(__name__)
 # Static files
 frontend_path = Path(__file__).parent.parent / "frontend"
 
+# Canonical book names in order
+OT_BOOKS = [
+    "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+    "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+    "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
+    "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+    "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
+    "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+    "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
+    "Haggai", "Zechariah", "Malachi"
+]
+NT_BOOKS = [
+    "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
+    "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+    "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
+    "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
+    "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+    "Jude", "Revelation"
+]
+CANONICAL_BOOKS = OT_BOOKS + NT_BOOKS
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -340,26 +361,6 @@ def search(
     scope: str = Query(default="all", description="Search scope: bible, ot, nt, book:BookName, commentary, all")
 ):
     """Full-text search across Bible text, notes, and commentaries."""
-    # OT/NT book lists for filtering
-    OT_BOOKS = [
-        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
-        "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
-        "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
-        "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
-        "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
-        "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
-        "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
-        "Haggai", "Zechariah", "Malachi"
-    ]
-    NT_BOOKS = [
-        "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
-        "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
-        "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
-        "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
-        "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
-        "Jude", "Revelation"
-    ]
-
     conn = get_db_connection()
     try:
         results = []
@@ -731,24 +732,6 @@ def get_passage_interlinear(
                 language = word_data['language']
 
         # Fallback language detection based on testament
-        OT_BOOKS = [
-            "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
-            "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
-            "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
-            "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
-            "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
-            "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
-            "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
-            "Haggai", "Zechariah", "Malachi"
-        ]
-        NT_BOOKS = [
-            "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
-            "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
-            "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
-            "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
-            "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
-            "Jude", "Revelation"
-        ]
         if not language and verses_data:
             language = 'hebrew' if book in OT_BOOKS else 'greek' if book in NT_BOOKS else None
 
@@ -860,6 +843,22 @@ def get_devotional_sources():
 
 # ========== READING PLAN ENDPOINTS ==========
 
+def _load_plan(plan_id: str) -> dict:
+    """Load a reading-plan JSON file by id. Raises 400/404 on bad id."""
+    # Sanitize plan_id to prevent path traversal
+    if not re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
+        raise HTTPException(status_code=400, detail="Invalid plan ID")
+    data_path = Path(__file__).parent.parent / "data"
+    # 'chronological-year' is a legacy alias for the 'chronological' plan file
+    plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
+
+    if not plan_file.exists():
+        raise HTTPException(status_code=404, detail=f"Reading plan not found: {plan_id}")
+
+    with open(plan_file) as f:
+        return json.load(f)
+
+
 @app.get("/api/reading-plans")
 def get_reading_plans():
     """Get list of available reading plans."""
@@ -883,33 +882,13 @@ def get_reading_plans():
 @app.get("/api/reading-plans/{plan_id}")
 def get_reading_plan(plan_id: str):
     """Get full reading plan with all days."""
-    # Sanitize plan_id to prevent path traversal
-    if not re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
-        raise HTTPException(status_code=400, detail="Invalid plan ID")
-    data_path = Path(__file__).parent.parent / "data"
-    plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
-
-    if not plan_file.exists():
-        raise HTTPException(status_code=404, detail=f"Reading plan not found: {plan_id}")
-
-    with open(plan_file) as f:
-        return json.load(f)
+    return _load_plan(plan_id)
 
 
 @app.get("/api/reading-plans/{plan_id}/day/{day}")
 def get_reading_plan_day(plan_id: str, day: int):
     """Get a specific day's reading from a plan."""
-    # Sanitize plan_id to prevent path traversal
-    if not re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
-        raise HTTPException(status_code=400, detail="Invalid plan ID")
-    data_path = Path(__file__).parent.parent / "data"
-    plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
-
-    if not plan_file.exists():
-        raise HTTPException(status_code=404, detail=f"Reading plan not found: {plan_id}")
-
-    with open(plan_file) as f:
-        plan = json.load(f)
+    plan = _load_plan(plan_id)
 
     # Find the day
     for d in plan["days"]:
@@ -1001,23 +980,7 @@ def parse_reference(reference: str) -> Optional[tuple]:
     }
 
     # Also map full canonical book names (case-insensitive) for direct lookup
-    canonical_books = [
-        "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
-        "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
-        "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
-        "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
-        "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah",
-        "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
-        "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah",
-        "Haggai", "Zechariah", "Malachi",
-        "Matthew", "Mark", "Luke", "John", "Acts", "Romans",
-        "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
-        "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians",
-        "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews",
-        "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
-        "Jude", "Revelation"
-    ]
-    canonical_map = {b.lower(): b for b in canonical_books}
+    canonical_map = {b.lower(): b for b in CANONICAL_BOOKS}
     # Add common alternative names
     canonical_map["song of songs"] = "Song of Solomon"
     canonical_map["psalm"] = "Psalms"
@@ -1461,6 +1424,39 @@ PRESET_META = {
 }
 
 
+def _get_neighbors(conn, book: str, chapter: int, verse: int, limit: int,
+                   focus_books: list = None):
+    """Top cross-reference neighbors of a verse (bidirectional), best votes first.
+
+    Returns rows of (book, chapter, verse, votes). When focus_books is given,
+    neighbors in those books sort ahead of everything else.
+    """
+    if focus_books:
+        placeholders = ",".join("?" for _ in focus_books)
+        order_by = (f"CASE WHEN target_book IN ({placeholders}) "
+                    "THEN 0 ELSE 1 END, MAX(votes) DESC")
+        extra_params = tuple(focus_books)
+    else:
+        order_by = "MAX(votes) DESC"
+        extra_params = ()
+    cursor = conn.execute(f"""
+        SELECT target_book, target_chapter, target_verse, votes
+        FROM (
+            SELECT target_book, target_chapter, target_verse, votes
+            FROM cross_references
+            WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
+            UNION ALL
+            SELECT source_book, source_chapter, source_verse, votes
+            FROM cross_references
+            WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
+        )
+        GROUP BY target_book, target_chapter, target_verse
+        ORDER BY {order_by}
+        LIMIT ?
+    """, (book, chapter, verse, book, chapter, verse, *extra_params, limit))
+    return cursor.fetchall()
+
+
 def _enrich_nodes(conn, nodes: dict):
     """Add verse text preview and book metadata (testament, book_order) to nodes."""
     for key, node in nodes.items():
@@ -1495,6 +1491,82 @@ def _enrich_nodes(conn, nodes: dict):
         meta = book_meta_cache[b]
         node["testament"] = meta["testament"]
         node["book_order"] = meta["book_order"]
+
+
+def _bfs_to_seeds(conn, book: str, chapter: int, verse: int, seed_ids: set,
+                  per_hop: int = 15, max_depth: int = 6):
+    """BFS the cross-reference graph from a start verse until any seed is reached.
+
+    Returns (found_seed, path_keys, nodes, edges):
+    - found_seed: key of the seed reached, or None
+    - path_keys: [start_key, ..., found_seed], empty list if no seed found
+    - nodes: key -> {id, book, chapter, verse, depth[, isSeed]} for verses seen
+    - edges: deduped edge dicts {source, target, votes} discovered on the way
+    """
+    start_key = f"{book}.{chapter}.{verse}"
+    nodes = {start_key: {"id": start_key, "book": book, "chapter": chapter,
+                         "verse": verse, "depth": 0}}
+    edges = []
+    edge_set = set()
+    visited = set()
+    parent = {}  # for path reconstruction
+    queue = [(book, chapter, verse, 0)]
+    found_seed = None
+
+    while queue and not found_seed:
+        src_book, src_chapter, src_verse, current_depth = queue.pop(0)
+        src_key = f"{src_book}.{src_chapter}.{src_verse}"
+        if src_key in visited:
+            continue
+        visited.add(src_key)
+
+        if src_key in seed_ids and src_key != start_key:
+            found_seed = src_key
+            break
+
+        if current_depth >= max_depth:
+            continue
+
+        for row in _get_neighbors(conn, src_book, src_chapter, src_verse, per_hop):
+            tgt_book, tgt_chapter, tgt_verse, votes = row
+            tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
+
+            edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
+            if edge_key not in edge_set:
+                edge_set.add(edge_key)
+                edges.append({
+                    "source": src_key, "target": tgt_key, "votes": votes
+                })
+
+            if tgt_key not in nodes:
+                nodes[tgt_key] = {
+                    "id": tgt_key, "book": tgt_book,
+                    "chapter": tgt_chapter, "verse": tgt_verse,
+                    "depth": current_depth + 1,
+                    "isSeed": tgt_key in seed_ids,
+                }
+            # Record the first (shortest) parent even when the node is already
+            # known; recording only on node creation reconstructed false paths.
+            if tgt_key not in parent and tgt_key != start_key:
+                parent[tgt_key] = src_key
+
+            if tgt_key in seed_ids:
+                found_seed = tgt_key
+                break
+
+            if tgt_key not in visited:
+                queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+
+    path_keys = []
+    if found_seed:
+        curr = found_seed
+        while curr and curr != start_key:
+            path_keys.append(curr)
+            curr = parent.get(curr)
+        path_keys.append(start_key)
+        path_keys.reverse()
+
+    return found_seed, path_keys, nodes, edges
 
 
 def _get_red_letter_seeds(conn):
@@ -1616,87 +1688,9 @@ def get_crossref_map_christological(
             seed_ids = {f"{s[0]}.{s[1]}.{s[2]}" for s in all_seeds}
 
             start_key = f"{book}.{chapter}.{verse_start}"
-            nodes = {}
-            edges = []
-            edge_set = set()
-            visited = set()
-            parent = {}  # for path reconstruction
-            queue = [(book, chapter, verse_start, 0)]
-            nodes[start_key] = {
-                "id": start_key, "book": book, "chapter": chapter,
-                "verse": verse_start, "depth": 0
-            }
-
-            found_seed = None
-            max_search_depth = 6
-
-            while queue and not found_seed:
-                src_book, src_chapter, src_verse, current_depth = queue.pop(0)
-                src_key = f"{src_book}.{src_chapter}.{src_verse}"
-                if src_key in visited:
-                    continue
-                visited.add(src_key)
-
-                if src_key in seed_ids and src_key != start_key:
-                    found_seed = src_key
-                    break
-
-                if current_depth >= max_search_depth:
-                    continue
-
-                cursor = conn.execute("""
-                    SELECT target_book, target_chapter, target_verse, votes
-                    FROM (
-                        SELECT target_book, target_chapter, target_verse, votes
-                        FROM cross_references
-                        WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
-                        UNION ALL
-                        SELECT source_book, source_chapter, source_verse, votes
-                        FROM cross_references
-                        WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
-                    )
-                    GROUP BY target_book, target_chapter, target_verse
-                    ORDER BY MAX(votes) DESC
-                    LIMIT ?
-                """, (src_book, src_chapter, src_verse,
-                      src_book, src_chapter, src_verse, 15))
-
-                for row in cursor.fetchall():
-                    tgt_book, tgt_chapter, tgt_verse, votes = row
-                    tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
-
-                    edge_key = (min(src_key, tgt_key), max(src_key, tgt_key))
-                    if edge_key not in edge_set:
-                        edge_set.add(edge_key)
-                        edges.append({
-                            "source": src_key, "target": tgt_key, "votes": votes
-                        })
-
-                    if tgt_key not in nodes:
-                        nodes[tgt_key] = {
-                            "id": tgt_key, "book": tgt_book,
-                            "chapter": tgt_chapter, "verse": tgt_verse,
-                            "depth": current_depth + 1,
-                            "isSeed": tgt_key in seed_ids,
-                        }
-                        parent[tgt_key] = src_key
-
-                    if tgt_key in seed_ids:
-                        found_seed = tgt_key
-                        break
-
-                    if tgt_key not in visited:
-                        queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
-
-            # Reconstruct path
-            path_to_christ = []
-            if found_seed:
-                curr = found_seed
-                while curr and curr != start_key:
-                    path_to_christ.append(curr)
-                    curr = parent.get(curr)
-                path_to_christ.append(start_key)
-                path_to_christ.reverse()
+            found_seed, path_to_christ, nodes, edges = _bfs_to_seeds(
+                conn, book, chapter, verse_start, seed_ids
+            )
 
             # Filter to only path + immediate neighbors for clarity
             path_set = set(path_to_christ) if path_to_christ else set(nodes.keys())
@@ -1788,24 +1782,7 @@ def get_crossref_map_christological(
             if current_depth >= depth:
                 continue
 
-            cursor = conn.execute("""
-                SELECT target_book, target_chapter, target_verse, votes
-                FROM (
-                    SELECT target_book, target_chapter, target_verse, votes
-                    FROM cross_references
-                    WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
-                    UNION ALL
-                    SELECT source_book, source_chapter, source_verse, votes
-                    FROM cross_references
-                    WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
-                )
-                GROUP BY target_book, target_chapter, target_verse
-                ORDER BY MAX(votes) DESC
-                LIMIT ?
-            """, (src_book, src_chapter, src_verse,
-                  src_book, src_chapter, src_verse, hop_limit))
-
-            for row in cursor.fetchall():
+            for row in _get_neighbors(conn, src_book, src_chapter, src_verse, hop_limit):
                 tgt_book, tgt_chapter, tgt_verse, votes = row
                 tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
 
@@ -1893,80 +1870,20 @@ def get_path_to_christ(
             }
 
         # BFS
-        visited = set()
-        parent = {}
-        verse_lookup = {}  # key -> (book, chapter, verse)
-        verse_lookup[start_key] = (book, chapter, verse_start)
-        queue = [(book, chapter, verse_start, 0)]
-        found_seed = None
-        max_search_depth = 6
-
-        while queue and not found_seed:
-            src_book, src_chapter, src_verse, current_depth = queue.pop(0)
-            src_key = f"{src_book}.{src_chapter}.{src_verse}"
-            if src_key in visited:
-                continue
-            visited.add(src_key)
-
-            if src_key in seed_ids and src_key != start_key:
-                found_seed = src_key
-                break
-
-            if current_depth >= max_search_depth:
-                continue
-
-            cursor = conn.execute("""
-                SELECT target_book, target_chapter, target_verse, votes
-                FROM (
-                    SELECT target_book, target_chapter, target_verse, votes
-                    FROM cross_references
-                    WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
-                    UNION ALL
-                    SELECT source_book, source_chapter, source_verse, votes
-                    FROM cross_references
-                    WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
-                )
-                GROUP BY target_book, target_chapter, target_verse
-                ORDER BY MAX(votes) DESC
-                LIMIT ?
-            """, (src_book, src_chapter, src_verse,
-                  src_book, src_chapter, src_verse, 15))
-
-            for row in cursor.fetchall():
-                tgt_book, tgt_chapter, tgt_verse, votes = row
-                tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
-
-                if tgt_key not in verse_lookup:
-                    verse_lookup[tgt_key] = (tgt_book, tgt_chapter, tgt_verse)
-
-                if tgt_key not in parent and tgt_key != start_key:
-                    parent[tgt_key] = src_key
-
-                if tgt_key in seed_ids:
-                    found_seed = tgt_key
-                    break
-
-                if tgt_key not in visited:
-                    queue.append((tgt_book, tgt_chapter, tgt_verse, current_depth + 1))
+        found_seed, path_keys, bfs_nodes, _ = _bfs_to_seeds(
+            conn, book, chapter, verse_start, seed_ids
+        )
 
         if not found_seed:
             return {"found": False, "start": start_key, "seed": None, "path": [], "hops": 0}
-
-        # Reconstruct path
-        path_keys = []
-        curr = found_seed
-        while curr and curr != start_key:
-            path_keys.append(curr)
-            curr = parent.get(curr)
-        path_keys.append(start_key)
-        path_keys.reverse()
 
         # Enrich with full verse text
         # Cache testament lookups
         testament_cache = {}
         path = []
         for key in path_keys:
-            v_book, v_chapter, v_verse = verse_lookup[key]
+            n = bfs_nodes[key]
+            v_book, v_chapter, v_verse = n["book"], n["chapter"], n["verse"]
             cursor = conn.execute(
                 "SELECT text FROM verses WHERE book = ? AND chapter = ? AND verse = ? AND translation_id = ?",
                 (v_book, v_chapter, v_verse, translation)
@@ -2078,50 +1995,8 @@ def get_crossref_map(
 
             # Get top cross-refs for this verse (bidirectional), ordered by votes
             # When focus_books is set, prioritize those books in the sort order
-            if focus_list:
-                placeholders = ",".join(["?" for _ in focus_list])
-                sql = f"""
-                    SELECT target_book, target_chapter, target_verse, votes
-                    FROM (
-                        SELECT target_book, target_chapter, target_verse, votes
-                        FROM cross_references
-                        WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
-                        UNION ALL
-                        SELECT source_book, source_chapter, source_verse, votes
-                        FROM cross_references
-                        WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
-                    )
-                    GROUP BY target_book, target_chapter, target_verse
-                    ORDER BY CASE WHEN target_book IN ({placeholders})
-                             THEN 0 ELSE 1 END, MAX(votes) DESC
-                    LIMIT ?
-                """
-                params = (
-                    src_book, src_chapter, src_verse,
-                    src_book, src_chapter, src_verse,
-                    *focus_list, hop_limit,
-                )
-                cursor = conn.execute(sql, params)
-            else:
-                cursor = conn.execute("""
-                    SELECT target_book, target_chapter, target_verse, votes
-                    FROM (
-                        SELECT target_book, target_chapter, target_verse, votes
-                        FROM cross_references
-                        WHERE source_book = ? AND source_chapter = ? AND source_verse = ?
-                        UNION ALL
-                        SELECT source_book, source_chapter, source_verse, votes
-                        FROM cross_references
-                        WHERE target_book = ? AND target_chapter = ? AND target_verse = ?
-                    )
-                    GROUP BY target_book, target_chapter, target_verse
-                    ORDER BY MAX(votes) DESC
-                    LIMIT ?
-                """, (src_book, src_chapter, src_verse,
-                      src_book, src_chapter, src_verse,
-                      hop_limit))
-
-            for row in cursor.fetchall():
+            for row in _get_neighbors(conn, src_book, src_chapter, src_verse,
+                                      hop_limit, focus_books=focus_list or None):
                 tgt_book, tgt_chapter, tgt_verse, votes = row
                 tgt_key = f"{tgt_book}.{tgt_chapter}.{tgt_verse}"
 
