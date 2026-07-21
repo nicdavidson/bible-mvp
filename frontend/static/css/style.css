@@ -146,6 +146,20 @@ body {
     background: #c4b48a;
 }
 
+/* Text selection colors */
+::selection {
+    background: rgba(37, 99, 235, 0.2);
+    color: inherit;
+}
+
+.dark ::selection {
+    background: rgba(96, 165, 250, 0.3);
+}
+
+.parchment ::selection {
+    background: rgba(184, 134, 11, 0.2);
+}
+
 /* Focus visible for keyboard nav */
 :focus-visible {
     outline: 2px solid var(--color-primary);
@@ -190,6 +204,7 @@ textarea:focus:not(:focus-visible) {
     justify-content: center;
     max-width: 600px;
     margin: 0 2rem;
+    position: relative; /* anchor for .book-picker-dropdown */
 }
 
 .reference-input {
@@ -318,10 +333,6 @@ textarea:focus:not(:focus-visible) {
 }
 
 /* Book Picker Dropdown */
-.header-center {
-    position: relative;
-}
-
 .book-picker-dropdown {
     position: absolute;
     top: calc(100% + 0.5rem);
@@ -407,12 +418,6 @@ textarea:focus:not(:focus-visible) {
     text-overflow: ellipsis;
     transition: all 0.15s;
     color: var(--color-text);
-}
-
-.picker-book-btn:hover {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
 }
 
 /* Genre-colored book buttons */
@@ -501,12 +506,6 @@ textarea:focus:not(:focus-visible) {
     text-align: center;
     transition: all 0.15s;
     color: var(--color-text);
-}
-
-.picker-chapter-btn:hover {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
 }
 .picker-chapter-btn.current-chapter {
     background: var(--color-primary);
@@ -636,11 +635,6 @@ textarea:focus:not(:focus-visible) {
     transition: all 0.15s;
 }
 
-.interlinear-toggle-header:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
 .interlinear-toggle-header:has(input:checked) {
     background: var(--color-primary);
     border-color: var(--color-primary);
@@ -690,6 +684,7 @@ textarea:focus:not(:focus-visible) {
     padding: 1rem;
     overflow-y: auto;
     flex: 1;
+    transition: padding var(--transition-fast);
 }
 
 /* Bible Text Panel */
@@ -712,12 +707,6 @@ textarea:focus:not(:focus-visible) {
     font-size: 0.875rem;
     font-weight: 500;
     transition: all var(--transition-fast);
-}
-
-.btn-nav:hover:not(:disabled) {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
 }
 
 .btn-nav:active:not(:disabled) {
@@ -743,6 +732,7 @@ textarea:focus:not(:focus-visible) {
 }
 
 .verse-box {
+    position: relative;
     margin-bottom: 0.25rem;
     padding: 0.5rem 0.75rem;
     margin-left: -0.75rem;
@@ -834,12 +824,6 @@ textarea:focus:not(:focus-visible) {
     background: var(--color-bg);
 }
 
-.btn-tts-play {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
-}
-
 .btn-tts-play:hover {
     background: var(--color-primary-hover);
 }
@@ -895,10 +879,6 @@ textarea:focus:not(:focus-visible) {
     .tts-rate-slider {
         width: 40px;
     }
-}
-
-.verse-box {
-    position: relative;
 }
 
 .verse-num {
@@ -1249,12 +1229,6 @@ textarea:focus:not(:focus-visible) {
     cursor: pointer;
     text-align: left;
     transition: all 0.15s;
-}
-
-.book-btn:hover {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
 }
 
 /* Genre-colored book buttons (main book selector) */
@@ -1938,11 +1912,6 @@ textarea:focus:not(:focus-visible) {
     text-align: center;
 }
 
-.input-end-verse:focus {
-    outline: none;
-    border-color: var(--color-primary);
-}
-
 .btn-range-toggle {
     width: 24px;
     height: 24px;
@@ -1959,12 +1928,6 @@ textarea:focus:not(:focus-visible) {
     transition: all 0.15s;
 }
 
-.btn-range-toggle:hover {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
-}
-
 .note-textarea {
     width: 100%;
     min-height: 100px;
@@ -1976,11 +1939,6 @@ textarea:focus:not(:focus-visible) {
     font-family: var(--font-sans);
     font-size: 0.9375rem;
     resize: vertical;
-}
-
-.note-textarea:focus {
-    outline: none;
-    border-color: var(--color-primary);
 }
 
 .btn-save {
@@ -2171,12 +2129,6 @@ textarea:focus:not(:focus-visible) {
     background: var(--color-surface);
 }
 
-.crossref-sort-btn.active {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
-}
-
 .crossref-filter-input {
     width: 100%;
     padding: 0.35rem 0.5rem;
@@ -2186,11 +2138,6 @@ textarea:focus:not(:focus-visible) {
     background: var(--color-bg);
     color: var(--color-text);
     box-sizing: border-box;
-}
-
-.crossref-filter-input:focus {
-    outline: none;
-    border-color: var(--color-primary);
 }
 
 .crossref-votes {
@@ -2218,6 +2165,11 @@ textarea:focus:not(:focus-visible) {
 .crossref-item {
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--color-border);
+    transition: background var(--transition-fast);
+}
+
+.crossref-item:hover {
+    background: var(--color-primary-bg);
 }
 
 .crossref-item:last-child {
@@ -2227,6 +2179,10 @@ textarea:focus:not(:focus-visible) {
 .crossref-item a {
     color: var(--color-primary);
     text-decoration: none;
+}
+
+.parchment .crossref-item a {
+    color: var(--color-primary);
 }
 
 .crossref-item a:hover {
@@ -2661,15 +2617,15 @@ textarea:focus:not(:focus-visible) {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--color-border);
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background var(--transition-fast), border-left var(--transition-fast);
 }
 
-.search-result:hover,
-.search-result.selected {
+.search-result:hover {
     background: var(--color-bg);
 }
 
 .search-result.selected {
+    background: var(--color-bg);
     border-left: 3px solid var(--color-primary);
     padding-left: calc(1rem - 3px);
 }
@@ -3742,11 +3698,6 @@ textarea:focus:not(:focus-visible) {
     margin-left: 0.75rem;
 }
 
-.setting-select:focus {
-    outline: none;
-    border-color: var(--color-primary);
-}
-
 /* Genre Colors Settings */
 .genre-colors-grid {
     display: grid;
@@ -4168,11 +4119,6 @@ textarea:focus:not(:focus-visible) {
     color: var(--color-text);
 }
 
-.download-actions .btn-secondary:hover:not(:disabled) {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
 .download-actions .btn-danger:hover:not(:disabled) {
     border-color: #ef4444;
     color: #ef4444;
@@ -4352,6 +4298,42 @@ textarea:focus:not(:focus-visible) {
         align-items: flex-start;
         gap: 0.375rem;
     }
+
+    .feedback-category-btns {
+        flex-direction: column;
+    }
+
+    .category-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* Hide shortcuts on mobile */
+    .shortcuts-desktop-only {
+        display: none;
+    }
+
+    .source-text-label {
+        display: none;
+    }
+
+    .share-actions {
+        flex-wrap: wrap;
+    }
+
+    .btn-share-option {
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+    }
+
+    .share-image-actions {
+        flex-wrap: wrap;
+    }
+
+    .share-image-actions .btn-share-option {
+        flex: 1;
+    }
 }
 
 /* ========== TAGS & MULTI-VERSE SELECTION ========== */
@@ -4409,17 +4391,6 @@ textarea:focus:not(:focus-visible) {
     font-size: 0.8125rem;
     color: var(--color-text);
     transition: all 0.15s;
-}
-
-.btn-select-verses:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
-.btn-select-verses.active {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
 }
 
 .select-hint {
@@ -4633,6 +4604,11 @@ textarea:focus:not(:focus-visible) {
     font-size: 0.875rem;
 }
 
+/* Shared input focus ring (consolidated from 5 identical copies) */
+.input-end-verse:focus,
+.note-textarea:focus,
+.crossref-filter-input:focus,
+.setting-select:focus,
 .tag-name-input:focus {
     outline: none;
     border-color: var(--color-primary);
@@ -4736,11 +4712,6 @@ textarea:focus:not(:focus-visible) {
     font-size: 0.75rem;
     color: var(--color-text-secondary);
     transition: all 0.15s;
-}
-
-.btn-edit-tag:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
 }
 
 .btn-delete-tag {
@@ -5042,12 +5013,6 @@ textarea:focus:not(:focus-visible) {
     border-radius: var(--radius);
     cursor: pointer;
     font-size: 0.875rem;
-}
-
-.btn-day-nav:hover:not(:disabled) {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
 }
 
 .btn-day-nav:disabled {
@@ -5811,12 +5776,6 @@ textarea:focus:not(:focus-visible) {
     border-color: var(--color-primary);
 }
 
-.category-btn.active {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
-}
-
 .accuracy-fields {
     display: flex;
     flex-direction: column;
@@ -5912,17 +5871,6 @@ textarea:focus:not(:focus-visible) {
 
 .btn-text:hover {
     color: var(--color-primary-hover);
-}
-
-@media (max-width: 768px) {
-    .feedback-category-btns {
-        flex-direction: column;
-    }
-
-    .category-btn {
-        width: 100%;
-        text-align: center;
-    }
 }
 
 /* ========== SIDE MENU STYLES ========== */
@@ -6139,13 +6087,6 @@ textarea:focus:not(:focus-visible) {
     margin-bottom: 0.75rem;
     font-size: 1rem;
     color: var(--color-text);
-}
-
-/* Hide shortcuts on mobile */
-@media (max-width: 768px) {
-    .shortcuts-desktop-only {
-        display: none;
-    }
 }
 
 /* ========== ABOUT MODAL STYLES ========== */
@@ -6594,12 +6535,6 @@ textarea:focus:not(:focus-visible) {
     opacity: 0.8;
 }
 
-@media (max-width: 768px) {
-    .source-text-label {
-        display: none;
-    }
-}
-
 /* Source text info banner */
 .source-text-warning {
     display: flex;
@@ -6667,17 +6602,6 @@ textarea:focus:not(:focus-visible) {
     color: var(--color-text);
     cursor: pointer;
     transition: all 0.15s;
-}
-
-.btn-share-toggle:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
-.btn-share-toggle.active {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: white;
 }
 
 .share-hint {
@@ -7050,11 +6974,6 @@ svg.action-bar-icon {
     transition: all 0.15s;
 }
 
-.btn-share-option:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
 .share-option-icon {
     font-size: 1rem;
 }
@@ -7108,27 +7027,6 @@ svg.action-bar-icon {
     gap: 0.5rem;
 }
 
-@media (max-width: 768px) {
-    .share-actions {
-        flex-wrap: wrap;
-    }
-
-    .btn-share-option {
-        flex: 1;
-        min-width: 0;
-        justify-content: center;
-    }
-
-    .share-image-actions {
-        flex-wrap: wrap;
-    }
-
-    .share-image-actions .btn-share-option {
-        flex: 1;
-    }
-
-}
-
 /* ========== IMMERSIVE READING MODE ========== */
 
 [x-cloak] {
@@ -7160,6 +7058,7 @@ svg.action-bar-icon {
     background: var(--color-surface);
     border-bottom: 1px solid var(--color-border);
     backdrop-filter: blur(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease; /* Alpine transition helper */
 }
 
 .immersive-btn {
@@ -7335,6 +7234,7 @@ svg.action-bar-icon {
     padding: 1rem 1.5rem;
     background: linear-gradient(transparent, var(--color-bg) 30%);
     padding-top: 2rem;
+    transition: opacity 0.2s ease, transform 0.2s ease; /* Alpine transition helper */
 }
 
 .immersive-nav-btn {
@@ -7383,12 +7283,6 @@ svg.action-bar-icon {
 /* Immersive enter icon in header */
 .immersive-enter-icon {
     font-size: 1.1rem;
-}
-
-/* Alpine transition helpers for immersive controls */
-.immersive-controls-top,
-.immersive-controls-bottom {
-    transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 /* Responsive adjustments */
@@ -7447,15 +7341,16 @@ svg.action-bar-icon {
     white-space: nowrap;
 }
 
+/* Shared primary hover state (consolidated from 7 identical copies) */
+.interlinear-toggle-header:hover,
+.download-actions .btn-secondary:hover:not(:disabled),
+.btn-select-verses:hover,
+.btn-edit-tag:hover,
+.btn-share-toggle:hover,
+.btn-share-option:hover,
 .btn-parallel:hover {
     border-color: var(--color-primary);
     color: var(--color-primary);
-}
-
-.btn-parallel.active {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
 }
 
 .parallel-view {
@@ -7732,46 +7627,6 @@ svg.action-bar-icon {
     border-color: rgba(184, 134, 11, 0.25);
 }
 
-/* ========== SELECTION & UTILITY POLISH ========== */
-
-/* Better text selection colors */
-::selection {
-    background: rgba(37, 99, 235, 0.2);
-    color: inherit;
-}
-
-.dark ::selection {
-    background: rgba(96, 165, 250, 0.3);
-}
-
-.parchment ::selection {
-    background: rgba(184, 134, 11, 0.2);
-}
-
-/* Smooth panel transitions */
-.panel-body {
-    transition: padding var(--transition-fast);
-}
-
-/* Subtle hover on search results */
-.search-result {
-    transition: background var(--transition-fast), border-left var(--transition-fast);
-}
-
-/* Better crossref item hover */
-.crossref-item {
-    transition: background var(--transition-fast);
-}
-
-.crossref-item:hover {
-    background: var(--color-primary-bg);
-}
-
-/* Parchment crossref link */
-.parchment .crossref-item a {
-    color: var(--color-primary);
-}
-
 /* ========== NAVE'S TOPICAL INDEX STYLES ========== */
 
 /* Search bar */
@@ -7842,11 +7697,20 @@ svg.action-bar-icon {
     transition: all 0.15s;
     font-family: var(--font-sans);
 }
-.topic-az-btn:hover:not(:disabled) {
-    background: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
-}
+/* Shared primary "active" state (consolidated from 14 identical copies) */
+.picker-book-btn:hover,
+.picker-chapter-btn:hover,
+.btn-nav:hover:not(:disabled),
+.btn-tts-play,
+.book-btn:hover,
+.btn-range-toggle:hover,
+.crossref-sort-btn.active,
+.btn-select-verses.active,
+.btn-day-nav:hover:not(:disabled),
+.category-btn.active,
+.btn-share-toggle.active,
+.btn-parallel.active,
+.topic-az-btn:hover:not(:disabled),
 .topic-az-btn.active {
     background: var(--color-primary);
     color: white;
