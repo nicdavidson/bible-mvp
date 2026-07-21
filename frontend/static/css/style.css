@@ -184,23 +184,6 @@ textarea:focus:not(:focus-visible) {
     align-items: center;
 }
 
-.logo {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-primary);
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-}
-
-.logo-icon {
-    font-size: 1.5rem;
-}
-
-.logo-text {
-    white-space: nowrap;
-}
-
 .header-center {
     flex: 1;
     display: flex;
@@ -914,18 +897,6 @@ textarea:focus:not(:focus-visible) {
     }
 }
 
-/* Copy Button */
-.btn-copy {
-    opacity: 0;
-    padding: 0.25rem 0.5rem;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 0.875rem;
-    transition: opacity 0.15s, background 0.15s;
-}
-
 .verse-box {
     position: relative;
 }
@@ -1003,25 +974,6 @@ textarea:focus:not(:focus-visible) {
     cursor: pointer;
     font-size: 0.875rem;
     color: var(--color-text-secondary);
-}
-
-.toggle-checkbox {
-    width: 1rem;
-    height: 1rem;
-    cursor: pointer;
-}
-
-.toggle-text {
-    user-select: none;
-}
-
-.interlinear-hint {
-    margin-left: auto;
-    font-size: 0.75rem;
-    color: var(--color-primary);
-    background: rgba(79, 70, 229, 0.1);
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius);
 }
 
 /* Interlinear Display */
@@ -1744,15 +1696,6 @@ textarea:focus:not(:focus-visible) {
     transition: transform 0.15s;
 }
 
-.commentary-preview {
-    padding: 0.5rem 1rem 0.75rem;
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-    line-height: 1.5;
-    font-style: italic;
-    border-top: none;
-}
-
 /* Chapter group for combined plan reading mode */
 .commentary-chapter-group {
     margin-bottom: 0.5rem;
@@ -1910,19 +1853,6 @@ textarea:focus:not(:focus-visible) {
 
 .commentary-verse-ref:hover {
     background: var(--color-primary-bg);
-}
-
-/* Chapter reference in combined plan reading mode */
-.commentary-chapter-ref {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    background: var(--color-bg);
-    padding: 0.15rem 0.4rem;
-    border-radius: var(--radius);
-    margin-right: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
 }
 
 .commentary-source {
@@ -2641,16 +2571,6 @@ textarea:focus:not(:focus-visible) {
     color: var(--color-text);
 }
 
-.btn-search {
-    padding: 0.75rem 1.5rem;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-weight: 500;
-}
-
 /* Search Results */
 .search-results {
     max-height: 400px;
@@ -2923,75 +2843,6 @@ textarea:focus:not(:focus-visible) {
     height: 20px;
 }
 
-/* Help Modal */
-.help-modal {
-    max-width: 500px;
-}
-
-.help-section {
-    margin-bottom: 1.5rem;
-}
-
-.help-section:last-child {
-    margin-bottom: 0;
-}
-
-.help-section h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.75rem;
-    color: var(--color-primary);
-}
-
-.help-section p {
-    color: var(--color-text-secondary);
-    font-size: 0.9375rem;
-    line-height: 1.6;
-}
-
-.shortcuts-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-}
-
-.shortcut {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-}
-
-.shortcut kbd {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    font-family: var(--font-sans);
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-text);
-}
-
-.shortcut span {
-    color: var(--color-text-secondary);
-}
-
-.help-features {
-    list-style: none;
-    font-size: 0.9375rem;
-}
-
-.help-features li {
-    padding: 0.375rem 0;
-    color: var(--color-text-secondary);
-}
-
-.help-features li strong {
-    color: var(--color-text);
-}
-
 /* Responsive */
 @media (max-width: 900px) {
     .main-content {
@@ -3004,10 +2855,6 @@ textarea:focus:not(:focus-visible) {
 
     .panel-word {
         max-height: 50vh;
-    }
-
-    .shortcuts-grid {
-        grid-template-columns: 1fr;
     }
 }
 
@@ -3022,18 +2869,6 @@ textarea:focus:not(:focus-visible) {
     /* Row 1: hamburger + icons, no wrapping */
     .header-left {
         flex: 0 0 auto;
-    }
-
-    .logo {
-        font-size: 1rem;
-    }
-
-    .logo-text {
-        display: none;
-    }
-
-    .logo-icon {
-        font-size: 1.75rem;
     }
 
     .header-right {
@@ -3347,20 +3182,6 @@ textarea:focus:not(:focus-visible) {
 
     .select-scope {
         flex: 1;
-    }
-
-    .btn-search {
-        flex: 0 0 auto;
-    }
-
-    /* Help modal */
-    .help-modal {
-        max-width: none;
-    }
-
-    .shortcuts-grid {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
     }
 
     /* Word panel on mobile */
@@ -4044,32 +3865,6 @@ textarea:focus:not(:focus-visible) {
     opacity: 0.9;
 }
 
-/* Connection Status */
-.connection-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 0.875rem;
-    border-radius: var(--radius);
-    margin-bottom: 1rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-}
-
-.connection-status.online {
-    background: rgba(5, 150, 105, 0.1);
-    color: var(--color-accent);
-}
-
-.connection-status.offline {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-}
-
-.connection-status .status-icon {
-    font-size: 0.75rem;
-}
-
 /* Shortcuts List */
 .shortcuts-list {
     display: flex;
@@ -4389,31 +4184,6 @@ textarea:focus:not(:focus-visible) {
     cursor: not-allowed;
 }
 
-.offline-option-info {
-    flex: 1;
-}
-
-.offline-option-name {
-    font-weight: 500;
-    margin-bottom: 0.125rem;
-}
-
-.offline-option-detail {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-}
-
-.offline-option-size {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    margin-left: 0.5rem;
-}
-
-.offline-option.downloaded .offline-option-name::after {
-    content: " ✓";
-    color: var(--color-accent);
-}
-
 /* Download Progress */
 .download-progress {
     margin-top: 1rem;
@@ -4446,109 +4216,6 @@ textarea:focus:not(:focus-visible) {
     font-size: 0.75rem;
     color: var(--color-text-secondary);
     margin-top: 0.5rem;
-}
-
-/* Offline Action Buttons */
-.offline-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1rem;
-}
-
-.btn-download {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.btn-download:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-}
-
-.btn-download:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.btn-refresh {
-    padding: 0.75rem 1rem;
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    color: var(--color-text);
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.875rem;
-}
-
-.btn-refresh:hover:not(:disabled) {
-    background: var(--color-bg);
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
-.btn-refresh:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.btn-clear-cache {
-    padding: 0.75rem 1rem;
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    color: var(--color-text);
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.875rem;
-}
-
-.btn-clear-cache:hover:not(:disabled) {
-    background: var(--color-bg);
-    border-color: #ef4444;
-    color: #ef4444;
-}
-
-.btn-clear-cache:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Cached Chapters List */
-.cached-chapters-list {
-    max-height: 200px;
-    overflow-y: auto;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    margin-top: 0.5rem;
-}
-
-.cached-chapter-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    font-size: 0.875rem;
-}
-
-.cached-chapter-item:last-child {
-    border-bottom: none;
-}
-
-.cached-chapter-ref {
-    font-weight: 500;
-}
-
-.cached-chapter-meta {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
 }
 
 /* Offline Badge on Book Buttons */
@@ -4656,23 +4323,6 @@ textarea:focus:not(:focus-visible) {
 
 /* Mobile settings/offline */
 @media (max-width: 768px) {
-    .offline-stats {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 0.5rem;
-    }
-
-    .stat-card {
-        padding: 0.5rem 0.25rem;
-    }
-
-    .stat-value {
-        font-size: 1rem;
-    }
-
-    .offline-actions {
-        flex-direction: column;
-    }
-
     .toast-container {
         left: 1rem;
         right: 1rem;
@@ -4702,87 +4352,6 @@ textarea:focus:not(:focus-visible) {
         align-items: flex-start;
         gap: 0.375rem;
     }
-}
-
-/* ========== DEVOTIONAL STYLES ========== */
-
-.devotional-content {
-    padding: 0.5rem 0;
-}
-
-.devotional-date-nav {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    padding: 0.75rem;
-    background: var(--color-bg);
-    border-radius: var(--radius);
-    margin-bottom: 1rem;
-}
-
-.devotional-date {
-    font-weight: 600;
-    font-size: 1rem;
-    min-width: 120px;
-    text-align: center;
-}
-
-.devotional-entry {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-
-.devotional-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9375rem;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.devotional-time {
-    font-weight: 500;
-}
-
-.devotional-source {
-    color: var(--color-text-secondary);
-    font-weight: 400;
-    font-size: 0.875rem;
-}
-
-.devotional-verse {
-    margin-bottom: 0.75rem;
-}
-
-.devotional-verse .verse-ref-link {
-    color: var(--color-primary);
-    cursor: pointer;
-    font-style: italic;
-    font-size: 0.9375rem;
-}
-
-.devotional-verse .verse-ref-link:hover {
-    text-decoration: underline;
-}
-
-.devotional-text {
-    font-family: var(--font-serif);
-    line-height: 1.75;
-    color: var(--color-text);
-}
-
-.devotional-text p {
-    margin-bottom: 0.75rem;
-}
-
-.devotional-text p:last-child {
-    margin-bottom: 0;
 }
 
 /* ========== TAGS & MULTI-VERSE SELECTION ========== */
@@ -6693,35 +6262,6 @@ textarea:focus:not(:focus-visible) {
     gap: 0.5rem;
 }
 
-.verse-link-btn {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    text-align: left;
-}
-
-.verse-link-btn:hover {
-    background: var(--color-surface);
-    border-color: var(--color-primary);
-}
-
-.verse-link-btn .verse-ref {
-    font-weight: 600;
-    color: var(--color-primary);
-    font-size: 0.9375rem;
-}
-
-.verse-link-btn .verse-theme {
-    color: var(--color-text-secondary);
-    font-size: 0.8125rem;
-}
-
 /* Share Jesus description and about section */
 .share-jesus-about {
     background: var(--color-bg);
@@ -8171,11 +7711,6 @@ svg.action-bar-icon {
     background: linear-gradient(135deg, #b8860b, #8b6f00);
 }
 
-/* Parchment: Devotional */
-.parchment .devotional-text {
-    font-family: var(--font-verse);
-}
-
 /* Parchment: Section headers in plan reading */
 .parchment .combined-section-header .section-label {
     background: var(--color-primary);
@@ -8636,27 +8171,6 @@ svg.action-bar-icon {
     background: rgba(239, 68, 68, 0.1);
 }
 
-/* Bookmark button on verses */
-.btn-bookmark {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.85rem;
-    padding: 0.15rem 0.3rem;
-    border-radius: 3px;
-    opacity: 0.4;
-    transition: opacity 0.15s;
-}
-
-.btn-bookmark:hover,
-.btn-bookmark.bookmarked {
-    opacity: 1;
-}
-
-.btn-bookmark.bookmarked {
-    color: var(--color-primary);
-}
-
 /* Side menu history */
 .side-menu-section-label {
     font-size: 0.7rem;
@@ -8720,26 +8234,6 @@ svg.action-bar-icon {
 }
 
 /* ========== VERSE HIGHLIGHTING STYLES ========== */
-
-.btn-highlight-toggle {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0.15rem 0.3rem;
-    border-radius: 3px;
-    opacity: 0.3;
-    transition: opacity 0.15s;
-    color: var(--color-text-tertiary);
-}
-
-.btn-highlight-toggle:hover {
-    opacity: 0.8;
-}
-
-.btn-highlight-toggle.has-highlight {
-    opacity: 1;
-}
 
 .highlight-picker {
     display: flex;
@@ -8841,10 +8335,6 @@ svg.action-bar-icon {
         width: 32px;
         height: 32px;
         font-size: 0.9rem;
-    }
-
-    .logo-icon {
-        font-size: 1.25rem;
     }
 
     .input-reference {
@@ -9271,28 +8761,6 @@ svg.action-bar-icon {
 
 .btn-rate-easy {
     background: #3b82f6;
-}
-
-/* Memorize button on verses */
-.btn-memorize {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.85rem;
-    padding: 0.15rem 0.3rem;
-    border-radius: 3px;
-    opacity: 0.4;
-    transition: opacity 0.15s;
-}
-
-.btn-memorize:hover {
-    opacity: 1;
-}
-
-.btn-memorize.in-memory {
-    opacity: 0.7;
-    color: var(--color-primary);
-    cursor: default;
 }
 
 /* Side menu badge for due count */
