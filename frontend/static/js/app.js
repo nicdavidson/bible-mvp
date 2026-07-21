@@ -67,11 +67,11 @@ const BOOK_ABBREVS = {
     'Deut': 'Deuteronomy', 'Deu': 'Deuteronomy', 'De': 'Deuteronomy', 'Dt': 'Deuteronomy',
     'Josh': 'Joshua', 'Jos': 'Joshua', 'Jsh': 'Joshua',
     'Judg': 'Judges', 'Jdg': 'Judges', 'Jg': 'Judges',
-    'Rth': 'Ruth', 'Ru': 'Ruth',
+    'Rth': 'Ruth', 'Rut': 'Ruth', 'Ru': 'Ruth',
     '1Sam': '1 Samuel', '1Sa': '1 Samuel', '1 Sam': '1 Samuel', '1 Sa': '1 Samuel',
     '2Sam': '2 Samuel', '2Sa': '2 Samuel', '2 Sam': '2 Samuel', '2 Sa': '2 Samuel',
-    '1Kgs': '1 Kings', '1Ki': '1 Kings', '1 Kings': '1 Kings', '1 Ki': '1 Kings',
-    '2Kgs': '2 Kings', '2Ki': '2 Kings', '2 Kings': '2 Kings', '2 Ki': '2 Kings',
+    '1Kgs': '1 Kings', '1 Kgs': '1 Kings', '1Ki': '1 Kings', '1 Kings': '1 Kings', '1 Ki': '1 Kings',
+    '2Kgs': '2 Kings', '2 Kgs': '2 Kings', '2Ki': '2 Kings', '2 Kings': '2 Kings', '2 Ki': '2 Kings',
     '1Chr': '1 Chronicles', '1Ch': '1 Chronicles', '1 Chr': '1 Chronicles', '1 Chron': '1 Chronicles',
     '2Chr': '2 Chronicles', '2Ch': '2 Chronicles', '2 Chr': '2 Chronicles', '2 Chron': '2 Chronicles',
     'Ezr': 'Ezra',
@@ -81,18 +81,19 @@ const BOOK_ABBREVS = {
     'Prov': 'Proverbs', 'Pro': 'Proverbs', 'Pr': 'Proverbs',
     'Eccl': 'Ecclesiastes', 'Ecc': 'Ecclesiastes', 'Ec': 'Ecclesiastes',
     'Song': 'Song of Solomon', 'Sol': 'Song of Solomon', 'So': 'Song of Solomon', 'SoS': 'Song of Solomon',
+    'Song of Songs': 'Song of Solomon',
     'Isa': 'Isaiah', 'Is': 'Isaiah',
     'Jer': 'Jeremiah', 'Je': 'Jeremiah',
     'Lam': 'Lamentations', 'La': 'Lamentations',
     'Ezek': 'Ezekiel', 'Eze': 'Ezekiel', 'Ezk': 'Ezekiel',
     'Dan': 'Daniel', 'Da': 'Daniel', 'Dn': 'Daniel',
     'Hos': 'Hosea', 'Ho': 'Hosea',
-    'Joe': 'Joel', 'Jl': 'Joel',
-    'Am': 'Amos',
+    'Joe': 'Joel', 'Jol': 'Joel', 'Jl': 'Joel',
+    'Am': 'Amos', 'Amo': 'Amos',
     'Obad': 'Obadiah', 'Oba': 'Obadiah', 'Ob': 'Obadiah',
     'Jon': 'Jonah', 'Jnh': 'Jonah',
     'Mic': 'Micah', 'Mi': 'Micah',
-    'Nah': 'Nahum', 'Na': 'Nahum',
+    'Nah': 'Nahum', 'Nam': 'Nahum', 'Na': 'Nahum',
     'Hab': 'Habakkuk',
     'Zeph': 'Zephaniah', 'Zep': 'Zephaniah',
     'Hag': 'Haggai',
@@ -100,9 +101,9 @@ const BOOK_ABBREVS = {
     'Mal': 'Malachi',
     // New Testament
     'Mat': 'Matthew', 'Matt': 'Matthew', 'Mt': 'Matthew',
-    'Mar': 'Mark', 'Mk': 'Mark', 'Mr': 'Mark',
+    'Mar': 'Mark', 'Mrk': 'Mark', 'Mk': 'Mark', 'Mr': 'Mark',
     'Luk': 'Luke', 'Lk': 'Luke', 'Lu': 'Luke',
-    'Joh': 'John', 'Jn': 'John',
+    'Joh': 'John', 'Jhn': 'John', 'Jn': 'John',
     'Act': 'Acts', 'Ac': 'Acts',
     'Rom': 'Romans', 'Ro': 'Romans', 'Rm': 'Romans',
     '1Cor': '1 Corinthians', '1Co': '1 Corinthians', '1 Cor': '1 Corinthians',
@@ -124,7 +125,7 @@ const BOOK_ABBREVS = {
     '1Joh': '1 John', '1Jn': '1 John', '1 Joh': '1 John', '1 Jn': '1 John',
     '2Joh': '2 John', '2Jn': '2 John', '2 Joh': '2 John', '2 Jn': '2 John',
     '3Joh': '3 John', '3Jn': '3 John', '3 Joh': '3 John', '3 Jn': '3 John',
-    'Jud': 'Jude',
+    'Jud': 'Jude', 'Jde': 'Jude',
     'Rev': 'Revelation', 'Re': 'Revelation'
 };
 
@@ -132,6 +133,22 @@ const BOOK_ABBREVS = {
 BIBLE_BOOKS.forEach(book => {
     BOOK_ABBREVS[book] = book;
 });
+
+// Case-insensitive lookup derived from BOOK_ABBREVS — the single canonical
+// book-name table (topic-index codes, print abbreviations, and full names).
+const BOOK_NAME_LOOKUP = {};
+Object.entries(BOOK_ABBREVS).forEach(([abbr, full]) => {
+    BOOK_NAME_LOOKUP[abbr.toLowerCase()] = full;
+});
+
+// Normalize a book name or abbreviation to its canonical full name.
+// Case-insensitive, strips a trailing period ("1 Chron." -> "1 Chronicles"),
+// and passes unrecognized input through unchanged ("Psalms" -> "Psalms").
+function normalizeBookName(book) {
+    if (!book) return book;
+    const key = String(book).trim().replace(/\.$/, '').toLowerCase();
+    return BOOK_NAME_LOOKUP[key] || book;
+}
 
 // Book genre categories for color-coding
 const BOOK_GENRES = {
@@ -1318,6 +1335,39 @@ function bibleApp() {
             ).join(' ');
         },
 
+        // Shared fetch-with-offline-fallback. Pattern: forcedOffline check ->
+        // fetch -> on network failure (or forced offline) fall back to IndexedDB
+        // via cacheGetter. A non-OK HTTP response does NOT hit the cache (matches
+        // the original loaders). Never throws.
+        // Returns { ok, data, fromCache, error }:
+        //   fromCache=true -> data is the cached array
+        //   ok=true        -> data is the parsed API response
+        //   ok=false       -> non-OK response, or fetch + cache both came up empty
+        async _fetchOrCache(url, cacheGetter, { forcedOfflineCheck = true } = {}) {
+            try {
+                if (forcedOfflineCheck && this.forcedOffline) {
+                    throw new Error('offline');
+                }
+                const response = await fetch(url);
+                if (!response.ok) {
+                    return { ok: false, data: null, fromCache: false, error: null };
+                }
+                return { ok: true, data: await response.json(), fromCache: false, error: null };
+            } catch (err) {
+                if (window.offlineStorage) {
+                    try {
+                        const cached = await cacheGetter();
+                        if (cached && cached.length > 0) {
+                            return { ok: true, data: cached, fromCache: true, error: null };
+                        }
+                    } catch (cacheErr) {
+                        console.debug('Cache fallback failed:', cacheErr);
+                    }
+                }
+                return { ok: false, data: null, fromCache: false, error: err };
+            }
+        },
+
         // Load commentary for current chapter (always full chapter for browsing)
         async loadCommentary() {
             if (!this.currentBook || !this.currentChapter) {
@@ -1326,42 +1376,19 @@ function bibleApp() {
             }
 
             this.loadingCommentary = true;
-            try {
-                // When forced offline, go straight to cache
-                if (this.forcedOffline) {
-                    throw new Error('offline');
-                }
-
-                const chapterRef = `${this.currentBook} ${this.currentChapter}`;
-                const response = await fetch(
-                    `/api/passage/${encodeURIComponent(chapterRef)}/commentary`
-                );
-
-                if (response.ok) {
-                    const data = await response.json();
-                    this.commentary = data.entries || [];
-                } else {
-                    this.commentary = [];
-                }
-            } catch (err) {
-                // Network failed or forced offline — try IndexedDB cache
-                if (window.offlineStorage && this.currentBook && this.currentChapter) {
-                    try {
-                        const cached = await window.offlineStorage.getChapterCommentary(
-                            this.currentBook, this.currentChapter
-                        );
-                        if (cached && cached.length > 0) {
-                            this.commentary = cached;
-                            return;
-                        }
-                    } catch (cacheErr) {
-                        console.debug('Commentary cache fallback failed:', cacheErr);
-                    }
-                }
+            const chapterRef = `${this.currentBook} ${this.currentChapter}`;
+            const result = await this._fetchOrCache(
+                `/api/passage/${encodeURIComponent(chapterRef)}/commentary`,
+                () => window.offlineStorage.getChapterCommentary(this.currentBook, this.currentChapter)
+            );
+            if (result.fromCache) {
+                this.commentary = result.data;
+            } else if (result.ok) {
+                this.commentary = result.data.entries || [];
+            } else {
                 this.commentary = [];
-            } finally {
-                this.loadingCommentary = false;
             }
+            this.loadingCommentary = false;
         },
 
         // Get sorted and filtered cross-references
@@ -1482,24 +1509,6 @@ function bibleApp() {
 
         formatTopicEntry(text) {
             if (!text) return '';
-            const bookMap = {
-                'GEN':'Genesis','EXO':'Exodus','LEV':'Leviticus','NUM':'Numbers',
-                'DEU':'Deuteronomy','JOS':'Joshua','JDG':'Judges','RUT':'Ruth',
-                '1SA':'1 Samuel','2SA':'2 Samuel','1KI':'1 Kings','2KI':'2 Kings',
-                '1CH':'1 Chronicles','2CH':'2 Chronicles','EZR':'Ezra','NEH':'Nehemiah',
-                'EST':'Esther','JOB':'Job','PSA':'Psalms','PRO':'Proverbs',
-                'ECC':'Ecclesiastes','ISA':'Isaiah','JER':'Jeremiah','LAM':'Lamentations',
-                'EZK':'Ezekiel','DAN':'Daniel','HOS':'Hosea','JOL':'Joel','AMO':'Amos',
-                'OBA':'Obadiah','JON':'Jonah','MIC':'Micah','NAM':'Nahum','NAH':'Nahum',
-                'HAB':'Habakkuk','ZEP':'Zephaniah','HAG':'Haggai','ZEC':'Zechariah',
-                'MAL':'Malachi','MAT':'Matthew','MRK':'Mark','LUK':'Luke','JHN':'John',
-                'ACT':'Acts','ROM':'Romans','1CO':'1 Corinthians','2CO':'2 Corinthians',
-                'GAL':'Galatians','EPH':'Ephesians','PHP':'Philippians','COL':'Colossians',
-                '1TH':'1 Thessalonians','2TH':'2 Thessalonians','1TI':'1 Timothy',
-                '2TI':'2 Timothy','TIT':'Titus','PHM':'Philemon','HEB':'Hebrews',
-                'JAS':'James','1PE':'1 Peter','2PE':'2 Peter','1JN':'1 John',
-                '2JN':'2 John','3JN':'3 John','JDE':'Jude','REV':'Revelation'
-            };
             // Convert -SubTopic headings to styled lines
             let html = text.replace(/^-/gm, '<br>&#x2022; ')
                           .replace(/\n/g, '<br>')
@@ -1508,8 +1517,8 @@ function bibleApp() {
             html = html.replace(
                 /([A-Z1-3][A-Z]{1,4})\s+(\d+):(\d+)/g,
                 (match, abbr, ch, vs) => {
-                    const book = bookMap[abbr];
-                    if (!book) return match;
+                    const book = normalizeBookName(abbr);
+                    if (!BIBLE_BOOKS.includes(book)) return match;
                     return `<a href="#" class="topic-ref-link" data-ref="${book} ${ch}:${vs}">${match}</a>`;
                 }
             );
@@ -1676,7 +1685,7 @@ function bibleApp() {
             this.updateURL();
 
             // Load cross-refs for the new verse
-            this.loadCrossRefsForVerse(verseNum);
+            this.loadCrossRefs(null, verseNum);
 
             // Commentary already loaded for full chapter - just update active verse display
             // (no reload needed since we have all chapter commentary)
@@ -1688,36 +1697,6 @@ function bibleApp() {
                     verseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             });
-        },
-
-        // Load cross-references for a specific verse
-        async loadCrossRefsForVerse(verseNum) {
-            try {
-                const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
-                const response = await fetch(
-                    `/api/passage/${encodeURIComponent(ref)}/crossrefs`
-                );
-                if (response.ok) {
-                    const data = await response.json();
-                    this.crossRefs = data.cross_references || [];
-                }
-            } catch (err) {
-                // Network failed — try IndexedDB cache
-                if (window.offlineStorage && this.currentBook && this.currentChapter) {
-                    try {
-                        const cached = await window.offlineStorage.getChapterCrossRefs(
-                            this.currentBook, this.currentChapter, verseNum, verseNum
-                        );
-                        if (cached && cached.length > 0) {
-                            this.crossRefs = cached;
-                            return;
-                        }
-                    } catch (cacheErr) {
-                        console.error('Cross-refs cache fallback failed:', cacheErr);
-                    }
-                }
-                console.error('Failed to load cross-refs:', err);
-            }
         },
 
         // Handle click on verse box - select verse unless clicking a word
@@ -2144,37 +2123,31 @@ function bibleApp() {
             this.$nextTick(() => this.scrollCommentaryToVerse(verseNum));
         },
 
-        // Load cross-references for current verse
-        async loadCrossRefs() {
-            try {
-                const response = await fetch(
-                    `/api/passage/${encodeURIComponent(this.currentReference)}/crossrefs`
-                );
-
-                if (response.ok) {
-                    const data = await response.json();
-                    this.crossRefs = data.cross_references || [];
-                } else {
-                    this.crossRefs = [];
-                }
-            } catch (err) {
-                // Network failed — try IndexedDB cache
-                if (window.offlineStorage && this.currentBook && this.currentChapter) {
-                    try {
-                        const cached = await window.offlineStorage.getChapterCrossRefs(
-                            this.currentBook, this.currentChapter
-                        );
-                        if (cached && cached.length > 0) {
-                            this.crossRefs = cached;
-                            return;
-                        }
-                    } catch (cacheErr) {
-                        console.error('Cross-refs cache fallback failed:', cacheErr);
-                    }
-                }
-                console.error('Failed to load cross-refs:', err);
-                this.crossRefs = [];
+        // Load cross-references. No args: current reference (chapter-scoped cache
+        // fallback, clears crossRefs on failure). With verseNum: that verse of the
+        // current chapter (verse-scoped cache fallback, keeps existing crossRefs on
+        // failure). refOverride wins for the fetch URL if provided.
+        async loadCrossRefs(refOverride = null, verseNum = null) {
+            const ref = refOverride
+                || (verseNum != null
+                    ? `${this.currentBook} ${this.currentChapter}:${verseNum}`
+                    : this.currentReference);
+            const result = await this._fetchOrCache(
+                `/api/passage/${encodeURIComponent(ref)}/crossrefs`,
+                () => verseNum != null
+                    ? window.offlineStorage.getChapterCrossRefs(this.currentBook, this.currentChapter, verseNum, verseNum)
+                    : window.offlineStorage.getChapterCrossRefs(this.currentBook, this.currentChapter)
+            );
+            if (result.fromCache) {
+                this.crossRefs = result.data;
+                return;
             }
+            if (result.ok) {
+                this.crossRefs = result.data.cross_references || [];
+                return;
+            }
+            if (result.error) console.error('Failed to load cross-refs:', result.error);
+            if (verseNum == null) this.crossRefs = [];
         },
 
         async findPathToChrist() {
@@ -2262,58 +2235,39 @@ function bibleApp() {
         async loadInterlinearData() {
             this.interlinearData = {};
 
-            try {
-                // When forced offline, go straight to cache
-                if (this.forcedOffline) {
-                    throw new Error('offline');
-                }
+            const ref = `${this.currentBook} ${this.currentChapter}`;
+            const result = await this._fetchOrCache(
+                `/api/passage/${encodeURIComponent(ref)}/interlinear?translation=${this.translation}`,
+                () => window.offlineStorage.getChapterInterlinear(this.currentBook, this.currentChapter)
+            );
 
-                const ref = `${this.currentBook} ${this.currentChapter}`;
-                const response = await fetch(
-                    `/api/passage/${encodeURIComponent(ref)}/interlinear?translation=${this.translation}`
-                );
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.has_interlinear && data.verses) {
-                        this.interlinearLanguage = data.language;
-                        this.interlinearSourceText = data.source_text || '';
-                        for (const [verseNum, words] of Object.entries(data.verses)) {
-                            this.interlinearData[parseInt(verseNum)] = {
-                                language: data.language,
-                                words: words
-                            };
-                        }
-                    } else {
-                        this.interlinearSourceText = '';
-                    }
+            if (result.fromCache) {
+                const lang = OT_BOOKS.includes(this.currentBook) ? 'hebrew' : 'greek';
+                this.interlinearLanguage = lang;
+                const byVerse = {};
+                for (const word of result.data) {
+                    if (!byVerse[word.verse]) byVerse[word.verse] = [];
+                    byVerse[word.verse].push(word);
                 }
-            } catch (err) {
-                // Network failed or forced offline — try IndexedDB cache
-                if (window.offlineStorage && this.currentBook && this.currentChapter) {
-                    try {
-                        const cached = await window.offlineStorage.getChapterInterlinear(
-                            this.currentBook, this.currentChapter
-                        );
-                        if (cached && cached.length > 0) {
-                            const lang = OT_BOOKS.includes(this.currentBook) ? 'hebrew' : 'greek';
-                            this.interlinearLanguage = lang;
-                            const byVerse = {};
-                            for (const word of cached) {
-                                if (!byVerse[word.verse]) byVerse[word.verse] = [];
-                                byVerse[word.verse].push(word);
-                            }
-                            for (const [verseNum, words] of Object.entries(byVerse)) {
-                                this.interlinearData[parseInt(verseNum)] = {
-                                    language: lang,
-                                    words: words
-                                };
-                            }
-                            return;
-                        }
-                    } catch (cacheErr) {
-                        console.debug('Interlinear cache fallback failed:', cacheErr);
+                for (const [verseNum, words] of Object.entries(byVerse)) {
+                    this.interlinearData[parseInt(verseNum)] = {
+                        language: lang,
+                        words: words
+                    };
+                }
+            } else if (result.ok) {
+                const data = result.data;
+                if (data.has_interlinear && data.verses) {
+                    this.interlinearLanguage = data.language;
+                    this.interlinearSourceText = data.source_text || '';
+                    for (const [verseNum, words] of Object.entries(data.verses)) {
+                        this.interlinearData[parseInt(verseNum)] = {
+                            language: data.language,
+                            words: words
+                        };
                     }
+                } else {
+                    this.interlinearSourceText = '';
                 }
             }
         },
@@ -4882,28 +4836,7 @@ function bibleApp() {
 
         async confirmStartPlan() {
             if (!this.pendingPlanId || !this.planStartDate) return;
-
-            this.planProgress[this.pendingPlanId] = {
-                startDate: this.planStartDate,
-                completedDays: []
-            };
-
-            // Sync to Supabase if logged in
-            if (this.authUser && window.SupabaseAuth?.subscribeToReadingPlan) {
-                try {
-                    const result = await window.SupabaseAuth.subscribeToReadingPlan(
-                        this.pendingPlanId,
-                        this.planStartDate
-                    );
-                    this.planProgress[this.pendingPlanId].userPlanId = result.id;
-                    this.planProgress[this.pendingPlanId].synced = true;
-                } catch (err) {
-                    console.warn('Failed to sync plan to Supabase:', err);
-                }
-            }
-
-            this.savePlanProgress();
-            this.loadPlan(this.pendingPlanId);
+            await this.startPlan(this.pendingPlanId, this.planStartDate);
             this.showPlanStartPicker = false;
             this.pendingPlanId = null;
         },
@@ -4956,60 +4889,25 @@ function bibleApp() {
             if (!this.pendingPlanId || !this.planStartDate) return;
 
             const daysElapsed = this.getDaysElapsed();
+            const catchUpDays = shouldCatchUp && daysElapsed > 0
+                ? Array.from({ length: daysElapsed }, (_, i) => i + 1)
+                : [];
 
-            // Create initial progress
-            this.planProgress[this.pendingPlanId] = {
-                startDate: this.planStartDate,
-                completedDays: []
-            };
-
-            // Sync to Supabase if logged in
-            if (this.authUser && window.SupabaseAuth?.subscribeToReadingPlan) {
-                try {
-                    const result = await window.SupabaseAuth.subscribeToReadingPlan(
-                        this.pendingPlanId,
-                        this.planStartDate
-                    );
-                    this.planProgress[this.pendingPlanId].userPlanId = result.id;
-                    this.planProgress[this.pendingPlanId].synced = true;
-                } catch (err) {
-                    console.warn('Failed to sync plan to Supabase:', err);
-                }
-            }
-
-            // If catching up, mark all past days as complete
-            if (shouldCatchUp && daysElapsed > 0) {
-                const completedDays = [];
-                for (let i = 1; i <= daysElapsed; i++) {
-                    completedDays.push(i);
-                }
-                this.planProgress[this.pendingPlanId].completedDays = completedDays;
-
-                // Bulk sync to Supabase if logged in
-                if (this.authUser && window.SupabaseAuth?.bulkMarkDaysComplete) {
-                    try {
-                        const userPlanId = this.planProgress[this.pendingPlanId].userPlanId;
-                        if (userPlanId) {
-                            await window.SupabaseAuth.bulkMarkDaysComplete(userPlanId, completedDays);
-                        }
-                    } catch (err) {
-                        console.warn('Failed to bulk sync catch-up days to Supabase:', err);
-                    }
-                }
-            }
-
-            this.savePlanProgress();
-            this.loadPlan(this.pendingPlanId);
+            await this.startPlan(this.pendingPlanId, this.planStartDate, catchUpDays);
             this.showPlanStartPicker = false;
             this.showCatchUpPrompt = false;
             this.pendingPlanId = null;
         },
 
-        async startPlan(planId) {
-            // For backwards compatibility, start with today
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const startDate = today.toISOString().split('T')[0];
+        // Core plan-start: write progress, sync to Supabase, save, load the plan.
+        // catchUpDays marks past days complete (from the catch-up prompt).
+        async startPlan(planId, startDate = null, catchUpDays = []) {
+            if (!startDate) {
+                // Default: start with today
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                startDate = today.toISOString().split('T')[0];
+            }
 
             this.planProgress[planId] = {
                 startDate: startDate,
@@ -5024,6 +4922,21 @@ function bibleApp() {
                     this.planProgress[planId].synced = true;
                 } catch (err) {
                     console.warn('Failed to sync plan to Supabase:', err);
+                }
+            }
+
+            // Mark catch-up days complete
+            if (catchUpDays.length > 0) {
+                this.planProgress[planId].completedDays = [...catchUpDays];
+
+                // Bulk sync to Supabase if logged in
+                const userPlanId = this.planProgress[planId].userPlanId;
+                if (this.authUser && userPlanId && window.SupabaseAuth?.bulkMarkDaysComplete) {
+                    try {
+                        await window.SupabaseAuth.bulkMarkDaysComplete(userPlanId, catchUpDays);
+                    } catch (err) {
+                        console.warn('Failed to bulk sync catch-up days to Supabase:', err);
+                    }
                 }
             }
 
@@ -5170,135 +5083,12 @@ function bibleApp() {
             }
         },
 
-        // Normalize book names (e.g., "Psalm" -> "Psalms")
-        normalizeBookName(book) {
-            // Handle common abbreviations and variations
-            const normalizations = {
-                'Psalm': 'Psalms',
-                'Song of Songs': 'Song of Solomon',
-                // Chronicles abbreviations
-                '1 Chron': '1 Chronicles',
-                '1 Chron.': '1 Chronicles',
-                '1 Chr': '1 Chronicles',
-                '1 Chr.': '1 Chronicles',
-                '2 Chron': '2 Chronicles',
-                '2 Chron.': '2 Chronicles',
-                '2 Chr': '2 Chronicles',
-                '2 Chr.': '2 Chronicles',
-                // Samuel abbreviations
-                '1 Sam': '1 Samuel',
-                '1 Sam.': '1 Samuel',
-                '2 Sam': '2 Samuel',
-                '2 Sam.': '2 Samuel',
-                // Kings abbreviations
-                '1 Kgs': '1 Kings',
-                '1 Kgs.': '1 Kings',
-                '2 Kgs': '2 Kings',
-                '2 Kgs.': '2 Kings',
-                // Other common abbreviations
-                'Gen': 'Genesis',
-                'Gen.': 'Genesis',
-                'Exod': 'Exodus',
-                'Exod.': 'Exodus',
-                'Ex': 'Exodus',
-                'Ex.': 'Exodus',
-                'Lev': 'Leviticus',
-                'Lev.': 'Leviticus',
-                'Num': 'Numbers',
-                'Num.': 'Numbers',
-                'Deut': 'Deuteronomy',
-                'Deut.': 'Deuteronomy',
-                'Josh': 'Joshua',
-                'Josh.': 'Joshua',
-                'Judg': 'Judges',
-                'Judg.': 'Judges',
-                'Neh': 'Nehemiah',
-                'Neh.': 'Nehemiah',
-                'Esth': 'Esther',
-                'Esth.': 'Esther',
-                'Prov': 'Proverbs',
-                'Prov.': 'Proverbs',
-                'Eccl': 'Ecclesiastes',
-                'Eccl.': 'Ecclesiastes',
-                'Isa': 'Isaiah',
-                'Isa.': 'Isaiah',
-                'Jer': 'Jeremiah',
-                'Jer.': 'Jeremiah',
-                'Lam': 'Lamentations',
-                'Lam.': 'Lamentations',
-                'Ezek': 'Ezekiel',
-                'Ezek.': 'Ezekiel',
-                'Dan': 'Daniel',
-                'Dan.': 'Daniel',
-                'Hos': 'Hosea',
-                'Hos.': 'Hosea',
-                'Obad': 'Obadiah',
-                'Obad.': 'Obadiah',
-                'Mic': 'Micah',
-                'Mic.': 'Micah',
-                'Nah': 'Nahum',
-                'Nah.': 'Nahum',
-                'Hab': 'Habakkuk',
-                'Hab.': 'Habakkuk',
-                'Zeph': 'Zephaniah',
-                'Zeph.': 'Zephaniah',
-                'Hag': 'Haggai',
-                'Hag.': 'Haggai',
-                'Zech': 'Zechariah',
-                'Zech.': 'Zechariah',
-                'Mal': 'Malachi',
-                'Mal.': 'Malachi',
-                'Matt': 'Matthew',
-                'Matt.': 'Matthew',
-                'Rom': 'Romans',
-                'Rom.': 'Romans',
-                '1 Cor': '1 Corinthians',
-                '1 Cor.': '1 Corinthians',
-                '2 Cor': '2 Corinthians',
-                '2 Cor.': '2 Corinthians',
-                'Gal': 'Galatians',
-                'Gal.': 'Galatians',
-                'Eph': 'Ephesians',
-                'Eph.': 'Ephesians',
-                'Phil': 'Philippians',
-                'Phil.': 'Philippians',
-                'Col': 'Colossians',
-                'Col.': 'Colossians',
-                '1 Thess': '1 Thessalonians',
-                '1 Thess.': '1 Thessalonians',
-                '2 Thess': '2 Thessalonians',
-                '2 Thess.': '2 Thessalonians',
-                '1 Tim': '1 Timothy',
-                '1 Tim.': '1 Timothy',
-                '2 Tim': '2 Timothy',
-                '2 Tim.': '2 Timothy',
-                'Tit': 'Titus',
-                'Tit.': 'Titus',
-                'Phlm': 'Philemon',
-                'Phlm.': 'Philemon',
-                'Heb': 'Hebrews',
-                'Heb.': 'Hebrews',
-                'Jas': 'James',
-                'Jas.': 'James',
-                '1 Pet': '1 Peter',
-                '1 Pet.': '1 Peter',
-                '2 Pet': '2 Peter',
-                '2 Pet.': '2 Peter',
-                '1 John': '1 John',
-                '2 John': '2 John',
-                '3 John': '3 John',
-                'Rev': 'Revelation',
-                'Rev.': 'Revelation'
-            };
-            return normalizations[book] || book;
-        },
-
         // Normalize a full reference (book + chapter/verse)
         normalizeReference(ref) {
             // Match book name at the start (including numbered books like "1 Chron.")
             const match = ref.match(/^(\d?\s*[A-Za-z][A-Za-z.\s]*?)(\s+\d.*)$/);
             if (match) {
-                const book = this.normalizeBookName(match[1].trim());
+                const book = normalizeBookName(match[1].trim());
                 return book + match[2];
             }
             return ref;
