@@ -367,21 +367,6 @@ CREATE TABLE IF NOT EXISTS devotionals (
 CREATE INDEX IF NOT EXISTS idx_devotionals_date ON devotionals(month, day);
 CREATE INDEX IF NOT EXISTS idx_devotionals_source ON devotionals(source);
 
--- User notes (stored locally but schema here for reference)
--- In practice, this will be in IndexedDB on the frontend
-CREATE TABLE IF NOT EXISTS user_notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    book TEXT NOT NULL,
-    chapter INTEGER NOT NULL,
-    verse_start INTEGER NOT NULL,
-    verse_end INTEGER,
-    content TEXT NOT NULL,
-    color TEXT,
-    tags TEXT,  -- JSON array
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 -- Insert default translations
 INSERT OR IGNORE INTO translations (id, name, language, is_public_domain, license_info)
 VALUES

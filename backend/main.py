@@ -2,7 +2,9 @@
 BibleMVP - FastAPI Backend
 A free, open-source Bible study platform.
 """
+import json
 import logging
+import re
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -338,8 +340,6 @@ def search(
     scope: str = Query(default="all", description="Search scope: bible, ot, nt, book:BookName, commentary, all")
 ):
     """Full-text search across Bible text, notes, and commentaries."""
-    import re
-
     # OT/NT book lists for filtering
     OT_BOOKS = [
         "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
@@ -387,17 +387,24 @@ def search(
                     "definition": lex_row["definition"]
                 }
 
+            # word_alignments stores zero-padded Strong's numbers (H430 -> H0430)
+            padded_strong = f"{prefix}{number.zfill(4)}"
+
             # Search for verses with this Strong's number, including the original word
             cursor = conn.execute("""
                 SELECT 'verse' as type, v.book, v.chapter, v.verse,
-                       v.text as snippet, w.text as original_word,
-                       w.translation as gloss
-                FROM words w
-                JOIN verses v ON w.verse_id = v.id
-                WHERE w.strong_number = ?
+                       v.text as snippet, wa.hebrew_text as original_word,
+                       wa.english_gloss as gloss
+                FROM word_alignments wa
+                JOIN verses v ON v.book = wa.book
+                    AND v.chapter = wa.chapter
+                    AND v.verse = wa.verse
+                    AND v.translation_id = 'WEB'
+                WHERE wa.strong_number IN (?, ?)
+                GROUP BY v.book, v.chapter, v.verse
                 ORDER BY v.book_order, v.chapter, v.verse
                 LIMIT 50
-            """, (strongs_num,))
+            """, (strongs_num, padded_strong))
 
             for row in cursor.fetchall():
                 result = dict(row)
@@ -406,8 +413,7 @@ def search(
                     gloss = result["gloss"]
                     snippet = result["snippet"]
                     # Try to highlight the gloss word in the verse text
-                    import re as regex
-                    pattern = regex.compile(r'\b(' + regex.escape(gloss) + r')\b', regex.IGNORECASE)
+                    pattern = re.compile(r'\b(' + re.escape(gloss) + r')\b', re.IGNORECASE)
                     result["snippet"] = pattern.sub(r'<mark>\1</mark>', snippet, count=1)
                 results.append(result)
 
@@ -436,8 +442,7 @@ def search(
         else:
             # Strip FTS5 special operators that could cause syntax errors
             # Includes: * ( ) { } ^ ~ + - : which are all FTS5 syntax characters
-            import re as _re
-            sanitized = _re.sub(r'[*(){}^~+\-:]', '', q)
+            sanitized = re.sub(r'[*(){}^~+\-:]', '', q)
             # Add wildcard for partial matching on last word
             words = sanitized.split()
             if words:
@@ -601,31 +606,18 @@ def get_word(strong_number: str):
             if align_row and align_row['transliteration']:
                 word_dict['transliteration'] = align_row['transliteration']
 
-        # Get all occurrences from words table
-        cursor = conn.execute("""
-            SELECT v.book, v.chapter, v.verse, w.position, w.translation
-            FROM words w
-            JOIN verses v ON w.verse_id = v.id
-            WHERE w.strong_number = ?
-            ORDER BY v.book_order, v.chapter, v.verse, w.position
-        """, (strong_number,))
-
-        occurrences = cursor.fetchall()
-
-        # Also get occurrences from word_alignments (zero-padded Strong's)
+        # Get all occurrences from word_alignments (zero-padded Strong's)
         prefix = strong_number[0]  # H or G
         num = strong_number[1:]
         padded_strong = f"{prefix}{num.zfill(4)}"
 
-        # If words table had no results, try word_alignments for occurrences
-        if not occurrences:
-            cursor = conn.execute("""
-                SELECT book, chapter, verse, word_position as position, english_gloss as translation
-                FROM word_alignments
-                WHERE strong_number = ?
-                ORDER BY book, chapter, verse, word_position
-            """, (padded_strong,))
-            occurrences = cursor.fetchall()
+        cursor = conn.execute("""
+            SELECT book, chapter, verse, word_position as position, english_gloss as translation
+            FROM word_alignments
+            WHERE strong_number IN (?, ?)
+            ORDER BY book, chapter, verse, word_position
+        """, (strong_number, padded_strong))
+        occurrences = cursor.fetchall()
 
         # Get translation variants (how the word is rendered in English)
         # Strip trailing/leading punctuation and normalize case for grouping
@@ -871,7 +863,6 @@ def get_devotional_sources():
 @app.get("/api/reading-plans")
 def get_reading_plans():
     """Get list of available reading plans."""
-    import json
     data_path = Path(__file__).parent.parent / "data"
     plans = []
 
@@ -892,10 +883,8 @@ def get_reading_plans():
 @app.get("/api/reading-plans/{plan_id}")
 def get_reading_plan(plan_id: str):
     """Get full reading plan with all days."""
-    import json
-    import re as _re
     # Sanitize plan_id to prevent path traversal
-    if not _re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
+    if not re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
         raise HTTPException(status_code=400, detail="Invalid plan ID")
     data_path = Path(__file__).parent.parent / "data"
     plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
@@ -910,10 +899,8 @@ def get_reading_plan(plan_id: str):
 @app.get("/api/reading-plans/{plan_id}/day/{day}")
 def get_reading_plan_day(plan_id: str, day: int):
     """Get a specific day's reading from a plan."""
-    import json
-    import re as _re
     # Sanitize plan_id to prevent path traversal
-    if not _re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
+    if not re.match(r'^[a-zA-Z0-9_-]+$', plan_id):
         raise HTTPException(status_code=400, detail="Invalid plan ID")
     data_path = Path(__file__).parent.parent / "data"
     plan_file = data_path / f"reading-plan-{plan_id.replace('chronological-year', 'chronological')}.json"
@@ -946,8 +933,6 @@ def parse_reference(reference: str) -> Optional[tuple]:
     Returns None if invalid.
     has_verse indicates whether a specific verse was requested (for highlighting).
     """
-    import re
-
     # Book name abbreviations
     abbrevs = {
         "gen": "Genesis", "ge": "Genesis", "ex": "Exodus", "exod": "Exodus",
@@ -1795,7 +1780,6 @@ def get_crossref_map_christological(
             queue.append((s_book, s_chapter, s_verse, 1))
 
         # BFS outward from seeds
-        visited = set(n for n in nodes if n != "__CHRIST__")
         while queue and len(nodes) < limit:
             src_book, src_chapter, src_verse, current_depth = queue.pop(0)
             src_key = f"{src_book}.{src_chapter}.{src_verse}"
