@@ -37,6 +37,9 @@ const EMPTY_COLORS = [];
 let _relevantNotesKey = null;
 let _relevantNotesCache = [];
 
+// Monotonic toast id — Date.now() collides for same-ms toasts (B11)
+let _toastSeq = 0;
+
 // Chapter counts for each book
 const BOOK_CHAPTERS = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
@@ -331,6 +334,11 @@ function bibleApp() {
             y: 0
         },
         previewTimeout: null,
+        _previewToken: 0,  // invalidates in-flight hover previews (B7)
+
+        // Request generation: bumped on each navigation; async loaders capture
+        // it at start and bail before assigning state if it changed (B4)
+        _loadGeneration: 0,
 
         // Copy feedback
         copyFeedback: null,
@@ -664,6 +672,10 @@ function bibleApp() {
             // Setup keyboard shortcuts
             this.setupKeyboardShortcuts();
 
+            // Recover from interrupted sheet drags (touchcancel bubbles to
+            // document; template only binds touchstart/move/end) (B12)
+            document.addEventListener('touchcancel', () => this.sheetTouchCancel(), { passive: true });
+
             // Setup scroll-based verse tracking (desktop only)
             this.setupScrollObserver();
 
@@ -733,6 +745,31 @@ function bibleApp() {
         },
 
         // Keyboard shortcuts
+        // True when any modal/overlay is open — global shortcuts must not fire (B10).
+        // Flags enumerated from modal-overlay / side-menu-overlay in index.html.
+        anyModalOpen() {
+            return this.showSearch || this.showSettings || this.showGuide
+                || this.showAbout || this.showPathToChrist || this.showShareModal
+                || this.showShareJesus || this.showFeedback || this.showReadingPlan
+                || this.showMemoryTool || this.showSideMenu;
+        },
+
+        // Close the topmost open modal. Order: transient/stacked dialogs first
+        // (share, path-to-christ open on top of the reader), then the big
+        // full-screen tools, then the side menu.
+        closeTopmostModal() {
+            const flags = [
+                'showPathToChrist', 'showShareModal', 'showShareJesus',
+                'showFeedback', 'showSearch', 'showMemoryTool',
+                'showReadingPlan', 'showSettings', 'showGuide', 'showAbout',
+                'showSideMenu'
+            ];
+            for (const f of flags) {
+                if (this[f]) { this[f] = false; return true; }
+            }
+            return false;
+        },
+
         setupKeyboardShortcuts() {
             document.addEventListener('keydown', (e) => {
                 // Ignore if typing in an input
@@ -740,9 +777,19 @@ function bibleApp() {
                     // But allow Escape to blur inputs
                     if (e.key === 'Escape') {
                         e.target.blur();
-                        this.showSearch = false;
-                        this.showSettings = false;
+                        this.closeTopmostModal();
                         this.selectedWord = null;
+                    }
+                    return;
+                }
+
+                // While a modal is open, only Escape acts — it closes the
+                // topmost modal. Everything else (d/f/arrows/space...) is
+                // swallowed so shortcuts don't fire under modals (B10).
+                if (this.anyModalOpen()) {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.closeTopmostModal();
                     }
                     return;
                 }
@@ -1007,6 +1054,29 @@ function bibleApp() {
             this.sheetDragStyle = '';
         },
 
+        // OS interruption (call, notification shade, alert) fires touchcancel
+        // instead of touchend — without this the sheet is left mid-drag with
+        // transition:none stuck (B12). Bound via a document-level touchcancel
+        // listener in init(); safe to also bind as @touchcancel in the template.
+        sheetTouchCancel() {
+            if (!this._sheetDragging) return;
+            this._sheetDragging = false;
+            const panel = this.$refs.resourcesPanel;
+            if (panel) {
+                panel.style.transition = '';
+                panel.style.transform = '';
+                panel.style.maxHeight = '';
+                panel.style.height = '';
+            }
+            // Restore the last committed snap styling
+            if (this.resourcesPanelExpanded && this.sheetSnap !== 'collapsed') {
+                const max = this.sheetSnap === 'full' ? '90vh' : '50vh';
+                this.sheetDragStyle = 'max-height: ' + max + '; transform: translateY(0)';
+            } else {
+                this.sheetDragStyle = '';
+            }
+        },
+
         sheetTouchEnd() {
             if (!this._sheetDragging || window.innerWidth > 600) return;
             this._sheetDragging = false;
@@ -1078,10 +1148,17 @@ function bibleApp() {
             this.error = null;
             this.selectedWord = null;
 
-            // Parse book/chapter from input BEFORE fetch so offline fallback has correct values
-            const refMatch = this.referenceInput.match(/^(.+?)\s+(\d+)/);
+            // Invalidate stale async loaders from prior navigations (B4)
+            const gen = ++this._loadGeneration;
+
+            // Parse book/chapter (and optional :verse or :start-end) from input
+            // BEFORE fetch so offline fallback has correct values
+            const refMatch = this.referenceInput.match(/^(.+?)\s+(\d+)(?::(\d+)(?:-(\d+))?)?/);
             const inputBook = refMatch ? refMatch[1] : this.referenceInput;
             const inputChapter = refMatch ? parseInt(refMatch[2]) : 1;
+            const inputVerse = refMatch && refMatch[3] ? parseInt(refMatch[3]) : null;
+            const inputVerseEnd = refMatch && refMatch[4]
+                ? Math.max(inputVerse, parseInt(refMatch[4])) : inputVerse;
 
             // If forced offline, skip fetch entirely and go straight to IndexedDB
             if (this.forcedOffline) {
@@ -1099,26 +1176,50 @@ function bibleApp() {
                     if (cached && cached.length > 0) {
                         // Show cached data immediately (html precomputed once per assignment)
                         this.verses = cached.map(v => ({ verse: v.verse, text: v.text, html: this.formatVerseText(v.text) }));
-                        this.currentReference = `${inputBook} ${inputChapter}`;
+                        // Preserve requested verse/range so cross-ref clicks keep
+                        // their highlight on the cache-first path (B2)
+                        if (inputVerse) {
+                            const available = new Set(cached.map(v => v.verse));
+                            const hv = [];
+                            for (let v = inputVerse; v <= inputVerseEnd; v++) {
+                                if (available.has(v)) hv.push(v);
+                            }
+                            this.highlightedVerses = hv;
+                            this.currentReference = inputVerseEnd > inputVerse
+                                ? `${inputBook} ${inputChapter}:${inputVerse}-${inputVerseEnd}`
+                                : `${inputBook} ${inputChapter}:${inputVerse}`;
+                        } else {
+                            this.highlightedVerses = [];
+                            this.currentReference = `${inputBook} ${inputChapter}`;
+                        }
                         this.parseCurrentReference();
                         this.rebuildVerseColorMap();
                         this.crossRefs = [];
-                        this.highlightedVerses = [];
                         this.speakerVerses = [];
                         this.updateURL(true);
                         this.observeVerses();
                         this.loading = false;
+
+                        // Scroll to highlighted verse (same behavior as network path)
+                        if (this.highlightedVerses.length > 0) {
+                            this.$nextTick(() => {
+                                const firstHighlighted = document.getElementById(`verse-${this.highlightedVerses[0]}`);
+                                if (firstHighlighted) {
+                                    firstHighlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            });
+                        }
 
                         // Load cached commentary/interlinear/cross-refs
                         await this.loadCommentary();
                         await this.loadInterlinearData();
                         try {
                             const cachedRefs = await window.offlineStorage.getChapterCrossRefs(inputBook, inputChapter);
-                            if (cachedRefs?.length > 0) this.crossRefs = cachedRefs;
+                            if (gen === this._loadGeneration && cachedRefs?.length > 0) this.crossRefs = cachedRefs;
                         } catch (e) { /* silent */ }
 
                         // Background refresh from API (fire-and-forget)
-                        this._backgroundRefresh(inputBook, inputChapter);
+                        this._backgroundRefresh(inputBook, inputChapter, gen);
                         return;
                     }
                 } catch (e) {
@@ -1138,6 +1239,7 @@ function bibleApp() {
                 }
 
                 const data = await response.json();
+                if (gen !== this._loadGeneration) return;  // superseded by newer navigation (B4)
                 this.currentReference = data.reference;
                 // Precompute rendered html once per assignment (P5) instead of per render
                 this.verses = (data.verses || []).map(v => ({ ...v, html: this.formatVerseText(v.text) }));
@@ -1194,10 +1296,13 @@ function bibleApp() {
                 }
 
             } catch (err) {
-                // Network failed — try IndexedDB fallback
-                await this._loadFromCache(inputBook, inputChapter, err.message);
+                // Network failed — try IndexedDB fallback (skip if superseded, B4)
+                if (gen === this._loadGeneration) {
+                    await this._loadFromCache(inputBook, inputChapter, err.message);
+                }
             } finally {
-                this.loading = false;
+                // A newer navigation owns the spinner if gen moved on (B4)
+                if (gen === this._loadGeneration) this.loading = false;
             }
         },
 
@@ -1256,7 +1361,7 @@ function bibleApp() {
         },
 
         // Background refresh: fetch fresh data from API and update cache (does not update UI unless data changed significantly)
-        async _backgroundRefresh(book, chapter) {
+        async _backgroundRefresh(book, chapter, gen) {
             try {
                 const ref = `${book} ${chapter}`;
                 const response = await fetch(
@@ -1264,6 +1369,9 @@ function bibleApp() {
                 );
                 if (!response.ok) return;
                 const data = await response.json();
+
+                // Stale response after fast navigation — do not clobber state (B4)
+                if (gen !== undefined && gen !== this._loadGeneration) return;
 
                 // Update cross-refs and speaker data silently (these aren't cached initially)
                 if (data.cross_references?.length > 0) {
@@ -1407,12 +1515,18 @@ function bibleApp() {
                 return;
             }
 
+            const gen = this._loadGeneration;
             this.loadingCommentary = true;
             const chapterRef = `${this.currentBook} ${this.currentChapter}`;
             const result = await this._fetchOrCache(
                 `/api/passage/${encodeURIComponent(chapterRef)}/commentary`,
                 () => window.offlineStorage.getChapterCommentary(this.currentBook, this.currentChapter)
             );
+            if (gen !== this._loadGeneration) {
+                // Stale response after navigation — leave state alone (B4)
+                this.loadingCommentary = false;
+                return;
+            }
             if (result.fromCache) {
                 this.commentary = result.data;
             } else if (result.ok) {
@@ -2037,9 +2151,15 @@ function bibleApp() {
         },
 
         memorizeSelected() {
+            let added = 0;
             this.highlightedVerses.forEach(v => {
-                if (!this.isInMemory(v)) this.addToMemory(v);
+                if (!this.isInMemory(v) && this.addToMemory(v, true)) added++;
             });
+            if (added > 0) {
+                this.showToast(added === 1
+                    ? 'Added to memory verses'
+                    : `Added ${added} verses to memory`, 'success');
+            }
         },
 
         // Copy all selected verses as a block
@@ -2165,6 +2285,7 @@ function bibleApp() {
         // current chapter (verse-scoped cache fallback, keeps existing crossRefs on
         // failure). refOverride wins for the fetch URL if provided.
         async loadCrossRefs(refOverride = null, verseNum = null) {
+            const gen = this._loadGeneration;
             const ref = refOverride
                 || (verseNum != null
                     ? `${this.currentBook} ${this.currentChapter}:${verseNum}`
@@ -2175,6 +2296,7 @@ function bibleApp() {
                     ? window.offlineStorage.getChapterCrossRefs(this.currentBook, this.currentChapter, verseNum, verseNum)
                     : window.offlineStorage.getChapterCrossRefs(this.currentBook, this.currentChapter)
             );
+            if (gen !== this._loadGeneration) return;  // stale after navigation (B4)
             if (result.fromCache) {
                 this.crossRefs = result.data;
                 return;
@@ -2235,15 +2357,21 @@ function bibleApp() {
                 clearTimeout(this.previewTimeout);
             }
 
+            // Invalidate older in-flight previews — last hover wins (B7)
+            const token = ++this._previewToken;
+
             // Delay slightly to avoid flickering
             this.previewTimeout = setTimeout(async () => {
                 try {
                     const response = await fetch(
                         `/api/verse/${encodeURIComponent(ref)}?translation=${this.translation}`
                     );
+                    // Superseded by a newer hover or hidePreview — drop it (B7)
+                    if (token !== this._previewToken) return;
 
                     if (response.ok) {
                         const data = await response.json();
+                        if (token !== this._previewToken) return;
                         const rect = event.target.getBoundingClientRect();
 
                         this.versePreview = {
@@ -2265,6 +2393,9 @@ function bibleApp() {
             if (this.previewTimeout) {
                 clearTimeout(this.previewTimeout);
             }
+            // Invalidate any in-flight preview fetch so it can't pop the
+            // tooltip back open after hide (B7)
+            this._previewToken++;
             this.versePreview.show = false;
         },
 
@@ -2281,6 +2412,7 @@ function bibleApp() {
 
         // Load interlinear data for the entire chapter
         async loadInterlinearData() {
+            const gen = this._loadGeneration;
             this.interlinearLoading = true;
             this.interlinearData = {};
             this._interlinearRef = null;
@@ -2290,6 +2422,12 @@ function bibleApp() {
                 `/api/passage/${encodeURIComponent(ref)}/interlinear?translation=${this.translation}`,
                 () => window.offlineStorage.getChapterInterlinear(this.currentBook, this.currentChapter)
             );
+
+            if (gen !== this._loadGeneration) {
+                // Stale response after navigation — leave state alone (B4)
+                this.interlinearLoading = false;
+                return;
+            }
 
             if (result.fromCache) {
                 const lang = OT_BOOKS.includes(this.currentBook) ? 'hebrew' : 'greek';
@@ -2585,7 +2723,8 @@ function bibleApp() {
                         editions: interlinearWord?.editions || null,
                         word_type: interlinearWord?.word_type || null,
                         occurrences: data.occurrences,
-                        count: data.count,
+                        // API caps occurrences at 500; total is the real count
+                        count: data.total ?? data.count,
                         glosses: data.glosses || [],
                         book_frequency: data.book_frequency || []
                     };
@@ -4385,7 +4524,7 @@ function bibleApp() {
 
         // Show a toast notification
         showToast(message, type = 'info') {
-            const id = Date.now();
+            const id = ++_toastSeq;
             this.toasts.push({ id, message, type });
 
             // Auto-remove after 4 seconds
@@ -5225,6 +5364,9 @@ function bibleApp() {
             const readings = this.getPlanDayReadings(this.planDay);
             if (!readings) return;
 
+            // Plan loading is a navigation — invalidate stale loaders (B4)
+            const gen = ++this._loadGeneration;
+
             this.showReadingPlan = false;
             this.loading = true;
             this.combinedPlanReading = true;
@@ -5348,6 +5490,9 @@ function bibleApp() {
                 }
             }
 
+            // Bail if the user navigated away while the plan was loading (B4)
+            if (gen !== this._loadGeneration) return;
+
             // Set combined verses in the main reader
             this.verses = allVerses;
             this.currentReference = `${this.currentPlan.name} - Day ${this.planDay}`;
@@ -5397,6 +5542,9 @@ function bibleApp() {
 
             this.interlinearData = {};
             const [commentaryGroups, interlinearResults] = await Promise.all([commentaryPromise, interlinearPromise]);
+
+            // User navigated away mid-load — do not clobber their state (B4)
+            if (gen !== this._loadGeneration) return;
 
             for (const entries of commentaryGroups) {
                 allCommentary = allCommentary.concat(entries);
@@ -5654,15 +5802,15 @@ function bibleApp() {
 
         // ========== SCRIPTURE MEMORY ==========
 
-        addToMemory(verseNum) {
-            if (!this.currentBook || !this.currentChapter) return;
+        addToMemory(verseNum, silent = false) {
+            if (!this.currentBook || !this.currentChapter) return false;
             const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
             if (this.memoryVerses.some(m => m.reference === ref)) {
-                this.showToast('Already in memory verses', 'info');
-                return;
+                if (!silent) this.showToast('Already in memory verses', 'info');
+                return false;
             }
             const verseObj = this.verses.find(v => v.verse === verseNum);
-            if (!verseObj) return;
+            if (!verseObj) return false;
             this.memoryVerses.push({
                 reference: ref,
                 text: verseObj.text,
@@ -5675,7 +5823,8 @@ function bibleApp() {
                 reviewCount: 0
             });
             this.saveMemoryVerses();
-            this.showToast('Added to memory verses', 'success');
+            if (!silent) this.showToast('Added to memory verses', 'success');
+            return true;
         },
 
         isInMemory(verseNum) {

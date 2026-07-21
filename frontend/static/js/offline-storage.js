@@ -79,30 +79,42 @@ class OfflineStorage {
         });
     }
 
+    // Write records + their meta entry in ONE readwrite transaction so they
+    // commit or fail atomically. Resolves on transaction.oncomplete; rejects on
+    // onerror/onabort — a per-put failure (e.g. QuotaExceededError) aborts the
+    // whole transaction, so meta can never claim cached:true for missing data.
+    _txWrite(storeName, records, metaKey, metaValue) {
+        const tx = this.db.transaction([storeName, STORES.META], 'readwrite');
+        const store = tx.objectStore(storeName);
+        for (const record of records) {
+            store.put(record);
+        }
+        tx.objectStore(STORES.META).put({ key: metaKey, ...metaValue });
+
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
+        });
+    }
+
     // ========== VERSES ==========
 
     async saveChapterVerses(translation, book, chapter, verses) {
         await this.ready;
-        const tx = this.db.transaction(STORES.VERSES, 'readwrite');
-        const store = tx.objectStore(STORES.VERSES);
-
-        for (const verse of verses) {
-            await store.put({
+        return this._txWrite(
+            STORES.VERSES,
+            verses.map(verse => ({
                 id: `${translation}:${book}:${chapter}:${verse.verse}`,
                 translation,
                 book,
                 chapter,
                 verse: verse.verse,
                 text: verse.text
-            });
-        }
-
-        // Mark chapter as cached
-        await this.setMeta(`verses:${translation}:${book}:${chapter}`, {
-            cached: true,
-            timestamp: Date.now(),
-            count: verses.length
-        });
+            })),
+            `verses:${translation}:${book}:${chapter}`,
+            { cached: true, timestamp: Date.now(), count: verses.length }
+        );
     }
 
     async getChapterVerses(translation, book, chapter) {
@@ -124,24 +136,18 @@ class OfflineStorage {
 
     async saveChapterAlignments(translation, book, chapter, alignments) {
         await this.ready;
-        const tx = this.db.transaction(STORES.ALIGNMENTS, 'readwrite');
-        const store = tx.objectStore(STORES.ALIGNMENTS);
-
-        for (const align of alignments) {
-            await store.put({
+        return this._txWrite(
+            STORES.ALIGNMENTS,
+            alignments.map(align => ({
                 id: `${translation}:${book}:${chapter}:${align.verse}:${align.position}`,
                 translation,
                 book,
                 chapter,
                 ...align
-            });
-        }
-
-        await this.setMeta(`alignments:${translation}:${book}:${chapter}`, {
-            cached: true,
-            timestamp: Date.now(),
-            count: alignments.length
-        });
+            })),
+            `alignments:${translation}:${book}:${chapter}`,
+            { cached: true, timestamp: Date.now(), count: alignments.length }
+        );
     }
 
     // ponytail: unused until offline word study wired up (see CODE_REVIEW_2026-07-21.md R4)
@@ -161,18 +167,12 @@ class OfflineStorage {
 
     async saveLexiconEntries(entries) {
         await this.ready;
-        const tx = this.db.transaction(STORES.LEXICON, 'readwrite');
-        const store = tx.objectStore(STORES.LEXICON);
-
-        for (const entry of entries) {
-            await store.put(entry);
-        }
-
-        await this.setMeta('lexicon', {
-            cached: true,
-            timestamp: Date.now(),
-            count: entries.length
-        });
+        return this._txWrite(
+            STORES.LEXICON,
+            entries,
+            'lexicon',
+            { cached: true, timestamp: Date.now(), count: entries.length }
+        );
     }
 
     // ponytail: unused until offline word study wired up (see CODE_REVIEW_2026-07-21.md R4)
@@ -192,23 +192,17 @@ class OfflineStorage {
 
     async saveChapterCrossRefs(book, chapter, refs) {
         await this.ready;
-        const tx = this.db.transaction(STORES.CROSS_REFS, 'readwrite');
-        const store = tx.objectStore(STORES.CROSS_REFS);
-
-        for (const ref of refs) {
-            await store.put({
+        return this._txWrite(
+            STORES.CROSS_REFS,
+            refs.map(ref => ({
                 id: `${book}:${chapter}:${ref.source_verse}:${ref.target_book}:${ref.target_chapter}:${ref.target_verse}`,
                 book,
                 chapter,
                 ...ref
-            });
-        }
-
-        await this.setMeta(`crossrefs:${book}:${chapter}`, {
-            cached: true,
-            timestamp: Date.now(),
-            count: refs.length
-        });
+            })),
+            `crossrefs:${book}:${chapter}`,
+            { cached: true, timestamp: Date.now(), count: refs.length }
+        );
     }
 
     async getChapterCrossRefs(book, chapter, verseStart, verseEnd) {
@@ -238,23 +232,17 @@ class OfflineStorage {
 
     async saveChapterCommentary(book, chapter, entries) {
         await this.ready;
-        const tx = this.db.transaction(STORES.COMMENTARY, 'readwrite');
-        const store = tx.objectStore(STORES.COMMENTARY);
-
-        for (const entry of entries) {
-            await store.put({
+        return this._txWrite(
+            STORES.COMMENTARY,
+            entries.map(entry => ({
                 id: `${entry.source}:${book}:${chapter}:${entry.reference_start}`,
                 book,
                 chapter,
                 ...entry
-            });
-        }
-
-        await this.setMeta(`commentary:${book}:${chapter}`, {
-            cached: true,
-            timestamp: Date.now(),
-            count: entries.length
-        });
+            })),
+            `commentary:${book}:${chapter}`,
+            { cached: true, timestamp: Date.now(), count: entries.length }
+        );
     }
 
     async getChapterCommentary(book, chapter, verseStart, verseEnd) {
@@ -285,23 +273,17 @@ class OfflineStorage {
 
     async saveChapterInterlinear(book, chapter, words) {
         await this.ready;
-        const tx = this.db.transaction(STORES.INTERLINEAR, 'readwrite');
-        const store = tx.objectStore(STORES.INTERLINEAR);
-
-        for (const word of words) {
-            await store.put({
+        return this._txWrite(
+            STORES.INTERLINEAR,
+            words.map(word => ({
                 id: `${book}:${chapter}:${word.verse}:${word.position}`,
                 book,
                 chapter,
                 ...word
-            });
-        }
-
-        await this.setMeta(`interlinear:${book}:${chapter}`, {
-            cached: true,
-            timestamp: Date.now(),
-            count: words.length
-        });
+            })),
+            `interlinear:${book}:${chapter}`,
+            { cached: true, timestamp: Date.now(), count: words.length }
+        );
     }
 
     async getChapterInterlinear(book, chapter) {
@@ -328,6 +310,7 @@ class OfflineStorage {
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted'));
         });
     }
 

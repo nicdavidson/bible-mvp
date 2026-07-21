@@ -1238,7 +1238,7 @@
                     </div>
                 </div>
                 <div class="word-occurrences" x-show="selectedWord?.count > 0">
-                    <h4>Appears <span x-text="selectedWord?.count"></span> times:</h4>
+                    <h4>Appears <span x-text="selectedWord?.count"></span> times<span x-show="selectedWord?.count > (selectedWord?.occurrences || []).length" x-text="' (showing first ' + (selectedWord?.occurrences || []).length + ')'"></span>:</h4>
                     <ul class="occurrence-list">
                         <template x-for="(occ, occIdx) in (showAllOccurrences ? (selectedWord?.occurrences || []) : (selectedWord?.occurrences || []).slice(0, 10))" :key="'occ-' + occIdx">
                             <li>
