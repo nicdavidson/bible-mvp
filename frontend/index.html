@@ -2790,6 +2790,16 @@
             navigator.serviceWorker.ready.then(reg => {
                 console.log('[Main] Service worker ready, controller:', !!navigator.serviceWorker.controller);
             });
+
+            // When a new SW takes over mid-session (fresh deploy), reload once so
+            // index.html and cached assets can never run as a mismatched pair
+            let swReloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (swReloaded) return;
+                swReloaded = true;
+                console.log('[Main] New service worker took control, reloading for consistent assets');
+                window.location.reload();
+            });
         } else if (!isLocalhost && !isSecure) {
             console.warn('[Main] Service worker disabled: requires localhost or HTTPS. Current:', location.hostname);
         }
