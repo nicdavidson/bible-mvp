@@ -294,7 +294,10 @@
 
             <!-- Plan reading header bar (shown when in combined plan reading mode) - sticky below header -->
             <div x-show="combinedPlanReading && currentPlan" class="plan-reading-bar">
-                <button @click="exitPlanReading()" class="btn-exit-plan" title="Exit to normal Bible view">✕ Exit</button>
+                <div class="plan-day-progress" aria-hidden="true">
+                    <div class="plan-day-progress-fill" :style="'width:' + Math.round(100 * planDay / (currentPlan?.duration_days || 365)) + '%'"></div>
+                </div>
+                <button @click="exitPlanReading()" class="btn-exit-plan" title="Exit to normal Bible view">✕<span class="exit-label"> Exit</span></button>
                 <div class="plan-reading-info">
                     <div class="plan-title-row">
                         <span class="plan-name" x-text="currentPlan?.name"></span>
@@ -574,7 +577,7 @@
         </section>
 
         <!-- Resources Panel -->
-        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed }" :style="sheetDragStyle" x-ref="resourcesPanel">
+        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed, 'peeking': !resourcesPanelExpanded && highlightedVerses.length > 0 && (commentary.length > 0 || crossRefs.length > 0 || verseTopics.length > 0 || getRelevantNotes().length > 0) }" :style="sheetDragStyle" x-ref="resourcesPanel">
             <!-- Sidebar toggle button (tablet/desktop only) -->
             <button
                 class="btn-sidebar-toggle"
@@ -584,6 +587,21 @@
             >
                 <span x-text="sidebarCollapsed ? '&#x00BB;' : '&#x00AB;'"></span>
             </button>
+            <div class="study-peek" x-show="!resourcesPanelExpanded && highlightedVerses.length > 0">
+                <span class="study-peek-label">Study</span>
+                <button class="peek-chip" x-show="commentary.length > 0" @click="activeTab = 'commentary'; resourcesPanelExpanded = true; sheetExpand()">
+                    Commentary <span class="peek-count" x-text="commentary.length"></span>
+                </button>
+                <button class="peek-chip" x-show="crossRefs.length > 0" @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true; sheetExpand()">
+                    Cross-refs <span class="peek-count" x-text="crossRefs.length"></span>
+                </button>
+                <button class="peek-chip" x-show="verseTopics.length > 0" @click="activeTab = 'topics'; resourcesPanelExpanded = true; sheetExpand(); initTopicSections()">
+                    Topics <span class="peek-count" x-text="verseTopics.length"></span>
+                </button>
+                <button class="peek-chip" x-show="getRelevantNotes().length > 0" @click="activeTab = 'notes'; resourcesPanelExpanded = true; sheetExpand()">
+                    Notes <span class="peek-count" x-text="getRelevantNotes().length"></span>
+                </button>
+            </div>
             <div class="panel-tabs" @touchstart="sheetTouchStart($event)" @touchmove.prevent="sheetTouchMove($event)" @touchend="sheetTouchEnd($event)">
                 <button
                     class="tab-drag-handle"

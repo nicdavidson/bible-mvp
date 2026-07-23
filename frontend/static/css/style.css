@@ -8718,3 +8718,133 @@ svg.action-bar-icon {
 .feedback-modal {
     max-width: 500px;
 }
+
+/* ============================================================
+   Mobile study-tool pass (2026-07-23): plan-mode readability,
+   compact plan bar + day progress, study peek chips
+   ============================================================ */
+
+/* Day progress: thin bar across the top edge of the plan bar */
+.plan-reading-bar {
+    position: sticky;
+}
+.plan-day-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--color-border);
+}
+.plan-day-progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 0 2px 2px 0;
+    transition: width 0.3s ease;
+}
+
+/* Study peek chips: hidden on desktop (panel is always visible there) */
+.study-peek { display: none; }
+
+@media (max-width: 900px) {
+    /* Collapsed sheet rises to show the peek row when a verse is selected */
+    .panel-resources.peeking {
+        transform: translateY(calc(100% - 96px));
+    }
+    .study-peek {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.5rem 0.75rem 0.25rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .study-peek::-webkit-scrollbar { display: none; }
+    .study-peek-label {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--color-text-muted);
+        flex-shrink: 0;
+    }
+    .peek-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.3rem 0.625rem;
+        border: 1px solid var(--color-border);
+        border-radius: 999px;
+        background: var(--color-bg);
+        color: var(--color-text);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .peek-chip:active { background: var(--color-surface-hover); }
+    .peek-count {
+        font-size: 0.6875rem;
+        font-weight: 700;
+        color: var(--color-primary);
+        background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+        border-radius: 999px;
+        padding: 0.05rem 0.4rem;
+    }
+}
+
+@media (max-width: 600px) {
+    /* Reading typography: bigger, calmer, book-like */
+    .verses {
+        font-size: 1.1875rem;
+        line-height: 1.8;
+    }
+    .verse-text { text-wrap: pretty; }
+    .panel-text .panel-body { padding-left: 1rem; padding-right: 1rem; }
+
+    /* Compact plan bar: one row, icon exit, smaller buttons */
+    .plan-reading-bar {
+        flex-wrap: nowrap;
+        padding: 0.5rem 0.625rem;
+        gap: 0.5rem;
+    }
+    .plan-reading-bar .exit-label { display: none; }
+    .plan-reading-bar .btn-exit-plan {
+        padding: 0.4rem 0.6rem;
+        flex-shrink: 0;
+    }
+    .plan-reading-info {
+        order: 0;
+        width: auto;
+        flex: 1;
+        min-width: 0;
+        gap: 0.1rem;
+    }
+    .plan-reading-info .plan-name { font-size: 0.875rem; }
+    .plan-reading-info .plan-day-label { font-size: 0.75rem; }
+    .plan-readings-subtitle {
+        font-size: 0.75rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+    .btn-complete-day {
+        padding: 0.4rem 0.625rem;
+        font-size: 0.8125rem;
+        flex-shrink: 0;
+    }
+
+    /* Chapter headers in plan mode: clearer hierarchy, less dead space */
+    .combined-section-header { margin-top: 1.5rem; }
+    .combined-section-header .section-ref { font-size: 1.375rem; }
+
+    /* Expanded sheet gets real study height + readable resource text */
+    .panel-resources.expanded { max-height: 62dvh; }
+    .commentary-content {
+        font-size: 0.9375rem;
+        line-height: 1.65;
+    }
+}
