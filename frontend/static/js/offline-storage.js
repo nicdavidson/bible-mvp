@@ -150,7 +150,6 @@ class OfflineStorage {
         );
     }
 
-    // ponytail: unused until offline word study wired up (see CODE_REVIEW_2026-07-21.md R4)
     async getWordAlignment(translation, book, chapter, verse, position) {
         await this.ready;
         const tx = this.db.transaction(STORES.ALIGNMENTS, 'readonly');
@@ -175,7 +174,6 @@ class OfflineStorage {
         );
     }
 
-    // ponytail: unused until offline word study wired up (see CODE_REVIEW_2026-07-21.md R4)
     async getLexiconEntry(strongNumber) {
         await this.ready;
         const tx = this.db.transaction(STORES.LEXICON, 'readonly');

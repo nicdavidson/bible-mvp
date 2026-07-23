@@ -2542,6 +2542,14 @@ function bibleApp() {
         },
 
         // Handle word click (for English words in verse text)
+        // Highlight the interlinear word matching an original-language position
+        _highlightInterlinearWord(verseBox, origPos) {
+            if (!this.showInterlinear || !origPos) return;
+            verseBox?.querySelectorAll('.interlinear-word').forEach((el, idx) => {
+                if (idx + 1 === origPos) el.classList.add('selected');
+            });
+        },
+
         async handleWordClick(event) {
             const wordEl = event.target.closest('.word');
             if (!wordEl) return;
@@ -2589,20 +2597,41 @@ function bibleApp() {
                             count: 0
                         };
 
-                        // Also highlight the corresponding interlinear word if visible
-                        if (this.showInterlinear) {
-                            const origPos = align.original_word_position;
-                            const interlinearWords = verseBox?.querySelectorAll('.interlinear-word');
-                            interlinearWords?.forEach((el, idx) => {
-                                if (idx + 1 === origPos) {
-                                    el.classList.add('selected');
-                                }
-                            });
-                        }
+                        this._highlightInterlinearWord(verseBox, align.original_word_position);
                         return;
                     }
                 } catch (err) {
                     console.error('Word alignment lookup failed:', err);
+                }
+            }
+
+            // Offline fallback: cached alignments + lexicon (saved with offline books)
+            if (window.offlineStorage && this.currentBook && this.currentChapter && verseNum && wordPosition) {
+                try {
+                    const align = await window.offlineStorage.getWordAlignment(
+                        this.translation, this.currentBook, this.currentChapter, verseNum, wordPosition);
+                    if (align) {
+                        // Cached alignments carry no transliteration/extended definition; lexicon does
+                        const lex = align.strong_number
+                            ? await window.offlineStorage.getLexiconEntry(align.strong_number).catch(() => null)
+                            : null;
+                        this.selectedWord = {
+                            text: word,
+                            original: align.original_text || lex?.original,
+                            transliteration: lex?.transliteration,
+                            strong_number: align.strong_number,
+                            parsing: null,
+                            definition: align.definition || lex?.definition,
+                            extended_definition: lex?.extended_definition,
+                            language: align.language || lex?.language,
+                            occurrences: [],
+                            count: 0
+                        };
+                        this._highlightInterlinearWord(verseBox, align.original_word_position);
+                        return;
+                    }
+                } catch (err) {
+                    console.error('Offline word lookup failed:', err);
                 }
             }
 
