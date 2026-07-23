@@ -16,7 +16,7 @@ router = APIRouter()
 # ========== OFFLINE DATA EXPORT ENDPOINTS ==========
 
 @router.get("/api/offline/chapter")
-@limiter.limit("20/minute")
+@limiter.limit("120/minute")
 def get_chapter_offline_data(
     request: Request,
     book: str,
@@ -225,7 +225,7 @@ def get_book_offline_data(
 
 
 @router.get("/api/offline/commentary")
-@limiter.limit("10/minute")
+@limiter.limit("30/minute")
 def get_commentary_offline_data(request: Request, book: str):
     """Get all commentary entries for a book for offline use."""
     conn = get_db_connection()
@@ -243,7 +243,7 @@ def get_commentary_offline_data(request: Request, book: str):
 
 
 @router.get("/api/offline/crossrefs")
-@limiter.limit("10/minute")
+@limiter.limit("30/minute")
 def get_crossrefs_offline_data(request: Request, book: str):
     """Get all cross-references for a book for offline use."""
     conn = get_db_connection()
