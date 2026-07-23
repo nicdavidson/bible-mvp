@@ -8848,3 +8848,18 @@ svg.action-bar-icon {
         line-height: 1.65;
     }
 }
+
+/* Auto-hiding header while reading (mobile) — see setupHeaderAutoHide() */
+@media (max-width: 900px) {
+    .header {
+        transition: background var(--transition-normal), border-color var(--transition-normal),
+                    transform 0.25s ease, margin-bottom 0.25s ease;
+    }
+    body.reading-immersed .header {
+        transform: translateY(-100%);
+        margin-bottom: calc(-1 * var(--header-h, 108px));
+    }
+    body.reading-immersed .panel-text {
+        max-height: calc(100dvh - 4px);
+    }
+}

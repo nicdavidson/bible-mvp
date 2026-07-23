@@ -671,6 +671,7 @@ function bibleApp() {
 
             // Setup keyboard shortcuts
             this.setupKeyboardShortcuts();
+            this.setupHeaderAutoHide();
 
             // Recover from interrupted sheet drags (touchcancel bubbles to
             // document; template only binds touchstart/move/end) (B12)
@@ -768,6 +769,39 @@ function bibleApp() {
                 if (this[f]) { this[f] = false; return true; }
             }
             return false;
+        },
+
+        setupHeaderAutoHide() {
+            // Mobile de-clutter: the reading pane (.panel-body) is the real
+            // scroll container (window never scrolls — .panel-text is
+            // viewport-capped). Hide the header scrolling down, reveal
+            // scrolling up, and let the pane claim the freed height via
+            // body.reading-immersed. Direct classList — no Alpine churn on
+            // a per-scroll hot path.
+            const header = document.querySelector('.header');
+            const pane = document.querySelector('.panel-text .panel-body');
+            if (!header || !pane) return;
+            const mobile = window.matchMedia('(max-width: 900px)');
+            const setH = () => document.documentElement.style.setProperty(
+                '--header-h', header.offsetHeight + 'px');
+            setH();
+            window.addEventListener('resize', setH, { passive: true });
+            let lastY = pane.scrollTop, ticking = false;
+            pane.addEventListener('scroll', () => {
+                if (ticking) return;
+                ticking = true;
+                requestAnimationFrame(() => {
+                    ticking = false;
+                    if (!mobile.matches) { document.body.classList.remove('reading-immersed'); return; }
+                    const y = pane.scrollTop;
+                    const delta = y - lastY;
+                    lastY = y;
+                    if (this.anyModalOpen && this.anyModalOpen()) return;
+                    if (y < 60) document.body.classList.remove('reading-immersed');
+                    else if (delta > 6) document.body.classList.add('reading-immersed');
+                    else if (delta < -6) document.body.classList.remove('reading-immersed');
+                });
+            }, { passive: true });
         },
 
         setupKeyboardShortcuts() {
