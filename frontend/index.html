@@ -1355,7 +1355,7 @@
 
     <!-- Search Modal -->
     <div class="modal-overlay" x-show="showSearch" x-transition @click.self="showSearch = false">
-        <div class="modal search-modal">
+        <div class="modal search-modal" role="dialog" aria-modal="true" aria-label="Search the Bible">
             <div class="modal-header">
                 <h2>Search</h2>
                 <button @click="showSearch = false" class="btn-close">×</button>
@@ -1484,7 +1484,7 @@
 
     <!-- Settings Modal -->
     <div class="modal-overlay" x-show="showSettings" x-transition @click.self="showSettings = false">
-        <div class="modal settings-modal">
+        <div class="modal settings-modal" role="dialog" aria-modal="true" aria-label="Settings">
             <div class="modal-header">
                 <h2>Settings</h2>
                 <button @click="showSettings = false" class="btn-close">×</button>
@@ -1927,7 +1927,7 @@
 
     <!-- Guide Modal -->
     <div class="modal-overlay" x-show="showGuide" x-transition @click.self="showGuide = false">
-        <div class="modal guide-modal">
+        <div class="modal guide-modal" role="dialog" aria-modal="true" aria-label="User guide">
             <div class="modal-header">
                 <h2>Guide</h2>
                 <button @click="showGuide = false" class="btn-close">&times;</button>
@@ -1989,7 +1989,7 @@
 
     <!-- About Modal -->
     <div class="modal-overlay" x-show="showAbout" x-transition @click.self="showAbout = false">
-        <div class="modal about-modal">
+        <div class="modal about-modal" role="dialog" aria-modal="true" aria-label="About">
             <div class="modal-header">
                 <h2>About</h2>
                 <button @click="showAbout = false" class="btn-close">&times;</button>
@@ -2039,7 +2039,7 @@
 
     <!-- Path to Christ Modal -->
     <div class="modal-overlay" x-show="showPathToChrist" x-transition @click.self="showPathToChrist = false">
-        <div class="modal ptc-modal">
+        <div class="modal ptc-modal" role="dialog" aria-modal="true" aria-label="Path to Christ">
             <div class="modal-header">
                 <h2>&#10013; Path to Christ</h2>
                 <button @click="showPathToChrist = false" class="btn-close">&times;</button>
@@ -2084,7 +2084,7 @@
 
     <!-- Share Verse Modal -->
     <div class="modal-overlay" x-show="showShareModal" x-transition @click.self="showShareModal = false">
-        <div class="modal share-modal">
+        <div class="modal share-modal" role="dialog" aria-modal="true" aria-label="Share verses">
             <div class="modal-header">
                 <h2>Share Verse</h2>
                 <button @click="showShareModal = false" class="btn-close">&times;</button>
@@ -2146,7 +2146,7 @@
 
     <!-- Share Jesus Modal -->
     <div class="modal-overlay" x-show="showShareJesus" x-transition @click.self="showShareJesus = false">
-        <div class="modal share-jesus-modal">
+        <div class="modal share-jesus-modal" role="dialog" aria-modal="true" aria-label="Share Jesus">
             <div class="modal-header">
                 <h2>Share Jesus Without Fear</h2>
                 <button @click="showShareJesus = false" class="btn-close">&times;</button>
@@ -2300,7 +2300,7 @@
 
     <!-- Feedback Modal (standalone) -->
     <div class="modal-overlay" x-show="showFeedback" x-transition @click.self="showFeedback = false">
-        <div class="modal feedback-modal">
+        <div class="modal feedback-modal" role="dialog" aria-modal="true" aria-label="Send feedback">
             <div class="modal-header">
                 <h2>Submit Feedback</h2>
                 <button @click="showFeedback = false" class="btn-close">&times;</button>
@@ -2397,7 +2397,7 @@
 
     <!-- Reading Plan Modal -->
     <div class="modal-overlay" x-show="showReadingPlan" x-transition @click.self="showReadingPlan = false">
-        <div class="modal reading-plan-modal">
+        <div class="modal reading-plan-modal" role="dialog" aria-modal="true" aria-label="Reading plans">
             <div class="modal-header">
                 <h2>Reading Plans</h2>
                 <button @click="showReadingPlan = false" class="btn-close">×</button>
@@ -2607,7 +2607,7 @@
 
     <!-- Scripture Memory Tool Modal -->
     <div class="modal-overlay" x-show="showMemoryTool" x-transition @click.self="showMemoryTool = false">
-        <div class="modal memory-modal">
+        <div class="modal memory-modal" role="dialog" aria-modal="true" aria-label="Scripture memory">
             <div class="modal-header">
                 <h2>Scripture Memory</h2>
                 <button @click="showMemoryTool = false" class="btn-close">&times;</button>
@@ -2725,6 +2725,15 @@
     </div>
 
     <script src="/static/js/offline-storage.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/tts.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/menus.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/share.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/feedback.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/tags.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/selection.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/offline.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/plans.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/study_extras.js?v=__SW_VERSION__"></script>
     <script src="/static/js/app.js?v=__SW_VERSION__"></script>
     <script>
         // Show cache toast notification
