@@ -16,6 +16,7 @@ COPY . .
 # Inject git commit hash into service worker for automatic cache busting
 ARG SW_VERSION=dev
 RUN sed -i "s/__SW_VERSION__/${SW_VERSION}/g" frontend/static/sw.js
+RUN sed -i "s/__SW_VERSION__/${SW_VERSION}/g" frontend/index.html
 
 # Create non-root user for runtime
 RUN adduser --disabled-password --gecos '' --home /home/appuser appuser && \

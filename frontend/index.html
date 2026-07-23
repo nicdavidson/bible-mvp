@@ -12,9 +12,9 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
     <link rel="apple-touch-icon" href="/static/icons/icon.svg">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=__SW_VERSION__">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script src="/static/js/supabase-client.js"></script>
+    <script src="/static/js/supabase-client.js?v=__SW_VERSION__"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body x-data="bibleApp()" x-init="init()" :class="{ 'dark': currentTheme === 'dark', 'parchment': currentTheme === 'parchment' }">
@@ -2724,8 +2724,8 @@
         </template>
     </div>
 
-    <script src="/static/js/offline-storage.js"></script>
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/offline-storage.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/app.js?v=__SW_VERSION__"></script>
     <script>
         // Show cache toast notification
         function showCacheToast(message) {
