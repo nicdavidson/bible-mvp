@@ -1,0 +1,36 @@
+# Manual: ship the image currently on dev (or a given commit's image) to prod. No rebuild.
+# The `production` environment requires Captain's approval before this job runs.
+name: Promote to prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit sha whose dev image to promote (blank = whatever dev runs now)"
+        required: false
+
+concurrency: promote
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      # Deploy caveats for both apps: reads the dev image, deploys prod
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_PROMOTE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Resolve image
+        id: image
+        run: |
+          if [ -n "${{ inputs.sha }}" ]; then
+            ref="registry.fly.io/bible-mvp-dev:${{ inputs.sha }}"
+          else
+            ref=$(flyctl image show -a bible-mvp-dev --json | jq -r '.[0] | "\(.Registry)/\(.Repository)@\(.Digest)"')
+          fi
+          echo "Promoting $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - run: flyctl deploy -c fly.toml --image "${{ steps.image.outputs.ref }}"
+      - name: Smoke test
+        run: curl -fsS --retry 5 --retry-all-errors https://bible-mvp.fly.dev/api/health

@@ -1,11 +1,30 @@
-app = "bible-mvp"   
+app = "bible-mvp"
+primary_region = "ord"
+
 [build]
   dockerfile = "Dockerfile"
+
+[env]
+  APP_ENV = "prod"
+  DATABASE_PATH = "/data/bible.db"
+  # Public anon key (was hardcoded in supabase-client.js); RLS protects the data
+  SUPABASE_URL = "https://grhmoooaegtulfpahnpy.supabase.co"
+  SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyaG1vb29hZWd0dWxmcGFobnB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzY2NzksImV4cCI6MjA4NDM1MjY3OX0.UA5IP0BudscfANQRzMZB76k3SQS-kNKWjyzEzHdBh80"
+
 [http_service]
   internal_port = 8000
   force_https = true
-[env]
-  DATABASE_PATH = "/data/bible.db"
+
+  [[http_service.checks]]
+    path = "/api/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+
 [mounts]
   source = "bible_data"
   destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

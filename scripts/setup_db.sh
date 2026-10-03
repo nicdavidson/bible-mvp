@@ -17,7 +17,7 @@ DB_PATH="${DATABASE_PATH:-$DATA_DIR/bible.db}"
 MANIFEST="$DATA_DIR/db-manifest.json"
 
 # GitHub repo for releases
-GITHUB_REPO="milo/bible-mvp"  # Update this to your actual repo
+GITHUB_REPO="nicdavidson/bible-mvp"
 
 FORCE=false
 if [ "$1" = "--force" ]; then
