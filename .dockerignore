@@ -18,3 +18,6 @@ data/*.zip
 # Keep data/bible.db (the built DB ships with the image)
 # Keep data/cross_references.txt (small, 8MB)
 # Keep data/db-manifest.json (build metadata)
+data/*.bak
+data/naves/
+data/cross_refs.*

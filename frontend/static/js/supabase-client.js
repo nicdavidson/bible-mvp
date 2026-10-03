@@ -3,11 +3,11 @@
  * Handles authentication and notes sync
  */
 
-const SUPABASE_URL = 'https://grhmoooaegtulfpahnpy.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyaG1vb29hZWd0dWxmcGFobnB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzY2NzksImV4cCI6MjA4NDM1MjY3OX0.UA5IP0BudscfANQRzMZB76k3SQS-kNKWjyzEzHdBh80';
+// Injected per environment by /config.js (empty URL = accounts/sync disabled)
+const { supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY } = window.APP_CONFIG || {};
 
 // Initialize Supabase client (loaded from CDN in HTML head)
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = SUPABASE_URL ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 // Auth functions
 async function getUser() {
@@ -577,8 +577,8 @@ async function uploadBugScreenshot(file) {
     return data.path;
 }
 
-// Export for use in app.js
-window.SupabaseAuth = {
+// Export for use in app.js (absent when sync is disabled; callers check window.SupabaseAuth)
+if (supabaseClient) window.SupabaseAuth = {
     getUser,
     signUp,
     signIn,

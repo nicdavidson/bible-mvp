@@ -2,7 +2,9 @@
 BibleMVP - FastAPI Backend
 A free, open-source Bible study platform.
 """
+import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -133,6 +135,24 @@ def health():
         return {"status": "ok", "database_exists": DATABASE_PATH.exists(), "stats": stats}
     finally:
         conn.close()
+
+
+@app.get("/config.js")
+def config_js():
+    """Per-environment frontend config, so one image runs on dev and prod.
+
+    Empty SUPABASE_URL disables accounts/sync (dev must never touch prod user data).
+    """
+    cfg = {
+        "env": os.environ.get("APP_ENV", "local"),
+        "supabaseUrl": os.environ.get("SUPABASE_URL", ""),
+        "supabaseAnonKey": os.environ.get("SUPABASE_ANON_KEY", ""),
+    }
+    return Response(
+        f"window.APP_CONFIG = {json.dumps(cfg)};",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/")

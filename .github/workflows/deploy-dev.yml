@@ -1,0 +1,35 @@
+# Every push to master: test, then deploy to bible-mvp-dev.
+# The image is labelled with the commit sha so promote.yml can ship the exact same image to prod.
+name: Deploy dev
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency: deploy-dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt boto3 pytest httpx
+      - name: Fetch pinned DB release
+        run: python scripts/fetch_db.py
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL_S3: ${{ secrets.AWS_ENDPOINT_URL_S3 }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+      - run: python -m pytest -q
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy -c fly.dev.toml --remote-only --image-label "$GITHUB_SHA" --build-arg SW_VERSION="${GITHUB_SHA::7}"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_DEV }}
+      - name: Smoke test
+        run: curl -fsS --retry 5 --retry-all-errors https://bible-mvp-dev.fly.dev/api/health
