@@ -675,7 +675,8 @@ def get_crossref_map(
 
         # Seed with the requested verses
         if has_verse:
-            for v in range(verse_start, verse_end + 1):
+            # Clamp: "John 1:1-30000000" used to pin a core for minutes (bug review #4)
+            for v in range(verse_start, min(verse_end, verse_start + 200) + 1):
                 key = f"{book}.{chapter}.{v}"
                 nodes[key] = {"id": key, "book": book, "chapter": chapter, "verse": v, "depth": 0}
                 queue.append((book, chapter, v, 0))

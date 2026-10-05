@@ -103,7 +103,7 @@ window.BibleModules.offline = {
             this.downloadProgress.status = 'Fetching Hebrew & Greek definitions';
 
             try {
-                const response = await fetch('/api/offline/lexicon');
+                const response = await this._fetchRetry('/api/offline/lexicon');
                 if (!response.ok) throw new Error('Failed to fetch lexicon');
 
                 const data = await response.json();
@@ -163,6 +163,7 @@ window.BibleModules.offline = {
             if (!this.hasDownloadSelections()) return;
 
             this.downloadProgress.active = true;
+            this._dlFailed = 0;
             this.downloadProgress.percent = 0;
 
             const tasks = [];
@@ -198,7 +199,11 @@ window.BibleModules.offline = {
                     }
                 }
 
-                this.showToast('Download complete!', 'success');
+                if (this._dlFailed) {
+                    this.showToast(`Download finished, but ${this._dlFailed} item(s) failed. Run it again to fill the gaps.`, 'error');
+                } else {
+                    this.showToast('Download complete!', 'success');
+                }
                 await this.updateOfflineStats();
 
                 // Reset selections
@@ -217,6 +222,27 @@ window.BibleModules.offline = {
             }
         },
 
+        // Offline downloads run long batches against rate-limited endpoints: retry
+        // 429s with backoff instead of silently skipping data (bug review #2), and
+        // count what still failed so we never claim "complete" on a partial download.
+        async _fetchRetry(url) {
+            for (let attempt = 0; ; attempt++) {
+                let res;
+                try { res = await fetch(url); } catch (err) { res = null; }
+                if (res && res.status !== 429 && res.status < 500) {
+                    if (!res.ok) this._dlFailed = (this._dlFailed || 0) + 1;
+                    return res;
+                }
+                if (attempt >= 6) {
+                    this._dlFailed = (this._dlFailed || 0) + 1;
+                    return res || new Response(null, { status: 503 });
+                }
+                const wait = Number(res?.headers.get('Retry-After')) || Math.min(60, 2 ** (attempt + 2));
+                this.downloadProgress.status = `Server busy, retrying in ${wait}s...`;
+                await new Promise(r => setTimeout(r, wait * 1000));
+            }
+        },
+
         // Download full translation (all 66 books)
         async downloadFullTranslation(translation, basePercent, totalTasks) {
             const books = Object.keys(BOOK_CHAPTERS);
@@ -231,7 +257,7 @@ window.BibleModules.offline = {
                     this.downloadProgress.status = `${book} ${ch}`;
 
                     try {
-                        const response = await fetch(
+                        const response = await this._fetchRetry(
                             `/api/offline/chapter?book=${encodeURIComponent(book)}&chapter=${ch}&translation=${translation}`
                         );
                         if (response.ok) {
@@ -273,7 +299,7 @@ window.BibleModules.offline = {
                 this.downloadProgress.status = book;
 
                 try {
-                    const response = await fetch(`/api/offline/commentary?book=${encodeURIComponent(book)}`);
+                    const response = await this._fetchRetry(`/api/offline/commentary?book=${encodeURIComponent(book)}`);
                     if (response.ok) {
                         const data = await response.json();
                         if (window.offlineStorage && data.entries?.length > 0) {
@@ -315,7 +341,7 @@ window.BibleModules.offline = {
             this.downloadProgress.status = 'Fetching all entries...';
 
             try {
-                const response = await fetch(`/api/offline/devotionals?source=${encodeURIComponent(source)}`);
+                const response = await this._fetchRetry(`/api/offline/devotionals?source=${encodeURIComponent(source)}`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.entries?.length > 0) {
@@ -343,7 +369,7 @@ window.BibleModules.offline = {
                 this.downloadProgress.status = book;
 
                 try {
-                    const response = await fetch(`/api/offline/crossrefs?book=${encodeURIComponent(book)}`);
+                    const response = await this._fetchRetry(`/api/offline/crossrefs?book=${encodeURIComponent(book)}`);
                     if (response.ok) {
                         const data = await response.json();
                         if (window.offlineStorage && data.entries?.length > 0) {
@@ -394,13 +420,12 @@ window.BibleModules.offline = {
                 // Re-download cached chapters
                 if (window.offlineStorage && this.offlineStats.chapters > 0) {
                     this.downloadProgress.status = 'Refreshing chapters...';
-                    // We'll need to iterate through what we have cached
-                    // For now, just clear and let auto-cache rebuild
-                    await window.offlineStorage.clearAll();
+                    // Chapters refresh themselves as they're read (background refresh);
+                    // this used to clearAll() and wipe the user's offline data (bug review #7).
                 }
 
                 await this.updateOfflineStats();
-                this.showToast('Cache refreshed', 'success');
+                this.showToast('Lexicon refreshed. Chapters update automatically as you read.', 'success');
             } catch (err) {
                 console.error('Refresh failed:', err);
                 this.showToast('Refresh failed', 'error');
