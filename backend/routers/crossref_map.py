@@ -1,3 +1,4 @@
+from collections import deque
 import json
 import logging
 import re
@@ -180,7 +181,7 @@ def _enrich_nodes(conn, nodes: dict):
 
 
 def _bfs_to_seeds(conn, book: str, chapter: int, verse: int, seed_ids: set,
-                  per_hop: int = 15, max_depth: int = 6):
+                  per_hop: int = 15, max_depth: int = 6, max_nodes: int = 2000):
     """BFS the cross-reference graph from a start verse until any seed is reached.
 
     Returns (found_seed, path_keys, nodes, edges):
@@ -196,17 +197,19 @@ def _bfs_to_seeds(conn, book: str, chapter: int, verse: int, seed_ids: set,
     edge_set = set()
     visited = set()
     parent = {}  # for path reconstruction
-    queue = [(book, chapter, verse, 0)]
+    queue = deque([(book, chapter, verse, 0)])
     found_seed = None
 
-    while queue and not found_seed:
+    # max_nodes caps work per request: an unreachable seed used to walk the whole
+    # graph (seconds of CPU, ~800KB response) (security review M2)
+    while queue and not found_seed and len(nodes) < max_nodes:
         # Queue depths are non-decreasing, so the front run of equal-depth
         # entries is a whole frontier level: prefetch its neighbors in one
         # batched query, then replay the per-node logic in original order.
         current_depth = queue[0][3]
         level = []
         while queue and queue[0][3] == current_depth:
-            level.append(queue.pop(0))
+            level.append(queue.popleft())
 
         neighbors = {}
         if current_depth < max_depth:
@@ -304,7 +307,7 @@ def _parse_seed_ids(seeds_str: str):
                 result.append((parts[0], int(parts[1]), int(parts[2])))
             except ValueError:
                 continue
-    return result
+    return result[:30]  # cap custom seed lists (security review M2)
 
 
 @router.get("/api/crossref-map/presets")
@@ -339,7 +342,9 @@ def get_crossref_presets():
 
 
 @router.get("/api/crossref-map/christological")
+@limiter.limit("20/minute")
 def get_crossref_map_christological(
+    request: Request,
     method: str = Query(default="gospel-peaks", description="Calculation method"),
     verse: str = Query(default=None, description="Verse for find-path mode"),
     depth: int = Query(default=2, ge=1, le=5, description="BFS depth from seeds"),
@@ -393,7 +398,9 @@ def get_crossref_map_christological(
             )
 
             # Filter to only path + immediate neighbors for clarity
-            path_set = set(path_to_christ) if path_to_christ else set(nodes.keys())
+            # No path: show the start verse's neighborhood, not every node the
+            # search visited (that was the ~1MB response in security review M2)
+            path_set = set(path_to_christ) if path_to_christ else {start_key}
             filtered_nodes = {}
             filtered_edges = []
             for key in path_set:
@@ -526,7 +533,9 @@ def get_crossref_map_christological(
 
 
 @router.get("/api/path-to-christ/{reference}")
+@limiter.limit("20/minute")
 def get_path_to_christ(
+    request: Request,
     reference: str,
     translation: str = Query(default="BSB", description="Translation for verse text"),
 ):
@@ -626,7 +635,9 @@ def get_path_to_christ(
 
 
 @router.get("/api/crossref-map/{reference}")
+@limiter.limit("30/minute")
 def get_crossref_map(
+    request: Request,
     reference: str,
     depth: int = Query(default=1, ge=1, le=7, description="How many hops to follow"),
     per_verse: int = Query(default=5, ge=1, le=50, description="Top N connections per verse"),

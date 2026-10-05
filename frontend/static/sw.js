@@ -14,6 +14,8 @@ const CONTENT_CACHE = `biblemvp-content-${SW_VERSION}`;
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
+    '/static/vendor/alpine-3.17.4.min.js',
+    '/static/vendor/supabase-2.117.2.min.js',
     '/',
     '/static/css/style.css',
     '/static/js/modules/tts.js',

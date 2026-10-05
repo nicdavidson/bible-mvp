@@ -297,3 +297,37 @@ class TestConfig:
         r = client.get("/config.js")
         assert r.status_code == 200
         assert '"supabaseUrl": ""' in r.text
+
+
+# ========== SECURITY REGRESSIONS (docs/SECURITY_REVIEW_2026-10.md) ==========
+
+class TestSecurity:
+    def test_fts_operators_are_neutralized(self, client):
+        # Used to escape the text: column filter and match metadata (M3)
+        r = client.get('/api/search', params={"q": '"x" ) OR (book : john', "scope": "bible"})
+        assert r.status_code == 200
+
+    def test_search_query_length_capped(self, client):
+        assert client.get("/api/search", params={"q": "a" * 101}).status_code == 422
+
+    def test_fts_query_builder(self):
+        from backend.routers.passages import _fts_query
+        assert _fts_query('"x" ) OR (book : john') == '"x" "OR" "book" "john"*'
+        assert _fts_query('"living water" god') == '"living water" "god"*'
+        assert _fts_query("jo") == '"jo"'
+        assert _fts_query("()") == ""
+
+    def test_unreachable_seed_bfs_is_bounded(self, client):
+        r = client.get("/api/crossref-map/christological",
+                       params={"method": "find-path", "verse": "Genesis 1:1", "seeds": "Nope.1.1"})
+        assert r.status_code == 200
+        assert len(r.content) < 800_000  # used to return the whole reachable graph (M2)
+
+    def test_negative_paging_rejected(self, client):
+        assert client.get("/api/topics/search", params={"q": "love", "limit": -1}).status_code == 422
+
+    def test_security_headers(self, client):
+        h = client.get("/").headers
+        assert "unpkg.com" not in h["content-security-policy"]
+        assert "object-src 'none'" in h["content-security-policy"]
+        assert "max-age" in h["strict-transport-security"]

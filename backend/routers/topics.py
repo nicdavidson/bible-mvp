@@ -16,7 +16,7 @@ router = APIRouter()
 @router.get("/api/topics/search")
 def search_topics(
     q: str = Query(..., min_length=1, description="Search query"),
-    limit: int = Query(default=50, le=200)
+    limit: int = Query(default=50, ge=1, le=200)
 ):
     """Search Nave's Topical Bible by keyword or topic name."""
     conn = get_db_connection()
@@ -115,7 +115,7 @@ def get_topics_for_verse(
 def browse_topics(
     section: str = Query(default=None, description="Filter by section letter (A-Z)"),
     page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=50, le=200)
+    per_page: int = Query(default=50, ge=1, le=200)
 ):
     """Browse Nave's topics alphabetically."""
     conn = get_db_connection()

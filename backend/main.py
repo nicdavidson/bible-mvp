@@ -5,6 +5,7 @@ A free, open-source Bible study platform.
 import json
 import logging
 import os
+from urllib.parse import urlparse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -43,7 +44,14 @@ async def lifespan(app: FastAPI):
     yield
 
 
+APP_ENV = os.environ.get("APP_ENV", "local")
+SUPABASE_HOST = urlparse(os.environ.get("SUPABASE_URL", "")).netloc
+
 app = FastAPI(
+    # No public API explorer in prod (security review)
+    docs_url=None if APP_ENV == "prod" else "/docs",
+    redoc_url=None if APP_ENV == "prod" else "/redoc",
+    openapi_url=None if APP_ENV == "prod" else "/openapi.json",
     title="BibleMVP API",
     description="Free Bible study platform with cross-resource linking",
     version="0.1.0",
@@ -79,13 +87,20 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # Scripts are vendored under /static/vendor, so no CDN hosts. connect-src is
+    # this environment's Supabase project only. 'unsafe-eval' is Alpine's
+    # expression evaluator; 'unsafe-inline' covers inline bootstrap scripts.
+    supabase = f" https://{SUPABASE_HOST} wss://{SUPABASE_HOST}" if SUPABASE_HOST else ""
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+        "script-src 'self' 'unsafe-eval' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: blob:; "
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co; "
+        f"connect-src 'self'{supabase}; "
         "font-src 'self'; "
+        "object-src 'none'; base-uri 'self'; form-action 'self'; "
         "frame-ancestors 'none'"
     )
     return response
@@ -144,7 +159,7 @@ def config_js():
     Empty SUPABASE_URL disables accounts/sync (dev must never touch prod user data).
     """
     cfg = {
-        "env": os.environ.get("APP_ENV", "local"),
+        "env": APP_ENV,
         "supabaseUrl": os.environ.get("SUPABASE_URL", ""),
         "supabaseAnonKey": os.environ.get("SUPABASE_ANON_KEY", ""),
     }
