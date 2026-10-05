@@ -331,3 +331,32 @@ class TestSecurity:
         assert "unpkg.com" not in h["content-security-policy"]
         assert "object-src 'none'" in h["content-security-policy"]
         assert "max-age" in h["strict-transport-security"]
+
+
+# ========== BUG REVIEW REGRESSIONS (docs/BUG_REVIEW_2026-10.md) ==========
+
+class TestBugReview:
+    def test_huge_int_is_400_not_500(self, client):
+        r = client.get("/api/passage/John 99999999999999999999")
+        assert r.status_code == 400
+
+    def test_crossref_map_huge_range_is_clamped(self, client):
+        import time
+        t = time.time()
+        r = client.get("/api/crossref-map/John 1:1-30000000", params={"limit": 10})
+        assert r.status_code == 200
+        assert time.time() - t < 5
+
+    def test_service_worker_may_control_root(self, client):
+        h = client.get("/static/sw.js").headers
+        assert h["service-worker-allowed"] == "/"
+
+    def test_app_shell_revalidates(self, client):
+        assert client.get("/John/3").headers["cache-control"] == "no-cache"
+
+    def test_reversed_range_is_swapped(self, client):
+        assert client.get("/api/passage/John 3:18-16").json()["highlighted_verses"] == [16, 17, 18]
+
+    def test_book_name_variants(self, client):
+        for ref, want in [("Rom. 3:23", "Romans 3:23"), ("1john 4:8", "1 John 4:8"), ("Exo 20", "Exodus 20")]:
+            assert client.get(f"/api/passage/{ref}").json()["reference"] == want

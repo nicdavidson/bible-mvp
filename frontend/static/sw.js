@@ -1,342 +1,104 @@
 /**
- * BibleMVP Service Worker
- * Provides offline caching for the app shell and recently viewed content.
- * Integrates with IndexedDB via postMessage for smart offline storage.
+ * BibleMVP Service Worker: offline app shell + recently viewed API content.
+ * Registered with scope '/' (server sends Service-Worker-Allowed: /).
+ * Structured offline data (downloads, auto-cached chapters) lives in IndexedDB,
+ * written by the app itself; this worker only caches HTTP responses.
  */
 
 // __SW_VERSION__ is replaced at Docker build time with the git commit hash.
-// To bust caches locally, change this to any unique string.
-// Cache bust: 2026-04-19
 const SW_VERSION = '__SW_VERSION__';
-const CACHE_NAME = `biblemvp-${SW_VERSION}`;
-const STATIC_CACHE = `biblemvp-static-${SW_VERSION}`;
-const CONTENT_CACHE = `biblemvp-content-${SW_VERSION}`;
+const STATIC_CACHE = `biblemvp-static-${SW_VERSION}`;  // app shell: one per deploy
+const CONTENT_CACHE = 'biblemvp-content';               // API data: survives deploys
 
-// Static assets to cache immediately
-const STATIC_ASSETS = [
-    '/static/vendor/alpine-3.17.4.min.js',
-    '/static/vendor/supabase-2.117.2.min.js',
-    '/',
-    '/static/css/style.css',
-    '/static/js/modules/tts.js',
-    '/static/js/modules/menus.js',
-    '/static/js/modules/share.js',
-    '/static/js/modules/feedback.js',
-    '/static/js/modules/tags.js',
-    '/static/js/modules/selection.js',
-    '/static/js/modules/offline.js',
-    '/static/js/modules/plans.js',
-    '/static/js/modules/study_extras.js',
-    '/static/js/app.js',
-    '/static/js/offline-storage.js',
-    '/static/js/supabase-client.js',
-    '/static/icons/icon.svg',
-    '/static/manifest.json'
+// Exactly the URLs index.html requests (versioned ones carry ?v=)
+const V = `?v=${SW_VERSION}`;
+const SHELL = [
+    '/', '/config.js', '/static/manifest.json', '/static/icons/icon.svg',
+    '/static/vendor/alpine-3.17.4.min.js', '/static/vendor/supabase-2.117.2.min.js',
+    ...[
+        '/static/css/style.css', '/static/js/app.js', '/static/js/offline-storage.js',
+        '/static/js/supabase-client.js',
+        ...['tts', 'menus', 'share', 'feedback', 'tags', 'selection', 'offline', 'plans', 'study_extras']
+            .map(m => `/static/js/modules/${m}.js`),
+    ].map(u => u + V),
 ];
 
-// API endpoints that should be cached for offline use
-const CACHEABLE_API_PATTERNS = [
-    /^\/api\/passage\//,
-    /^\/api\/interlinear\//,
-    /^\/api\/verse\//,
-    /^\/api\/word\//,
-    /^\/api\/word-alignment/,
-    /^\/api\/offline\//,
-    /^\/api\/topics\//
+const CACHEABLE_API = [
+    /^\/api\/passage\//, /^\/api\/verse\//, /^\/api\/word\//, /^\/api\/word-alignment/,
+    /^\/api\/topics\//, /^\/api\/reading-plans/, /^\/api\/devotional/,
 ];
+const CONTENT_MAX = 300;
 
-// Install event - cache static assets
 self.addEventListener('install', event => {
-    console.log(`[SW] Installing service worker ${SW_VERSION}...`);
+    // cache:'reload' so we never precache a stale copy from the HTTP cache
     event.waitUntil(
         caches.open(STATIC_CACHE)
-            .then(cache => cache.addAll(STATIC_ASSETS))
-            .then(() => {
-                console.log('[SW] Static assets cached, calling skipWaiting');
-                return self.skipWaiting();
-            })
+            .then(cache => cache.addAll(SHELL.map(u => new Request(u, { cache: 'reload' }))))
+            .then(() => self.skipWaiting())
     );
 });
 
-// Activate event - clean up old caches
 self.addEventListener('activate', event => {
-    console.log(`[SW] Activating service worker ${SW_VERSION}...`);
     event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames
-                    .filter(name => name.startsWith('biblemvp-') &&
-                                   name !== STATIC_CACHE &&
-                                   name !== CONTENT_CACHE)
-                    .map(name => caches.delete(name))
-            );
-        }).then(() => {
-            console.log('[SW] Claiming clients');
-            return self.clients.claim();
-        })
+        caches.keys()
+            .then(names => Promise.all(names
+                .filter(n => n.startsWith('biblemvp') && n !== STATIC_CACHE && n !== CONTENT_CACHE)
+                .map(n => caches.delete(n))))
+            .then(() => self.clients.claim())
     );
 });
 
-// Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', event => {
-    const url = new URL(event.request.url);
-
-    // Skip non-GET requests
-    if (event.request.method !== 'GET') return;
-
-    // Skip cross-origin requests (like Alpine.js CDN)
+    const req = event.request;
+    if (req.method !== 'GET') return;
+    const url = new URL(req.url);
     if (url.origin !== location.origin) return;
 
-    // API requests - network first with smart caching
-    if (url.pathname.startsWith('/api/')) {
-        console.log('[SW] Intercepting API request:', url.pathname);
-        // Check if this is a cacheable API endpoint
-        const isCacheable = CACHEABLE_API_PATTERNS.some(pattern => pattern.test(url.pathname));
-
-        if (isCacheable) {
-            event.respondWith(networkFirstWithSmartCache(event.request, url));
-        } else {
-            event.respondWith(networkOnly(event.request));
-        }
-        return;
+    if (req.mode === 'navigate') {
+        // Every app route serves the same index.html: network first, cached shell offline
+        event.respondWith(fetch(req).catch(() => caches.match('/', { cacheName: STATIC_CACHE })));
+    } else if (url.pathname.startsWith('/api/')) {
+        if (CACHEABLE_API.some(p => p.test(url.pathname))) event.respondWith(networkFirst(event, req));
+        // other API calls: not intercepted
+    } else if (url.pathname.startsWith('/static/') || url.pathname === '/config.js') {
+        event.respondWith(cacheFirst(req));
     }
-
-    // Static assets - stale-while-revalidate (fast + stays fresh)
-    event.respondWith(staleWhileRevalidate(event.request));
 });
 
-// Stale-while-revalidate: serve cached version instantly, fetch fresh copy in background
-async function staleWhileRevalidate(request) {
-    const cache = await caches.open(STATIC_CACHE);
-    const cached = await cache.match(request);
-
-    // Fetch fresh copy in background regardless
-    const fetchPromise = fetch(request).then(response => {
-        if (response.ok) {
-            cache.put(request, response.clone());
-        }
-        return response;
-    }).catch(() => null);
-
-    // Return cached immediately if available, otherwise wait for network
+// Static files: versioned URLs are immutable, and the shell cache is per deploy.
+async function cacheFirst(req) {
+    const cached = await caches.match(req);
     if (cached) return cached;
-
-    try {
-        const response = await fetchPromise;
-        if (response) return response;
-    } catch (error) { /* fall through */ }
-
-    // Fully offline, no cache — return offline fallback
-    return caches.match('/');
-}
-
-// Network-only strategy (no caching)
-async function networkOnly(request) {
-    try {
-        return await fetch(request);
-    } catch (error) {
-        return new Response(JSON.stringify({
-            error: 'offline',
-            detail: 'You are offline and this content is not available.'
-        }), {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-        });
+    const res = await fetch(req);
+    if (res.ok) {
+        const copy = res.clone();  // clone now: the page may consume the body first
+        caches.open(STATIC_CACHE).then(c => c.put(req, copy)).catch(() => {});
     }
+    return res;
 }
 
-// Network-first strategy with smart caching for API calls
-async function networkFirstWithSmartCache(request, url) {
+async function networkFirst(event, req) {
+    let res;
     try {
-        const response = await fetch(request);
-
-        // Cache successful responses for offline use
-        if (response.ok) {
-            const cache = await caches.open(CONTENT_CACHE);
-            cache.put(request, response.clone());
-
-            console.log('[SW] Caching API response:', url.pathname + url.search);
-
-            // Notify the main thread to also store in IndexedDB for structured queries
-            notifyClientToCache(url.pathname + url.search, response.clone());
-
-            // Limit content cache size
-            limitCacheSize(CONTENT_CACHE, 200);
-        }
-
-        return response;
-    } catch (error) {
-        // Try to serve from cache when offline
-        const cached = await caches.match(request);
-        if (cached) {
-            // Add offline indicator header
-            const headers = new Headers(cached.headers);
-            headers.set('X-Offline-Cache', 'true');
-            return new Response(cached.body, {
-                status: cached.status,
-                statusText: cached.statusText,
-                headers: headers
-            });
-        }
-
-        // Return error response
-        return new Response(JSON.stringify({
-            error: 'offline',
-            detail: 'You are offline and this content is not cached.',
-            offline: true
-        }), {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-}
-
-// Notify client to cache data in IndexedDB
-async function notifyClientToCache(pathname, response) {
-    try {
-        const clients = await self.clients.matchAll();
-        console.log('[SW] notifyClientToCache - clients:', clients.length, 'pathname:', pathname);
-        if (clients.length === 0) return;
-
-        const data = await response.json();
-
-        // Determine cache type based on URL pattern
-        let cacheType = null;
-        let cacheData = null;
-
-        if (pathname.match(/^\/api\/passage\/[^/?]+(\?|$)/)) {
-            // Main passage data - cache verses
-            cacheType = 'passage';
-            cacheData = data;
-        } else if (pathname.includes('/interlinear')) {
-            // Interlinear data
-            cacheType = 'interlinear';
-            cacheData = data;
-        } else if (pathname.includes('/commentary')) {
-            // Commentary data
-            cacheType = 'commentary';
-            cacheData = data;
-        } else if (pathname.includes('/crossrefs')) {
-            // Cross-references
-            cacheType = 'crossrefs';
-            cacheData = data;
-        } else if (pathname.match(/^\/api\/word\/[GH]\d+$/)) {
-            // Lexicon entry
-            cacheType = 'lexicon';
-            cacheData = data;
-        }
-
-        if (cacheType && cacheData) {
-            console.log('[SW] Sending CACHE_DATA message:', cacheType, pathname);
-            // Send to first available client
-            clients[0].postMessage({
-                type: 'CACHE_DATA',
-                cacheType: cacheType,
-                data: cacheData,
-                pathname: pathname
-            });
-        } else {
-            console.log('[SW] No cache type matched for:', pathname);
-        }
+        res = await fetch(req);
     } catch (err) {
-        // Silent fail - caching is best-effort
-        console.warn('[SW] Failed to notify client for caching:', err);
+        const cached = await caches.match(req, { cacheName: CONTENT_CACHE });
+        return cached || new Response(
+            JSON.stringify({ error: 'offline', detail: 'You are offline and this content is not cached.', offline: true }),
+            { status: 503, headers: { 'Content-Type': 'application/json' } });
     }
+    // Cache failures (quota, private mode) must never turn a good response into an error
+    if (res.ok) {
+        const copy = res.clone();
+        event.waitUntil(caches.open(CONTENT_CACHE)
+            .then(c => c.put(req, copy).then(() => trim(c)))
+            .catch(() => {}));
+    }
+    return res;
 }
 
-// Limit cache size by removing oldest entries
-async function limitCacheSize(cacheName, maxItems) {
-    const cache = await caches.open(cacheName);
+// ponytail: FIFO by insertion order; LRU only if 300 entries proves too few
+async function trim(cache) {
     const keys = await cache.keys();
-
-    if (keys.length > maxItems) {
-        // Delete oldest entries (first in list)
-        const deleteCount = keys.length - maxItems;
-        for (let i = 0; i < deleteCount; i++) {
-            await cache.delete(keys[i]);
-        }
-    }
-}
-
-// Handle messages from the main thread
-self.addEventListener('message', event => {
-    const { type, payload } = event.data || {};
-
-    switch (type) {
-        case 'SKIP_WAITING':
-            self.skipWaiting();
-            break;
-
-        case 'CLEAR_CACHE':
-            // Clear all caches
-            caches.keys().then(names => {
-                return Promise.all(names.map(name => caches.delete(name)));
-            }).then(() => {
-                event.ports[0]?.postMessage({ success: true });
-            });
-            break;
-
-        case 'GET_CACHE_STATS':
-            // Return cache statistics
-            getCacheStats().then(stats => {
-                event.ports[0]?.postMessage(stats);
-            });
-            break;
-
-        case 'PREFETCH_CHAPTER':
-            // Prefetch a chapter for offline use
-            if (payload?.book && payload?.chapter) {
-                prefetchChapter(payload.book, payload.chapter, payload.translation || 'BSB');
-            }
-            break;
-    }
-});
-
-// Get cache statistics
-async function getCacheStats() {
-    const stats = {
-        static: { count: 0 },
-        content: { count: 0, urls: [] }
-    };
-
-    try {
-        const staticCache = await caches.open(STATIC_CACHE);
-        const staticKeys = await staticCache.keys();
-        stats.static.count = staticKeys.length;
-
-        const contentCache = await caches.open(CONTENT_CACHE);
-        const contentKeys = await contentCache.keys();
-        stats.content.count = contentKeys.length;
-        stats.content.urls = contentKeys.slice(0, 20).map(r => r.url);
-    } catch (err) {
-        console.error('Failed to get cache stats:', err);
-    }
-
-    return stats;
-}
-
-// Prefetch a chapter for offline use
-async function prefetchChapter(book, chapter, translation) {
-    const baseUrl = self.location.origin;
-    const ref = encodeURIComponent(`${book} ${chapter}`);
-
-    const urls = [
-        `${baseUrl}/api/passage/${ref}?translation=${translation}`,
-        `${baseUrl}/api/passage/${ref}/interlinear?translation=${translation}`,
-        `${baseUrl}/api/passage/${ref}/commentary`
-    ];
-
-    const cache = await caches.open(CONTENT_CACHE);
-
-    for (const url of urls) {
-        try {
-            const response = await fetch(url);
-            if (response.ok) {
-                await cache.put(url, response);
-            }
-        } catch (err) {
-            // Continue with other URLs
-            console.warn(`Failed to prefetch ${url}:`, err);
-        }
-    }
+    for (const k of keys.slice(0, Math.max(0, keys.length - CONTENT_MAX))) await cache.delete(k);
 }

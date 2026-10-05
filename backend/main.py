@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -61,6 +61,12 @@ app = FastAPI(
 # Rate limiter lives in core so routers can decorate with the same instance
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(OverflowError)
+def _int_too_large(request: Request, exc: OverflowError):
+    # Ints past 2^63 blow up at SQLite binding; that's bad input, not a 500 (bug review #5)
+    return JSONResponse(status_code=400, content={"detail": "Number out of range"})
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
@@ -115,6 +121,10 @@ async def add_cache_headers(request: Request, call_next):
         # Service worker must never be cached — browser needs to fetch fresh to detect updates
         if path == "/static/sw.js":
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            # Lets the worker (served from /static/) control the whole app (bug review #1)
+            response.headers["Service-Worker-Allowed"] = "/"
+        elif response.headers.get("content-type", "").startswith("text/html"):
+            response.headers["Cache-Control"] = "no-cache"  # always revalidate the app shell
         elif any(path.startswith(p) for p in _CACHEABLE_PREFIXES):
             response.headers["Cache-Control"] = CACHE_LONG
         elif any(path.startswith(p) for p in _SHORT_CACHE_PREFIXES):
@@ -147,7 +157,11 @@ def health():
                 stats[label] = row[0]
             except Exception:
                 stats[label] = 0
-        return {"status": "ok", "database_exists": DATABASE_PATH.exists(), "stats": stats}
+        body = {"status": "ok", "database_exists": DATABASE_PATH.exists(), "stats": stats}
+        if not stats["verses"]:
+            # Missing/truncated DB: fail the Fly health check instead of serving blanks
+            return JSONResponse(status_code=503, content={**body, "status": "error"})
+        return body
     finally:
         conn.close()
 

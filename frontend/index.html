@@ -2784,7 +2784,7 @@
         const isSecure = location.protocol === 'https:';
 
         if ('serviceWorker' in navigator && (isLocalhost || isSecure)) {
-            navigator.serviceWorker.register('/static/sw.js')
+            navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
                 .then(reg => {
                     console.log('[Main] Service worker registered:', reg.scope);
                     console.log('[Main] SW state:', reg.installing ? 'installing' : reg.waiting ? 'waiting' : reg.active ? 'active' : 'unknown');
@@ -2807,9 +2807,11 @@
 
             // When a new SW takes over mid-session (fresh deploy), reload once so
             // index.html and cached assets can never run as a mismatched pair
+            // (not on first install: there's no old pairing to protect, just a pointless reload)
+            const hadController = !!navigator.serviceWorker.controller;
             let swReloaded = false;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (swReloaded) return;
+                if (!hadController || swReloaded) return;
                 swReloaded = true;
                 console.log('[Main] New service worker took control, reloading for consistent assets');
                 window.location.reload();
@@ -2818,100 +2820,6 @@
             console.warn('[Main] Service worker disabled: requires localhost or HTTPS. Current:', location.hostname);
         }
 
-        // Handle messages from service worker to cache data in IndexedDB
-        navigator.serviceWorker?.addEventListener('message', async (event) => {
-            const { type, cacheType, data, pathname } = event.data || {};
-
-            console.log('[Main] SW Message received:', type, cacheType, pathname);
-
-            if (type !== 'CACHE_DATA' || !window.offlineStorage) {
-                console.log('[SW Message] Skipping - type:', type, 'storage:', !!window.offlineStorage);
-                return;
-            }
-
-            // Check if auto-caching is enabled
-            if (localStorage.getItem('autoCacheEnabled') === 'false') {
-                console.log('[SW Message] Auto-cache disabled');
-                return;
-            }
-
-            try {
-                // Parse reference from pathname to determine book/chapter
-                const refMatch = pathname.match(/\/api\/passage\/([^/?]+)/);
-                if (!refMatch) return;
-
-                const ref = decodeURIComponent(refMatch[1]);
-                const parsedRef = ref.match(/^(.+?)\s+(\d+)/);
-                if (!parsedRef) return;
-
-                const book = parsedRef[1];
-                const chapter = parseInt(parsedRef[2]);
-
-                let cached = false;
-                switch (cacheType) {
-                    case 'passage':
-                        // Cache verses
-                        if (data.verses && data.verses.length > 0) {
-                            const translation = new URLSearchParams(pathname.split('?')[1]).get('translation') || 'BSB';
-                            await window.offlineStorage.saveChapterVerses(translation, book, chapter, data.verses);
-                            showCacheToast(`Cached ${book} ${chapter}`);
-                            cached = true;
-                        }
-                        break;
-
-                    case 'interlinear':
-                        // Cache interlinear data
-                        if (data.verses) {
-                            const allWords = [];
-                            for (const [verseNum, words] of Object.entries(data.verses)) {
-                                for (const word of words) {
-                                    allWords.push({ ...word, verse: parseInt(verseNum) });
-                                }
-                            }
-                            if (allWords.length > 0) {
-                                await window.offlineStorage.saveChapterInterlinear(book, chapter, allWords);
-                                cached = true;
-                            }
-                        }
-                        break;
-
-                    case 'commentary':
-                        // Cache commentary
-                        if (data.entries && data.entries.length > 0) {
-                            await window.offlineStorage.saveChapterCommentary(book, chapter, data.entries);
-                            cached = true;
-                        }
-                        break;
-
-                    case 'crossrefs':
-                        // Cache cross-references
-                        if (data.cross_references && data.cross_references.length > 0) {
-                            await window.offlineStorage.saveChapterCrossRefs(book, chapter, data.cross_references);
-                            cached = true;
-                        }
-                        break;
-
-                    case 'lexicon':
-                        // Cache lexicon entry
-                        if (data.word) {
-                            await window.offlineStorage.saveLexiconEntries([data.word]);
-                            cached = true;
-                        }
-                        break;
-                }
-
-                // Refresh offline stats in the Alpine app
-                if (cached) {
-                    console.log('[Main] Cached data:', cacheType, book, chapter);
-                    const alpineApp = window.Alpine?.$data(document.querySelector('[x-data]'));
-                    if (alpineApp && typeof alpineApp.updateOfflineStats === 'function') {
-                        alpineApp.updateOfflineStats();
-                    }
-                }
-            } catch (err) {
-                console.warn('Failed to cache data in IndexedDB:', err);
-            }
-        });
     </script>
 </body>
 </html>

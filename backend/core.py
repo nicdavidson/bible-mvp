@@ -48,7 +48,7 @@ def parse_reference(reference: str) -> Optional[tuple]:
     """
     # Book name abbreviations
     abbrevs = {
-        "gen": "Genesis", "ge": "Genesis", "ex": "Exodus", "exod": "Exodus",
+        "gen": "Genesis", "ge": "Genesis", "ex": "Exodus", "exod": "Exodus", "exo": "Exodus",
         "lev": "Leviticus", "le": "Leviticus",
         "num": "Numbers", "nu": "Numbers",
         "deut": "Deuteronomy", "de": "Deuteronomy", "dt": "Deuteronomy",
@@ -115,6 +115,7 @@ def parse_reference(reference: str) -> Optional[tuple]:
 
     # Also map full canonical book names (case-insensitive) for direct lookup
     canonical_map = {b.lower(): b for b in CANONICAL_BOOKS}
+    canonical_map.update({b.lower().replace(" ", ""): b for b in CANONICAL_BOOKS})  # "1john"
     # Add common alternative names
     canonical_map["song of songs"] = "Song of Solomon"
     canonical_map["psalm"] = "Psalms"
@@ -128,14 +129,15 @@ def parse_reference(reference: str) -> Optional[tuple]:
         # No chapter - try as book name only (defaults to ch 1)
         book_raw = reference.strip()
         book_key = book_raw.lower().replace(" ", "")
-        book = abbrevs.get(book_key) or canonical_map.get(book_raw.lower()) or book_raw.title()
+        book = abbrevs.get(book_key) or canonical_map.get(book_raw.lower()) or canonical_map.get(book_key) or book_raw.title()
         return (book, 1, 1, 999, False)
 
     book_raw, chapter, verse_start, verse_end = match.groups()
+    book_raw = book_raw.rstrip(".")  # "Rom. 3:23"
 
     # Normalize book name: try abbreviation, then canonical name, then title case
     book_key = book_raw.lower().replace(" ", "")
-    book = abbrevs.get(book_key) or canonical_map.get(book_raw.lower()) or book_raw.title()
+    book = abbrevs.get(book_key) or canonical_map.get(book_raw.lower()) or canonical_map.get(book_key) or book_raw.title()
 
     chapter = int(chapter)
     # "Jude 5" means Jude 1:5: single-chapter books cite verses directly (P1-4)
@@ -144,6 +146,8 @@ def parse_reference(reference: str) -> Optional[tuple]:
     has_verse = verse_start is not None
     verse_start = int(verse_start) if verse_start else 1
     verse_end = int(verse_end) if verse_end else (verse_start if has_verse else 999)
+    if verse_end < verse_start:  # "John 3:18-16"
+        verse_start, verse_end = verse_end, verse_start
 
     return (book, chapter, verse_start, verse_end, has_verse)
 
