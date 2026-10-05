@@ -16,6 +16,21 @@ window.BibleModules.menus = {
             }
         },
 
+        // Home screen (Recent, Bookmarks, book grid) is just "no passage loaded";
+        // give it a real route so it's reachable again (P1-2, P1-8).
+        goHome({ history = 'push' } = {}) {
+            this.showSideMenu = false;
+            this.currentView = 'reader';
+            this.exitPlanReading();
+            this._loadGeneration++;  // drop any in-flight passage load
+            Object.assign(this, {
+                verses: [], currentBook: null, currentChapter: null, currentReference: '',
+                referenceInput: '', highlightedVerses: [], error: null, loading: false,
+            });
+            if (history === 'push' && window.location.pathname !== '/') window.history.pushState({}, '', '/');
+            window.scrollTo(0, 0);
+        },
+
         // Exit plan reading mode and return to normal Bible view
         exitPlanReading() {
             this.combinedPlanReading = false;

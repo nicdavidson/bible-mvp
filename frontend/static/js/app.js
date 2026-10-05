@@ -634,18 +634,18 @@ function bibleApp() {
             const planURL = this.parsePlanURL();
             if (planURL) {
                 // Restore reading plan state from URL
-                await this.restorePlanFromURL(planURL.planId, planURL.day);
+                await this.restorePlanFromURL(planURL.planId, planURL.day, 'replace');
             } else {
                 const pathRef = this.parsePathReference();
                 if (pathRef) {
                     this.referenceInput = pathRef;
-                    await this.loadPassage();
+                    await this.loadPassage({ history: 'replace' });
                 } else {
                     const urlParams = new URLSearchParams(window.location.search);
                     const ref = urlParams.get('ref');
                     if (ref) {
                         this.referenceInput = ref;
-                        await this.loadPassage();
+                        await this.loadPassage({ history: 'replace' });
                     }
                 }
             }
@@ -654,7 +654,9 @@ function bibleApp() {
             window.addEventListener('popstate', () => {
                 const planURL = this.parsePlanURL();
                 if (planURL) {
-                    this.restorePlanFromURL(planURL.planId, planURL.day);
+                    this.restorePlanFromURL(planURL.planId, planURL.day, 'replace');
+                } else if (window.location.pathname === '/') {
+                    this.goHome({ history: 'none' });
                 } else {
                     const pathRef = this.parsePathReference();
                     if (pathRef) {
@@ -664,7 +666,7 @@ function bibleApp() {
                             this.planReadingMode = false;
                         }
                         this.referenceInput = pathRef;
-                        this.loadPassage();
+                        this.loadPassage({ history: 'replace' });
                     }
                 }
             });
@@ -763,7 +765,7 @@ function bibleApp() {
                 'showPathToChrist', 'showShareModal', 'showShareJesus',
                 'showFeedback', 'showSearch', 'showMemoryTool',
                 'showReadingPlan', 'showSettings', 'showGuide', 'showAbout',
-                'showSideMenu'
+                'showBookPicker', 'showChapterJump', 'showSideMenu'
             ];
             for (const f of flags) {
                 if (this[f]) { this[f] = false; return true; }
@@ -1168,8 +1170,14 @@ function bibleApp() {
         },
 
         // Load a passage
-        async loadPassage() {
-            if (!this.referenceInput.trim()) return;
+        // history: 'push' for user navigation, 'replace' when restoring a URL
+        // (page load, browser Back/Forward) so restoring never adds entries (P0-1).
+        async loadPassage({ history = 'push' } = {}) {
+            // Capture once: click.outside handlers can rewrite referenceInput while
+            // we await below, which used to reload the old chapter (P0-2).
+            const ref = (this.referenceInput || '').trim();
+            if (!ref) return;
+            this._historyMode = history;
 
             // Dismiss mobile keyboard
             this.$refs.referenceInput?.blur();
@@ -1187,8 +1195,9 @@ function bibleApp() {
 
             // Parse book/chapter (and optional :verse or :start-end) from input
             // BEFORE fetch so offline fallback has correct values
-            const refMatch = this.referenceInput.match(/^(.+?)\s+(\d+)(?::(\d+)(?:-(\d+))?)?/);
-            const inputBook = refMatch ? refMatch[1] : this.referenceInput;
+            const refMatch = ref.match(/^(.+?)\s+(\d+)(?::(\d+)(?:-(\d+))?)?/);
+            // Canonical name so "rom 8:28" doesn't become currentBook "rom" (P1-3)
+            const inputBook = normalizeBookName(refMatch ? refMatch[1] : ref);
             const inputChapter = refMatch ? parseInt(refMatch[2]) : 1;
             const inputVerse = refMatch && refMatch[3] ? parseInt(refMatch[3]) : null;
             const inputVerseEnd = refMatch && refMatch[4]
@@ -1230,7 +1239,9 @@ function bibleApp() {
                         this.rebuildVerseColorMap();
                         this.crossRefs = [];
                         this.speakerVerses = [];
-                        this.updateURL(true);
+                        this.referenceInput = this.currentReference;
+                        this.addToHistory(this.currentReference, this.translation);
+                        this.updateURL(this._historyMode === 'push');
                         this.observeVerses();
                         this.loading = false;
 
@@ -1263,18 +1274,24 @@ function bibleApp() {
 
             try {
                 const response = await fetch(
-                    `/api/passage/${encodeURIComponent(this.referenceInput)}?translation=${this.translation}`
+                    `/api/passage/${encodeURIComponent(ref)}?translation=${this.translation}`
                 );
 
                 if (!response.ok) {
                     let detail = 'Failed to load passage';
                     try { const data = await response.json(); detail = data.detail || detail; } catch {}
-                    throw new Error(detail);
+                    // The server answered: show its message, not "not cached" (P0-4)
+                    if (gen === this._loadGeneration) {
+                        this.error = response.status === 404 ? `Couldn't find "${ref}". ${detail}` : detail;
+                        this.verses = [];
+                    }
+                    return;
                 }
 
                 const data = await response.json();
                 if (gen !== this._loadGeneration) return;  // superseded by newer navigation (B4)
                 this.currentReference = data.reference;
+                this.referenceInput = data.reference;
                 // Precompute rendered html once per assignment (P5) instead of per render
                 this.verses = (data.verses || []).map(v => ({ ...v, html: this.formatVerseText(v.text) }));
                 this.crossRefs = data.cross_references || [];
@@ -1289,7 +1306,7 @@ function bibleApp() {
                 this.addToHistory(this.currentReference, this.translation);
 
                 // Update URL with clean path format (new chapter = new history entry)
-                this.updateURL(true);
+                this.updateURL(this._historyMode === 'push');
 
                 // Load commentary
                 await this.loadCommentary();
@@ -1360,7 +1377,8 @@ function bibleApp() {
                     this.crossRefs = [];
                     this.highlightedVerses = [];
                     this.speakerVerses = [];
-                    this.updateURL(true);
+                    this.referenceInput = this.currentReference;
+                    this.updateURL(this._historyMode === 'push');
                     this.observeVerses();
 
                     // Load cached cross-refs
@@ -1785,7 +1803,7 @@ function bibleApp() {
 
         // Navigate to previous chapter
         previousChapter() {
-            if (this.loading) return;
+            if (this.loading || !this.currentBook) return;  // combined plan mode has no current book (P0-5)
             if (this.currentChapter > 1) {
                 // Go to previous chapter in same book
                 this.referenceInput = `${this.currentBook} ${this.currentChapter - 1}`;
@@ -1804,7 +1822,7 @@ function bibleApp() {
 
         // Navigate to next chapter
         nextChapter() {
-            if (this.loading) return;
+            if (this.loading || !this.currentBook) return;
             const maxChapter = BOOK_CHAPTERS[this.currentBook] || 1;
             if (this.currentChapter < maxChapter) {
                 // Go to next chapter in same book

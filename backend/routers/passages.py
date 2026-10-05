@@ -61,7 +61,10 @@ def get_passage(
         speaker_verses = get_speaker_verses(conn, book, chapter)
 
         return {
-            "reference": f"{book} {chapter}" if not has_verse else reference,
+            # Always canonical ("rom 8:28" -> "Romans 8:28"); the client uses this as state (P1-3)
+            "reference": (f"{book} {chapter}" if not has_verse
+                          else f"{book} {chapter}:{verse_start}" if verse_end == verse_start
+                          else f"{book} {chapter}:{verse_start}-{verse_end}"),
             "translation": translation,
             "verses": [dict(v) for v in verses],
             "cross_references": cross_refs,
@@ -193,11 +196,32 @@ def get_single_verse(
         conn.close()
 
 
+def _fts_query(q: str) -> str:
+    """Build an FTS5 query from user text using only quoted terms.
+
+    "Quoted phrases" stay phrases; every other word becomes its own quoted term,
+    so FTS5 syntax (OR, NEAR, column filters, parens) can't be injected and
+    queries stay cheap (security review M3). Last bare word gets a prefix match.
+    """
+    parts = []
+    for phrase, word in re.findall(r'"([^"]*)"|(\w+)', q)[:8]:
+        if phrase:
+            words = re.findall(r"\w+", phrase)
+            if words:
+                parts.append('"' + " ".join(words) + '"')
+        elif word:
+            parts.append(f'"{word}"')
+    last = re.findall(r'"[^"]*"|\w+', q)
+    if parts and last and not last[-1].startswith('"') and len(last[-1]) >= 3:
+        parts[-1] += "*"
+    return " ".join(parts)
+
+
 @router.get("/api/search")
 @limiter.limit("30/minute")
 def search(
     request: Request,
-    q: str = Query(..., min_length=2, description="Search query"),
+    q: str = Query(..., min_length=2, max_length=100, description="Search query"),
     scope: str = Query(default="all", description="Search scope: bible, ot, nt, book:BookName, commentary, all")
 ):
     """Full-text search across Bible text, notes, and commentaries."""
@@ -273,22 +297,9 @@ def search(
             testament_filter = NT_BOOKS
             scope = "bible"
 
-        # Build FTS query - handle phrase search with quotes
-        # Sanitize FTS5 special characters to prevent OperationalError
-        fts_query = q
-        if '"' in q:
-            # FTS5 handles quoted phrases natively, but ensure balanced quotes
-            if q.count('"') % 2 != 0:
-                fts_query = q.replace('"', '')
-        else:
-            # Strip FTS5 special operators that could cause syntax errors
-            # Includes: * ( ) { } ^ ~ + - : which are all FTS5 syntax characters
-            sanitized = re.sub(r'[*(){}^~+\-:]', '', q)
-            # Add wildcard for partial matching on last word
-            words = sanitized.split()
-            if words:
-                words[-1] = words[-1] + '*'
-                fts_query = ' '.join(words)
+        fts_query = _fts_query(q)
+        if not fts_query:
+            return {"query": q, "scope": scope, "results": results}
 
         # Scope MATCH to the text column — the FTS tables also index book/chapter/verse
         # metadata, so a bare match on "john" returns every verse in the books of John.

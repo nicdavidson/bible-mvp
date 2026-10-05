@@ -8748,6 +8748,11 @@ svg.action-bar-icon {
 
 @media (max-width: 900px) {
     /* Collapsed sheet rises to show the peek row when a verse is selected */
+    /* The peek row (96px) used to cover the action bar's buttons (P0-3) */
+    body:has(.panel-resources.peeking) .verse-action-bar {
+        bottom: calc(96px + 8px);
+    }
+
     .panel-resources.peeking {
         transform: translateY(calc(100% - 96px));
     }

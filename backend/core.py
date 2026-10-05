@@ -26,6 +26,7 @@ NT_BOOKS = [
     "Jude", "Revelation"
 ]
 CANONICAL_BOOKS = OT_BOOKS + NT_BOOKS
+SINGLE_CHAPTER_BOOKS = {"Obadiah", "Philemon", "2 John", "3 John", "Jude"}
 
 def _get_client_ip(request: Request) -> str:
     """Extract real client IP from X-Forwarded-For (set by Fly.io proxy)."""
@@ -137,6 +138,9 @@ def parse_reference(reference: str) -> Optional[tuple]:
     book = abbrevs.get(book_key) or canonical_map.get(book_raw.lower()) or book_raw.title()
 
     chapter = int(chapter)
+    # "Jude 5" means Jude 1:5: single-chapter books cite verses directly (P1-4)
+    if book in SINGLE_CHAPTER_BOOKS and chapter > 1 and verse_start is None:
+        chapter, verse_start = 1, str(chapter)
     has_verse = verse_start is not None
     verse_start = int(verse_start) if verse_start else 1
     verse_end = int(verse_end) if verse_end else (verse_start if has_verse else 999)

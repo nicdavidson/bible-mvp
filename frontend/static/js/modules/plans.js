@@ -129,7 +129,7 @@ window.BibleModules.plans = {
         },
 
         // Restore reading plan state from URL (used on page load and popstate)
-        async restorePlanFromURL(planId, day) {
+        async restorePlanFromURL(planId, day, history = 'replace') {
             try {
                 // Load the plan data
                 const response = await fetch(`/api/reading-plans/${planId}`);
@@ -137,7 +137,7 @@ window.BibleModules.plans = {
                     this.currentPlan = await response.json();
                     this.planDay = Math.max(1, Math.min(day, this.currentPlan.duration_days));
                     // Start reading the plan
-                    await this.startPlanReading();
+                    await this.startPlanReading({ history });
                 } else {
                     console.error('Plan not found:', planId);
                     // Fallback to home
@@ -457,7 +457,8 @@ window.BibleModules.plans = {
         },
 
         // Load all passages for the day into the main reader view
-        async startPlanReading() {
+        async startPlanReading({ history = 'push' } = {}) {
+            this.error = null;  // a stale passage error hid the whole plan reading (P0-4)
             if (!this.currentPlan) return;
 
             const readings = this.getPlanDayReadings(this.planDay);
@@ -671,7 +672,7 @@ window.BibleModules.plans = {
             });
 
             // Update URL to reflect plan reading state
-            this.updateURL();
+            this.updateURL(history === 'push');
         },
 
         exitPlanReadingMode() {
@@ -715,7 +716,8 @@ window.BibleModules.plans = {
         goToPlanPassage(ref) {
             this.showReadingPlan = false;
             this.planReadingMode = false;
-            this.referenceInput = ref;
+            // The passage API has no chapter ranges: "Genesis 1-3" -> "Genesis 1" (P0-4)
+            this.referenceInput = ref.replace(/^(.+?\s\d+)-\d+$/, '$1');
             this.loadPassage();
         },
 

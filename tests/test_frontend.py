@@ -124,8 +124,8 @@ class TestJS:
 
     def test_keyboard_dismiss(self, js):
         """loadPassage should blur the reference input."""
-        idx = js.index("async loadPassage()")
-        snippet = js[idx:idx + 300]
+        idx = js.index("async loadPassage(")
+        snippet = js[idx:idx + 800]
         assert "blur()" in snippet
 
     def test_multi_select_in_selectVerse(self, js):
@@ -187,7 +187,7 @@ class TestHTML:
         """Action bar click.outside should not dismiss on verse clicks."""
         assert ".verse-box" in html
         # The click.outside handler should check for verse-box
-        assert "closest('.verse-box')" in html
+        assert "closest('.verse-box" in html
 
     def test_viewport_meta(self, html):
         assert 'name="viewport"' in html

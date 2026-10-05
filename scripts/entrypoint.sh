@@ -54,7 +54,8 @@ fi
 # Drop privileges and start the app as non-root user
 if command -v gosu > /dev/null 2>&1; then
     chown -R appuser:appuser /data 2>/dev/null || true
-    exec gosu appuser uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    exec gosu appuser uvicorn backend.main:app --host 0.0.0.0 --port 8000 \
+    --proxy-headers --forwarded-allow-ips='*'  # trust Fly's proxy for https redirects
 else
     exec uvicorn backend.main:app --host 0.0.0.0 --port 8000
 fi
