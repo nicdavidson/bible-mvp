@@ -103,10 +103,15 @@ window.BibleModules.selection = {
         // usePush=true creates a new history entry (for chapter navigation);
         // usePush=false uses replaceState (for verse selection within same chapter)
         updateURL(usePush = false) {
+            // Never push an entry for the page we're already on: re-pushing the
+            // same path is what made Back loop on one chapter (P0-1).
+            const go = (path) => {
+                if (usePush && path !== window.location.pathname) window.history.pushState({}, '', path);
+                else window.history.replaceState({}, '', path);
+            };
             // If in combined plan reading mode, use plan URL format
             if (this.combinedPlanReading && this.currentPlan) {
-                const path = `/plan/${this.currentPlan.id}/${this.planDay}`;
-                window.history.pushState({}, '', path);
+                go(`/plan/${this.currentPlan.id}/${this.planDay}`);
                 return;
             }
 
@@ -118,11 +123,7 @@ window.BibleModules.selection = {
                 ? `/${bookSlug}/${this.currentChapter}/${verse}`
                 : `/${bookSlug}/${this.currentChapter}`;
 
-            if (usePush) {
-                window.history.pushState({}, '', path);
-            } else {
-                window.history.replaceState({}, '', path);
-            }
+            go(path);
         },
 
         // Copy verse to clipboard

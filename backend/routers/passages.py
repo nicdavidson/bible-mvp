@@ -61,7 +61,10 @@ def get_passage(
         speaker_verses = get_speaker_verses(conn, book, chapter)
 
         return {
-            "reference": f"{book} {chapter}" if not has_verse else reference,
+            # Always canonical ("rom 8:28" -> "Romans 8:28"); the client uses this as state (P1-3)
+            "reference": (f"{book} {chapter}" if not has_verse
+                          else f"{book} {chapter}:{verse_start}" if verse_end == verse_start
+                          else f"{book} {chapter}:{verse_start}-{verse_end}"),
             "translation": translation,
             "verses": [dict(v) for v in verses],
             "cross_references": cross_refs,

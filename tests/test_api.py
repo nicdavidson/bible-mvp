@@ -267,3 +267,33 @@ class TestCleanUrls:
     def test_map_route(self, client):
         r = client.get("/map")
         assert r.status_code == 200
+
+
+# ========== REFERENCE NORMALIZATION (UI audit P1-3, P1-4) ==========
+
+class TestReferenceNormalization:
+    def test_abbreviated_reference_is_canonical(self, client):
+        data = client.get("/api/passage/rom 8:28").json()
+        assert data["reference"] == "Romans 8:28"
+        assert data["highlighted_verses"] == [28]
+
+    def test_range_reference_is_canonical(self, client):
+        assert client.get("/api/passage/jn 3:16-18").json()["reference"] == "John 3:16-18"
+
+    def test_single_chapter_book_verse(self, client):
+        data = client.get("/api/passage/Jude 5").json()
+        assert data["reference"] == "Jude 1:5"
+        assert data["highlighted_verses"] == [5]
+
+    def test_single_chapter_book_chapter_one_is_whole_chapter(self, client):
+        data = client.get("/api/passage/Jude 1").json()
+        assert data["reference"] == "Jude 1"
+        assert data["highlighted_verses"] == []
+
+
+class TestConfig:
+    def test_config_js_defaults_to_sync_off(self, client, monkeypatch):
+        monkeypatch.delenv("SUPABASE_URL", raising=False)
+        r = client.get("/config.js")
+        assert r.status_code == 200
+        assert '"supabaseUrl": ""' in r.text

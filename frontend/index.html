@@ -16,7 +16,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="/config.js"></script>
     <script src="/static/js/supabase-client.js?v=__SW_VERSION__"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.17.4/dist/cdn.min.js"></script>
 </head>
 <body x-data="bibleApp()" x-init="init()" :class="{ 'dark': currentTheme === 'dark', 'parchment': currentTheme === 'parchment' }">
     <!-- Toast notification for caching feedback -->
@@ -37,6 +37,10 @@
 
         <div class="side-menu-content">
             <div class="side-menu-section">
+                <button @click="goHome()" class="side-menu-item">
+                    <span class="side-menu-icon">🏠</span>
+                    <span>Home</span>
+                </button>
                 <button @click="navigateTo('reader')" class="side-menu-item" :class="{ 'active': currentView === 'reader' }">
                     <span class="side-menu-icon">📖</span>
                     <span>Get in the Word</span>
@@ -538,7 +542,7 @@
                 x-transition:leave="action-bar-leave"
                 x-transition:leave-start="action-bar-leave-start"
                 x-transition:leave-end="action-bar-leave-end"
-                @click.outside="if (!$event.target.closest('.verse-box') && !$event.target.closest('.highlight-picker')) clearVerseSelection()"
+                @click.outside="if (!$event.target.closest('.verse-box, .highlight-picker, .study-peek, .panel-resources')) clearVerseSelection()"
                 x-ref="actionBar"
             >
                 <div class="action-bar-label" x-text="getSelectionLabel()"></div>
@@ -2899,7 +2903,7 @@
                 // Refresh offline stats in the Alpine app
                 if (cached) {
                     console.log('[Main] Cached data:', cacheType, book, chapter);
-                    const alpineApp = document.querySelector('[x-data]')?.__x?.$data;
+                    const alpineApp = window.Alpine?.$data(document.querySelector('[x-data]'));
                     if (alpineApp && typeof alpineApp.updateOfflineStats === 'function') {
                         alpineApp.updateOfflineStats();
                     }
