@@ -9,49 +9,135 @@ Build: `python scripts/build_alignments.py all` (or the `alignments` step of
 `scripts/build_db.py`). Evaluate: `python scripts/build_alignments.py evaluate`
 writes `docs/alignment-eval-2026-11.json`, which the tables below come from.
 
-## Headline numbers
+## Headline numbers (round two, 2026-11-13)
 
 All on held-out books never used for training or tuning (Ruth, 2 Samuel, Job,
 Song of Solomon, Lamentations, Hosea, Habakkuk, Zechariah, Mark, Galatians,
-1 Peter, 1 John, Revelation). Token-level: a link is right when it names a
-gold source word for that English word.
+1 Peter, 1 John, Revelation), with every word tappable (the new tokenizer).
+Token-level: a link is right when it names a gold source word for that English
+word. "Content" = not one of ~45 function words (the, of, to, and, pronouns,
+auxiliaries...; `scripts/aligner/rerank.py`).
 
-| Test | Precision | Recall | F1 | AER |
+| Test | Model | Precision | Recall | F1 | AER |
+|---|---|---:|---:|---:|---:|
+| BSB vs human gold, clean verses, all words | HMM (round one) | 82.2 | 81.1 | 81.7 | 21.4 |
+| | **HMM + reranker** | **83.8** | **84.3** | **84.0** | **19.0** |
+| KJV as if untagged, vs its Strong's tags (incl. italics as "no source") | HMM | 82.9 | 88.6 | 85.7 | 14.3 |
+| | **HMM + reranker** | **83.2** | **91.0** | **86.9** | **13.1** |
+| YLT vs Clear-Bible manual alignment (independent gold) | HMM | 81.3 | 86.0 | 83.6 | 16.8 |
+| | HMM + reranker | 80.6 | 86.8 | 83.6 | 16.8 |
+
+**Precision when shown (links with confidence ≥ 0.5):**
+
+| | Content words | Function words | All |
+|---|---:|---:|---:|
+| BSB (aligner, held-out) | 89.8 (recall 86.7) | 83.0 (recall 78.1) | 86.3 |
+| KJV (aligner without tags, vs tags) | 93.1 (recall 92.5) | n/a: tags skip function words | |
+| YLT (aligner, vs Clear) | 90.8 (recall 90.6) | 75.8 (recall 81.0) | 82.4 |
+| WEB | no gold; expect between BSB and YLT | | |
+
+Shipped KJV content words come mostly from human tags (confidence 1.0); the
+aligner fills function words and words whose tag could not be resolved.
+
+**One threshold or two?** Confidence is calibrated separately for function and
+content words, so 0.7 means about 70% right for both. What differs is how many
+links each class has at each confidence. If the goal is "a shown link is right
+about nine times in ten", the cut that reaches it is 0.5 for content words
+(BSB 89.8%) but about 0.7 for function words (88.3% at 0.7, 83.0% at 0.5).
+Recommended rule: **show content-word links at ≥ 0.5 and function-word links at
+≥ 0.7.** On BSB that hides 19% of function-word links for +5.3 points of
+precision on them, and changes nothing for content words. YLT function words
+(archaic English) are 8–10 points less accurate than stated, so for KJV and
+WEB the 0.7 function cut is the minimum. `lemma_renderings` keeps one 0.5 cut
+(it counts content words in practice).
+
+Shipped coverage in the combined database (share of tappable words with a
+link) and confidence:
+
+| Translation | Tappable words | Linked | conf ≥ 0.9 | 0.7–0.9 | 0.5–0.7 | < 0.5 | Shown under the recommended rule |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| BSB | 726,093 | 721,560 (99.4%) | 703,533 | 9,670 | 6,745 | 1,612 | 99.0% |
+| KJV | 789,633 | 762,603 (96.6%) | 537,859 | 135,090 | 66,108 | 23,546 | 86.6% |
+| WEB | 750,447 | 750,318 (100%) | 431,671 | 197,695 | 75,363 | 45,589 | 87.2% |
+
+BSB: 692,981 human links + 28,579 aligner links (shifted verses and isolated
+bad gold). KJV: 354,443 from Strong's tags + 408,160 aligner links; the 26,988
+italic words have no link by design.
+
+## Round two changes and measurements
+
+**1. Every word is tappable.** The reader's `formatVerseText()` now takes every
+match of `/[A-Za-zÀ-ÖØ-öø-ÿ]+(?:['’-][A-Za-zÀ-ÖØ-öø-ÿ]+)*/g` as a word, so
+words touching curly quotes, apostrophes ("God’s", "bless'd") and dashes are
+tappable ("Let" and the first "light" in Genesis 1:3, "Truly" and "again" in
+John 3:3). Tappable words: BSB 706,141 → 726,093; WEB 726,545 → 750,447; KJV
+787,634 → 789,633. `scripts/aligner/text.py` uses the identical regex;
+`tests/test_tokenizer_parity.py` runs the real `formatVerseText` under node and
+the Python tokenizer against 983 shared vectors (edge cases + ~320 verses per
+translation). `_highlightInterlinearWord` now matches the interlinear word's
+own position (`data-word-id`) instead of its index, which was wrong in NT
+verses filtered by edition.
+
+**2. Reranker: function-word attachment + agreement of directions**
+(`scripts/aligner/rerank.py`). Each English word is re-decided among the HMM's
+top three choices (or no link) and the source words of the nearest content
+word on each side. A conditional logit scores them with: forward posterior;
+reverse-direction posterior P(this English word | source word), from Bayes on
+the same lexical table with the diagonal prior; whether the two directions
+agree (exactly or within an English phrase); the left/right attachment
+relations; repeated-lemma indicators; diagonal distance. Most weights are per
+word class (each frequent function word, pronouns, auxiliaries, content). It is
+trained out-of-fold: two HMMs on alternate halves of the training books, each
+decoding the other half (296K words; the gold is among the candidates for
+95%). Its probability is then calibrated per class on the dev books.
+
+Per slice, F1 before → after (same held-out books, same tokenizer):
+
+| Slice | BSB HMM | BSB +reranker | KJV HMM | KJV +reranker | YLT HMM | YLT +reranker |
+|---|---:|---:|---:|---:|---:|---:|
+| all | 81.7 | 84.0 | 85.7 | 86.9 | 83.6 | 83.6 |
+| OT | 79.9 | 82.9 | 85.6 | 87.0 | 83.4 | 82.7 |
+| NT | 84.6 | 86.0 | 85.8 | 86.9 | 83.9 | 85.1 |
+| OT narrative | 81.9 | 84.6 | 88.5 | 89.7 | 82.2 | 80.8 |
+| OT poetry | 77.4 | 80.9 | 82.5 | 83.9 | 85.2 | 84.7 |
+| OT prophecy | 81.1 | 83.5 | 86.9 | 88.6 | 82.4 | 82.5 |
+| NT narrative | 85.0 | 86.6 | 84.2 | 85.7 | 84.5 | 85.5 |
+| NT epistle | 83.3 | 84.5 | 87.8 | 88.3 | 83.3 | 84.4 |
+| NT prophecy | 84.9 | 86.4 | 86.8 | 87.7 | 83.6 | 85.1 |
+
+Function words on BSB: F1 77.1 → 80.5; content words 86.6 → 87.9. BSB error
+classes (held-out): adjacent source word 7,933 → 7,006; wrong source word
+5,991 → 5,833; same lemma, wrong occurrence 651 → 615; missed 1,624 → 1;
+spurious 461 → 494. The reranker almost never chooses "no link" (BSB gold has
+almost none), which is right for BSB and WEB. On YLT it trades 0.7 points of
+precision for 0.8 of recall, and helps the NT but not the OT: Clear's YLT gold
+leaves more archaic function words unlinked than its BSB gold does. **Kept**
+for all translations.
+
+Things tried and **dropped**: KJV tag data as extra training for the modern
+translations (+0.06 F1 on BSB dev, noise). A full reverse-direction HMM was not
+built: the Bayes-reverse posterior inside the reranker gets the agreement
+signal at no training cost.
+
+**3. KJV calibration from its tags.** Fitted on KJV content words of the dev
+books (tags), applied to KJV content-word links the aligner makes. Content
+words, KJV test books, stated vs measured:
+
+| Stated | BSB-fitted: links | measured | KJV-fitted: links | measured |
 |---|---:|---:|---:|---:|
-| BSB vs human gold (Clear-Bible), clean verses, all words incl. "the/of/and" | 81.9 | 80.7 | 81.3 | 21.7 |
-| KJV aligned as if untagged, vs KJV Strong's tags (content words + italics) | 82.9 | 88.7 | 85.7 | 14.3 |
-| — same, content words only (italic words excluded) | ≈90.0 | 88.7 | ≈89.4 | |
-| YLT vs Clear-Bible manual alignment (independent second gold) | 81.7 | 85.6 | 83.6 | 16.8 |
+| 0.30–0.50 | 824 | 37 | 626 | 35 |
+| 0.50–0.60 | 386 | 44 | 789 | 46 |
+| 0.60–0.70 | 1,490 | 57 | 2,047 | 60 |
+| 0.70–0.80 | 1,021 | 65 | 915 | 75 |
+| 0.80–0.90 | 1,399 | 80 | 156 | 81 |
+| 0.90–0.95 | 5,825 | 95 | 2,092 | 89 |
+| 0.95–1.00 | 18,893 | 99 | 23,187 | 99 |
 
-The KJV row uses the production recipe (BSB gold + self-training on the KJV's
-own text, no KJV tags). Without self-training it is 81.1 / 87.2 / 84.0.
-With links below confidence 0.5 hidden: BSB precision 85.6 (recall 77.5),
-KJV precision 86.0 (recall 86.8).
-
-Shipped coverage (share of tappable words with a link) and confidence:
-
-| Translation | Tappable words | Linked | conf ≥ 0.9 | 0.7–0.9 | 0.5–0.7 | < 0.5 | Source of links |
-|---|---:|---:|---:|---:|---:|---:|---|
-| BSB | 706,141 | 99.4% | 685,143 | 7,423 | 7,358 | 1,666 | 675,689 human gold (1.0); 25,901 aligner (627 shifted verses + ~11,300 isolated implausible gold links) |
-| KJV | 787,634 | 95.4% | 516,985 | 118,544 | 91,882 | 23,617 | 352,464 from tags, 398,564 aligner (mostly function words the tagging skips) |
-| WEB | 726,545 | 98.5% | 399,879 | 164,807 | 107,682 | 43,109 | aligner |
-
-KJV words with no link: 26,988 italic supplied words (no source by design) and
-about 9,600 words the aligner or the textual tradition leaves unlinked.
-
-**Recommendation for the UI.** Show links with confidence ≥ 0.5 as is. Mark
-0.5–0.8 as approximate if the design has room for it. Hide links below 0.5:
-on BSB that drops 8% of links and lifts precision from 81.9 to 85.6. On KJV
-the stated confidence runs 5 to 15 points higher than measured accuracy in the
-0.5–0.95 band (calibration tables below), so treat a stated 0.7 on KJV or WEB
-as roughly 0.6. The `lemma_renderings` index uses the same 0.5 cut.
-
-Is the unsupervised aligner good enough to show? For WEB, yes behind the 0.5
-threshold, with the caveat that a tap is wrong roughly one time in seven, more
-often on "the", "of", "and" and pronouns than on nouns and verbs. Content
-words are where users look, and there the KJV proxy measures about 90%
-precision. For KJV, most content words come from human tags, so it is better
-than that.
+Better from 0.6 up; the 0.5–0.6 band is still about 10 points optimistic, and
+the threshold results are unchanged (precision at 0.5: 93.4 vs 93.1). Kept for
+KJV. BSB function-word calibration holds on BSB (stated 76 → measured 78 in
+0.7–0.8); on YLT's archaic function words it is 8–10 points optimistic, which
+is why the function-word cut above is 0.7.
 
 ## What was wrong before this work
 
@@ -213,7 +299,7 @@ No large model and no randomness: `build_alignments.py all` on this N100 box
 takes about 30 minutes and peaks under 2 GB RAM. The local model router was
 not used; nothing in the error analysis called for it yet (see Next steps).
 
-## Evaluation
+## Evaluation (round one, superseded by the tables above for the headline)
 
 Splits are by whole book. Test books (above) and dev books (Joshua,
 Ecclesiastes, Micah, Philippians, James, 2 Peter) are excluded from training
@@ -372,16 +458,11 @@ English Bibles (the only one in that repo is the ESV, CC BY-NC, Trap 1).
   aligner only when it is confident (calibrated ≥ 0.5); others are kept.
   Evaluation scores count gold errors against the model, so true accuracy is
   somewhat higher than measured.
-- **Tokenization contract.** 2.6% of BSB and 3.0% of WEB words are not
-  tappable today because the UI's tokenizer rejects curly quotes and
-  apostrophes (“Let, God’s). They get no row. If the UI's tokenizer changes,
-  `scripts/aligner/text.py` must change with it and the build must be re-run;
-  otherwise positions drift.
-- **Interlinear highlight in the NT.** `_highlightInterlinearWord` in `app.js`
-  highlights by index in the rendered (edition-filtered) list, but
-  `original_word_position` is the STEPBible position. In verses with words
-  outside the active edition, the wrong interlinear word lights up. The tap
-  popup itself is right. A frontend fix: match on `position`, not index.
+- **Tokenization contract.** Positions follow `formatVerseText()` in
+  `app.js`. Any other client (the study view, a future native app) must use the
+  same rule (`tests/fixtures/tokenizer_vectors.json` is the reference), and any
+  change to it needs a matching change in `scripts/aligner/text.py` plus an
+  alignment rebuild.
 - **KJV tag confidence** (1.0 unique, 0.9 by order) is assigned, not measured.
 - **Strong's lemma classes** (20 sets) cover the frequent 1890-vs-STEPBible
   numbering splits; about 6,600 KJV tags (0.8%) still match no source word
@@ -389,21 +470,16 @@ English Bibles (the only one in that repo is the ESV, CC BY-NC, Trap 1).
 
 ## Storage
 
-Measured with `dbstat` on a `VACUUM INTO` copy:
+Combined database (13 commentaries + this work), after `VACUUM`: **804.0 MB**
+(the integration copy it started from was 755.0 MB). `dbstat`:
+`english_word_alignments` 77.7 MB (2,234,481 rows, BSB + KJV + WEB, ~36 B/row,
+about 25 MB per translation; the BSB-only table was 44.2 MB before this
+work), `lemma_renderings` 5.4 MB, `word_alignments` 36.4 MB (+2.5 MB for the
+22,310 recovered words), `commentary_entries` 479.0 MB.
 
-| | Before | After |
-|---|---:|---:|
-| `english_word_alignments` | 44.2 MB (BSB only, 724,050 rows: 23.8 table + 20.4 unique index) | 75.3 MB (2,168,095 rows, ~36 B/row, no separate index) |
-| — per translation (by row share) | BSB 44.2 | BSB ≈24.4, KJV ≈26.1, WEB ≈24.8 |
-| `lemma_renderings` | — | 5.3 MB (214,006 rows) |
-| `word_alignments` (+22,310 recovered words) | 33.9 MB | 36.4 MB |
-| WEB text (+1,414 verses, full poetry/words of Jesus), incl. FTS | | ≈ +3 MB |
-| Whole DB file | 384.9 MB | 422.5 MB (+37.6 MB) |
-
-So each additional aligned translation costs about 25 MB in the server DB. The
-offline download is unaffected until the client fetches a translation's
-chapters (`/api/offline/...` already includes alignments per translation).
-Packed storage (Next steps) would cut ~25 MB to ~2–3 MB per translation.
+Packed storage (Next steps, item 7) would bring the alignments to about 8 MB
+per translation, saving about 50 MB for the three. Not done this round (it
+touches `offline.py`, which `v2/study-view` is changing).
 
 ## How to add a translation
 
@@ -427,24 +503,26 @@ Packed storage (Next steps) would cut ~25 MB to ~2–3 MB per translation.
 
 ## Next steps to raise accuracy
 
-1. **Fix the UI tokenizer** to accept curly quotes and apostrophes: +2.6–3%
-   tappable words at no accuracy cost (needs a coordinated rebuild).
-2. **Function-word attachment model**: a small classifier for "the/of/to/and"
-   deciding between the neighbouring content words' sources, trained on BSB
-   gold. These words are about half of all errors.
+1. ~~Fix the UI tokenizer~~ and 2. ~~function-word attachment~~: done in round two.
 3. **Second-order or syntax-aware jumps** for poetry (a phrase-level
    reordering model, or Hebrew clause boundaries from the cantillation marks
    that TAHOT keeps).
-4. **Bidirectional agreement**: train a Hebrew/Greek → English model too and
-   keep links both directions agree on (classic symmetrization). Typically a
-   few points of precision.
-5. **KJV-specific calibration** using the tags (we have measured accuracy per
-   confidence bin; fit a second calibrator for archaic translations).
+4. **A trained reverse-direction HMM** (Hebrew/Greek → English) to replace
+   the Bayes-reverse posterior in the reranker; and a calibrator for function
+   words in archaic English (YLT shows them 8–10 points optimistic; the KJV
+   tags cannot measure this because they skip function words).
+5. **Content-word confidence 0.5–0.6 on KJV** is still ~10 points optimistic
+   after the KJV calibration; more KJV dev data (use train books too) would help.
 6. **Use the GPU box** for an embedding-based similarity feature (e.g. a
    multilingual model scoring English word vs. gloss in context). Job: embed
    ~450K source tokens (gloss + lemma) and ~2.2M English tokens in context
    once, store a compact cosine table per verse, add as an emission feature;
    about one GPU-hour. Justify it by the BSB dev F1 like the ablations above.
 7. **Packed storage**: one row per verse with the links as a compact string
-   (`3,1,1,2,…`) would cut `english_word_alignments` from ~39 to ~3 bytes per
-   word, at the cost of a small change in `words.py` and `offline.py`.
+   (`position:original:confidence%:method,…`). Measured on the built table:
+   ~7–7.5 MB of link text per translation, about 8 MB per translation with row
+   overhead, vs ~25 MB today: about 50 MB saved for three translations (~17 MB
+   per added translation). The API contract can stay the same, but
+   `words.py` (word lookup, renderings) and `offline.py` (chapter and book
+   exports) must unpack, and `offline.py` is being changed on
+   `v2/study-view`; not done in this round to avoid that conflict.
