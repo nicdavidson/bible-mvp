@@ -98,6 +98,16 @@ IMPORT_STEPS = [
         "data_source": "https://github.com/Clear-Bible/Alignments",
     },
     {
+        # Storage only: converts a per-word english_word_alignments table left by an
+        # older build into english_alignment_verses (one row per verse). A no-op when
+        # the alignments step already wrote the packed table. See backend/alignment_store.py.
+        "name": "alignments_pack",
+        "description": "Pack word alignments into one row per verse (english_alignment_verses)",
+        "version": "1.0",
+        "script": "build_alignments.py",
+        "args": ["pack"],
+    },
+    {
         "name": "cross_refs",
         "description": "Treasury of Scripture Knowledge cross-references (41K entries)",
         "version": "1.0",
@@ -162,7 +172,28 @@ IMPORT_STEPS = [
         "script": "import_naves.py",
         "requires_data": "naves/NavesTopicalDictionary.csv",
     },
+    {
+        "name": "tidy",
+        "description": "Drop redundant indexes (idx_alignment_ref, idx_alignment_word_type)",
+        "version": "1.0",
+        "script": "tidy_db.py",
+    },
 ]
+
+# After a build that leaves more than this share of the file as free pages
+# (e.g. the alignments_pack conversion frees ~70 MB), VACUUM so the released
+# file is actually smaller. VACUUM needs about the DB's size in free disk.
+VACUUM_FREE_SHARE = 0.05
+
+
+def vacuum_if_fragmented(conn):
+    pages = conn.execute("PRAGMA page_count").fetchone()[0]
+    free = conn.execute("PRAGMA freelist_count").fetchone()[0]
+    if pages and free / pages > VACUUM_FREE_SHARE:
+        print(f"\nVACUUM ({free} of {pages} pages free)...")
+        t = time.time()
+        conn.execute("VACUUM")
+        print(f"  done in {time.time() - t:.0f}s")
 
 
 def get_db_connection():
@@ -368,7 +399,8 @@ def count_rows(conn, step_name):
         "full_bibles": "verses",
         "web": "verses",
         "interlinear": "word_alignments",
-        "alignments": "english_word_alignments",
+        "alignments": "english_alignment_verses",
+        "alignments_pack": "english_alignment_verses",
         "strongs": "lexicon",
         "cross_refs": "cross_references",
         "speakers": "speaker_verses",
@@ -382,6 +414,8 @@ def count_rows(conn, step_name):
     if not table:
         return 0
     try:
+        if table == "english_alignment_verses":  # one row per verse: count linked words
+            return conn.execute(f"SELECT COALESCE(SUM(n_links), 0) FROM {table}").fetchone()[0]
         cursor = conn.execute(f"SELECT COUNT(*) FROM {table}")
         return cursor.fetchone()[0]
     except sqlite3.OperationalError:
@@ -599,6 +633,9 @@ def main():
     # Summary
     print("\n" + "=" * 60)
     print(f"Build complete: {completed} done, {skipped} skipped, {failed} failed")
+
+    if completed and DB_PATH.exists():
+        vacuum_if_fragmented(conn)
 
     if DB_PATH.exists() and DB_PATH.stat().st_size > 0:
         size_mb = DB_PATH.stat().st_size / 1024 / 1024
