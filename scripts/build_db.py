@@ -162,6 +162,15 @@ IMPORT_STEPS = [
         "script": "import_naves.py",
         "requires_data": "naves/NavesTopicalDictionary.csv",
     },
+    {
+        # Needs numpy, onnxruntime, tokenizers; model pinned in backend/semantic.py and
+        # cached in data/models/ (docs/SEMANTIC_SEARCH_2026-11.md). Bump version on any
+        # change to the model, ALPHA, or unit texts.
+        "name": "embeddings",
+        "description": "Meaning-search vectors, one per BSB verse (int8 + sign bits)",
+        "version": "1.0",
+        "script": "build_embeddings.py",
+    },
 ]
 
 

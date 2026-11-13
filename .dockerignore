@@ -21,3 +21,8 @@ data/*.zip
 data/*.bak
 data/naves/
 data/cross_refs.*
+
+# Meaning-search models: ship only the one the vectors were built with (backend/semantic.py)
+data/models/*
+!data/models/gte-small@5927d1727bb1/
+data/semantic-browser/

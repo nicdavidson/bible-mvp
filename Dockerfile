@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY data/bible.db data/db-manifest.json data/
 
 COPY data/reading-plan-*.json data/
+# Meaning-search model (~34 MB, pinned in backend/semantic.py; .dockerignore keeps only the
+# shipped one). Missing model => /api/search/meaning falls back to keyword search.
+COPY data/models/ data/models/
 COPY scripts/ scripts/
 COPY backend/ backend/
 COPY frontend/ frontend/

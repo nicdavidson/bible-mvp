@@ -37,9 +37,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from backend.semantic import CANDIDATES, Encoder, fetch_model, quantize_int8, pack_binary, rrf  # noqa: E402
-from backend.search_text import content_terms, fts_or_query, fts_today_query, unit_texts  # noqa: E402
 from import_naves import NAVES_BOOK_MAP  # noqa: E402
+
+from backend.search_text import content_terms, fts_or_query, fts_today_query, unit_texts  # noqa: E402
+from backend.semantic import CANDIDATES, Encoder, fetch_model, pack_binary, quantize_int8, rrf  # noqa: E402
 
 DB_PATH = Path(os.environ.get("DATABASE_PATH", PROJECT_ROOT / "data" / "bible.db"))
 QUESTIONS = PROJECT_ROOT / "tests" / "fixtures" / "semantic_questions.json"
