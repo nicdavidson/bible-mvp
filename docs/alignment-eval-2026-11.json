@@ -1,0 +1,1442 @@
+{
+ "suspect_gold_verses": 627,
+ "suspect_examples": [
+  "1 Chronicles 11:21",
+  "1 Chronicles 11:9",
+  "1 Chronicles 12:18",
+  "1 Chronicles 12:36",
+  "1 Chronicles 17:21",
+  "1 Chronicles 21:10",
+  "1 Chronicles 28:19",
+  "1 Chronicles 9:20",
+  "1 Chronicles 9:23",
+  "1 Chronicles 9:25",
+  "1 Corinthians 10:29",
+  "1 Corinthians 11:17",
+  "1 Corinthians 12:25",
+  "1 Corinthians 4:4",
+  "1 Corinthians 5:10",
+  "1 Corinthians 7:1",
+  "1 Corinthians 7:15",
+  "1 Corinthians 8:6",
+  "1 Corinthians 8:8",
+  "1 John 2:16",
+  "1 John 2:20",
+  "1 John 5:20",
+  "1 John 5:6",
+  "1 Kings 10:13",
+  "1 Kings 11:10",
+  "1 Kings 11:3",
+  "1 Kings 11:41",
+  "1 Kings 12:10",
+  "1 Kings 12:16",
+  "1 Kings 12:5",
+  "1 Kings 13:27",
+  "1 Kings 16:3",
+  "1 Kings 17:5",
+  "1 Kings 20:10",
+  "1 Kings 22:17",
+  "1 Kings 22:53",
+  "1 Kings 2:14",
+  "1 Kings 2:24",
+  "1 Kings 3:11",
+  "1 Kings 3:12"
+ ],
+ "bsb_test_clean": {
+  "NT": {
+   "precision": 0.8496,
+   "recall": 0.842,
+   "f1": 0.8458,
+   "aer": 0.1971,
+   "aer_cap": 0.0505,
+   "null_precision": 0.4835,
+   "words": 31243,
+   "pred": 30423
+  },
+  "NT-epistle": {
+   "precision": 0.8404,
+   "recall": 0.8356,
+   "f1": 0.838,
+   "aer": 0.2044,
+   "aer_cap": 0.0505,
+   "null_precision": 0.0294,
+   "words": 7545,
+   "pred": 7367
+  },
+  "NT-narrative": {
+   "precision": 0.8523,
+   "recall": 0.8422,
+   "f1": 0.8472,
+   "aer": 0.2077,
+   "aer_cap": 0.0644,
+   "null_precision": 0.8044,
+   "words": 12982,
+   "pred": 12515
+  },
+  "NT-prophecy": {
+   "precision": 0.853,
+   "recall": 0.8464,
+   "f1": 0.8497,
+   "aer": 0.1789,
+   "aer_cap": 0.0334,
+   "null_precision": 0.0538,
+   "words": 10716,
+   "pred": 10541
+  },
+  "OT": {
+   "precision": 0.8007,
+   "recall": 0.787,
+   "f1": 0.7938,
+   "aer": 0.2289,
+   "aer_cap": 0.0284,
+   "null_precision": 0.0516,
+   "words": 52476,
+   "pred": 51425
+  },
+  "OT-narrative": {
+   "precision": 0.8153,
+   "recall": 0.807,
+   "f1": 0.8111,
+   "aer": 0.2204,
+   "aer_cap": 0.0387,
+   "null_precision": 0.0,
+   "words": 19464,
+   "pred": 19210
+  },
+  "OT-poetry": {
+   "precision": 0.7803,
+   "recall": 0.7608,
+   "f1": 0.7704,
+   "aer": 0.2465,
+   "aer_cap": 0.0217,
+   "null_precision": 0.0833,
+   "words": 21450,
+   "pred": 20843
+  },
+  "OT-prophecy": {
+   "precision": 0.8137,
+   "recall": 0.8021,
+   "f1": 0.8078,
+   "aer": 0.2109,
+   "aer_cap": 0.0231,
+   "null_precision": 0.0769,
+   "words": 11562,
+   "pred": 11372
+  },
+  "all": {
+   "precision": 0.8189,
+   "recall": 0.8074,
+   "f1": 0.8131,
+   "aer": 0.2169,
+   "aer_cap": 0.0367,
+   "null_precision": 0.388,
+   "words": 83719,
+   "pred": 81848
+  },
+  "epistle": {
+   "precision": 0.8404,
+   "recall": 0.8356,
+   "f1": 0.838,
+   "aer": 0.2044,
+   "aer_cap": 0.0505,
+   "null_precision": 0.0294,
+   "words": 7545,
+   "pred": 7367
+  },
+  "narrative": {
+   "precision": 0.8299,
+   "recall": 0.8209,
+   "f1": 0.8253,
+   "aer": 0.2153,
+   "aer_cap": 0.049,
+   "null_precision": 0.6818,
+   "words": 32446,
+   "pred": 31725
+  },
+  "poetry": {
+   "precision": 0.7803,
+   "recall": 0.7608,
+   "f1": 0.7704,
+   "aer": 0.2465,
+   "aer_cap": 0.0217,
+   "null_precision": 0.0833,
+   "words": 21450,
+   "pred": 20843
+  },
+  "prophecy": {
+   "precision": 0.8326,
+   "recall": 0.8233,
+   "f1": 0.8279,
+   "aer": 0.1954,
+   "aer_cap": 0.0281,
+   "null_precision": 0.0588,
+   "words": 22278,
+   "pred": 21913
+  }
+ },
+ "bsb_test_all_gold": {
+  "NT": {
+   "precision": 0.838,
+   "recall": 0.8305,
+   "f1": 0.8342,
+   "aer": 0.2077,
+   "aer_cap": 0.0501,
+   "null_precision": 0.48,
+   "words": 31987,
+   "pred": 31159
+  },
+  "NT-epistle": {
+   "precision": 0.8244,
+   "recall": 0.8195,
+   "f1": 0.8219,
+   "aer": 0.219,
+   "aer_cap": 0.0497,
+   "null_precision": 0.0294,
+   "words": 7850,
+   "pred": 7669
+  },
+  "NT-narrative": {
+   "precision": 0.8471,
+   "recall": 0.8371,
+   "f1": 0.8421,
+   "aer": 0.2126,
+   "aer_cap": 0.0645,
+   "null_precision": 0.8019,
+   "words": 13105,
+   "pred": 12636
+  },
+  "NT-prophecy": {
+   "precision": 0.8369,
+   "recall": 0.8307,
+   "f1": 0.8338,
+   "aer": 0.1938,
+   "aer_cap": 0.0329,
+   "null_precision": 0.0521,
+   "words": 11032,
+   "pred": 10854
+  },
+  "OT": {
+   "precision": 0.793,
+   "recall": 0.7793,
+   "f1": 0.7861,
+   "aer": 0.2369,
+   "aer_cap": 0.029,
+   "null_precision": 0.05,
+   "words": 53894,
+   "pred": 52807
+  },
+  "OT-narrative": {
+   "precision": 0.8029,
+   "recall": 0.7946,
+   "f1": 0.7987,
+   "aer": 0.2327,
+   "aer_cap": 0.0392,
+   "null_precision": 0.0,
+   "words": 20107,
+   "pred": 19843
+  },
+  "OT-poetry": {
+   "precision": 0.7764,
+   "recall": 0.7567,
+   "f1": 0.7664,
+   "aer": 0.2512,
+   "aer_cap": 0.0227,
+   "null_precision": 0.0811,
+   "words": 22040,
+   "pred": 21409
+  },
+  "OT-prophecy": {
+   "precision": 0.8069,
+   "recall": 0.7957,
+   "f1": 0.8013,
+   "aer": 0.2173,
+   "aer_cap": 0.0231,
+   "null_precision": 0.069,
+   "words": 11747,
+   "pred": 11555
+  },
+  "all": {
+   "precision": 0.8097,
+   "recall": 0.7982,
+   "f1": 0.8039,
+   "aer": 0.2259,
+   "aer_cap": 0.0369,
+   "null_precision": 0.3831,
+   "words": 85881,
+   "pred": 83966
+  },
+  "epistle": {
+   "precision": 0.8244,
+   "recall": 0.8195,
+   "f1": 0.8219,
+   "aer": 0.219,
+   "aer_cap": 0.0497,
+   "null_precision": 0.0294,
+   "words": 7850,
+   "pred": 7669
+  },
+  "narrative": {
+   "precision": 0.8201,
+   "recall": 0.8112,
+   "f1": 0.8156,
+   "aer": 0.2248,
+   "aer_cap": 0.0492,
+   "null_precision": 0.68,
+   "words": 33212,
+   "pred": 32479
+  },
+  "poetry": {
+   "precision": 0.7764,
+   "recall": 0.7567,
+   "f1": 0.7664,
+   "aer": 0.2512,
+   "aer_cap": 0.0227,
+   "null_precision": 0.0811,
+   "words": 22040,
+   "pred": 21409
+  },
+  "prophecy": {
+   "precision": 0.8215,
+   "recall": 0.8126,
+   "f1": 0.817,
+   "aer": 0.2059,
+   "aer_cap": 0.0279,
+   "null_precision": 0.056,
+   "words": 22779,
+   "pred": 22409
+  }
+ },
+ "bsb_calibration": [
+  {
+   "bin": "0.00-0.30",
+   "links": 1047,
+   "mean_conf": 0.22862229235567053,
+   "accuracy": 0.29608404966571156
+  },
+  {
+   "bin": "0.30-0.50",
+   "links": 5611,
+   "mean_conf": 0.39387607853726747,
+   "accuracy": 0.4259490286936375
+  },
+  {
+   "bin": "0.50-0.60",
+   "links": 8116,
+   "mean_conf": 0.538912729178924,
+   "accuracy": 0.5611138491867915
+  },
+  {
+   "bin": "0.60-0.70",
+   "links": 6062,
+   "mean_conf": 0.6420858418106677,
+   "accuracy": 0.6647970966677664
+  },
+  {
+   "bin": "0.70-0.80",
+   "links": 6137,
+   "mean_conf": 0.7394850862202494,
+   "accuracy": 0.7585139318885449
+  },
+  {
+   "bin": "0.80-0.90",
+   "links": 13743,
+   "mean_conf": 0.8541102425755511,
+   "accuracy": 0.8587644619078804
+  },
+  {
+   "bin": "0.90-0.95",
+   "links": 20501,
+   "mean_conf": 0.9241875263391461,
+   "accuracy": 0.9372713526169455
+  },
+  {
+   "bin": "0.95-1.00",
+   "links": 20631,
+   "mean_conf": 0.9703088967265934,
+   "accuracy": 0.9728079104260579
+  }
+ ],
+ "bsb_thresholds": [
+  {
+   "threshold": 0.0,
+   "precision": 0.8189082201153357,
+   "recall": 0.8073670770194415,
+   "f1": 0.8130966967112685,
+   "pred": 81848
+  },
+  {
+   "threshold": 0.3,
+   "precision": 0.8256828504597715,
+   "recall": 0.8036329470717194,
+   "f1": 0.8145086955725526,
+   "pred": 80801
+  },
+  {
+   "threshold": 0.4,
+   "precision": 0.8395891809134983,
+   "recall": 0.7926835144185598,
+   "f1": 0.8154623973035601,
+   "pred": 78380
+  },
+  {
+   "threshold": 0.5,
+   "precision": 0.8555127011570688,
+   "recall": 0.7748440097328291,
+   "f1": 0.8131826456310679,
+   "pred": 75190
+  },
+  {
+   "threshold": 0.6,
+   "precision": 0.8911351641470615,
+   "recall": 0.7199884362427426,
+   "f1": 0.7964714974815447,
+   "pred": 67074
+  },
+  {
+   "threshold": 0.7,
+   "precision": 0.9136235494656789,
+   "recall": 0.6714447469223542,
+   "f1": 0.7740331875303758,
+   "pred": 61012
+  },
+  {
+   "threshold": 0.8,
+   "precision": 0.9309703872437357,
+   "recall": 0.6153725698041389,
+   "f1": 0.7409658213252304,
+   "pred": 54875
+  },
+  {
+   "threshold": 0.9,
+   "precision": 0.9550957891665857,
+   "recall": 0.4732106290202125,
+   "f1": 0.6328634716069271,
+   "pred": 41132
+  }
+ ],
+ "bsb_errors": {
+  "counts": {
+   "wrong source word": 5932,
+   "same lemma, wrong occurrence": 627,
+   "spurious (link, gold has none)": 429,
+   "adjacent source word": 7834,
+   "missed (no link, gold has one)": 1599
+  },
+  "examples": {
+   "wrong source word": [
+    "Ruth 1:1 'ruled' pred וַ/יְהִ֥י#5 (0.50) gold שְׁפֹ֣ט#3",
+    "Ruth 1:1 'went' pred יְהוּדָ֗ה#12 (0.50) gold וַ/יֵּ֨לֶךְ#8",
+    "Ruth 1:5 'and' pred וְ/כִלְי֑וֹן#5 (0.52) gold הָֽ/אִשָּׁ֔ה#7",
+    "Ruth 1:5 'Naomi' pred וְ/כִלְי֑וֹן#5 (0.53) gold הָֽ/אִשָּׁ֔ה#7",
+    "Ruth 1:5 'without' pred וַ/תִּשָּׁאֵר֙#6 (0.32) gold מִ/שְּׁנֵ֥י#8",
+    "Ruth 1:5 'her' pred וַ/תִּשָּׁאֵר֙#6 (0.46) gold מִ/שְּׁנֵ֥י#8"
+   ],
+   "same lemma, wrong occurrence": [
+    "Ruth 1:1 'there' pred וַ/יְהִ֥י#5 (0.90) gold וַ/יְהִ֗י#1",
+    "Ruth 1:1 'was' pred וַ/יְהִ֥י#5 (0.80) gold וַ/יְהִ֗י#1",
+    "Ruth 1:2 'Bethlehem' pred מִ/בֵּ֥ית#13 (0.48) gold לֶ֖חֶם#14",
+    "Ruth 1:6 'the' pred בִּ/שְׂדֵ֣ה#9 (0.56) gold מִ/שְּׂדֵ֣י#5",
+    "Ruth 1:6 'land' pred בִּ/שְׂדֵ֣ה#9 (0.59) gold מִ/שְּׂדֵ֣י#5",
+    "Ruth 1:6 'of' pred מוֹאָ֔ב#10 (0.62) gold מוֹאָ֑ב#6"
+   ],
+   "spurious (link, gold has none)": [
+    "Ruth 1:1 'And' pred וַ/יֵּ֨לֶךְ#8 (0.72) gold -",
+    "Ruth 1:1 'a' pred אִ֜ישׁ#9 (0.92) gold -",
+    "Ruth 1:1 'certain' pred אִ֜ישׁ#9 (0.94) gold -",
+    "Ruth 1:1 'man' pred אִ֜ישׁ#9 (0.97) gold -",
+    "Ruth 2:6 'is' pred הַ/נִּצָּ֥ב#3 (0.63) gold -",
+    "Ruth 3:12 'a' pred גֹאֵ֖ל#6 (0.68) gold -"
+   ],
+   "adjacent source word": [
+    "Ruth 1:2 'The' pred וְ/שֵׁ֣ם#1 (0.75) gold הָ/אִ֣ישׁ#2",
+    "Ruth 1:2 'his' pred וְ/שֵׁם֩#4 (0.42) gold אִשְׁתּ֨/וֹ#5",
+    "Ruth 1:2 'of' pred וְ/שֵׁ֥ם#7 (0.53) gold שְׁנֵֽי\\־#8",
+    "Ruth 1:2 'settled' pred שָֽׁם\\׃#20 (0.41) gold וַ/יִּֽהְיוּ\\־#19",
+    "Ruth 1:3 'Then' pred אִ֣ישׁ#3 (0.45) gold נָעֳמִ֑י#4",
+    "Ruth 1:3 'and' pred וַ/תִּשָּׁאֵ֥ר#5 (0.63) gold הִ֖יא#6"
+   ],
+   "missed (no link, gold has one)": [
+    "Ruth 1:2 'They' pred - (0.48) gold אֶפְרָתִ֔ים#12",
+    "Ruth 1:5 'sons' pred - (0.51) gold יְלָדֶ֖י/הָ#9",
+    "Ruth 1:7 'leading' pred - (0.50) gold לָ/שׁ֖וּב#12",
+    "Ruth 1:9 'new' pred - (0.34) gold אִישָׁ֑/הּ#8",
+    "Ruth 1:17 'anything' pred - (0.53) gold הַ/מָּ֔וֶת#13",
+    "Ruth 1:21 'After' pred - (0.46) gold וַֽ/יהוָה֙#11"
+   ]
+  }
+ },
+ "kjv_test_vs_tags": {
+  "NT": {
+   "precision": 0.835,
+   "recall": 0.8562,
+   "f1": 0.8455,
+   "aer": 0.1545,
+   "aer_cap": 0.0,
+   "null_precision": 0.0803,
+   "words": 18519,
+   "pred": 18209
+  },
+  "NT-epistle": {
+   "precision": 0.8444,
+   "recall": 0.8792,
+   "f1": 0.8615,
+   "aer": 0.1385,
+   "aer_cap": 0.0,
+   "null_precision": 0.0759,
+   "words": 4102,
+   "pred": 4024
+  },
+  "NT-narrative": {
+   "precision": 0.8227,
+   "recall": 0.8373,
+   "f1": 0.8299,
+   "aer": 0.1701,
+   "aer_cap": 0.0,
+   "null_precision": 0.061,
+   "words": 8716,
+   "pred": 8571
+  },
+  "NT-prophecy": {
+   "precision": 0.8472,
+   "recall": 0.869,
+   "f1": 0.8579,
+   "aer": 0.1421,
+   "aer_cap": 0.0,
+   "null_precision": 0.1096,
+   "words": 5701,
+   "pred": 5614
+  },
+  "OT": {
+   "precision": 0.7896,
+   "recall": 0.8863,
+   "f1": 0.8352,
+   "aer": 0.1648,
+   "aer_cap": 0.0,
+   "null_precision": 0.0784,
+   "words": 21031,
+   "pred": 20645
+  },
+  "OT-narrative": {
+   "precision": 0.8242,
+   "recall": 0.9092,
+   "f1": 0.8646,
+   "aer": 0.1354,
+   "aer_cap": 0.0,
+   "null_precision": 0.0468,
+   "words": 7478,
+   "pred": 7401
+  },
+  "OT-poetry": {
+   "precision": 0.7551,
+   "recall": 0.8609,
+   "f1": 0.8045,
+   "aer": 0.1955,
+   "aer_cap": 0.0,
+   "null_precision": 0.0952,
+   "words": 9285,
+   "pred": 9041
+  },
+  "OT-prophecy": {
+   "precision": 0.8028,
+   "recall": 0.899,
+   "f1": 0.8482,
+   "aer": 0.1518,
+   "aer_cap": 0.0,
+   "null_precision": 0.0816,
+   "words": 4268,
+   "pred": 4203
+  },
+  "all": {
+   "precision": 0.8109,
+   "recall": 0.8715,
+   "f1": 0.8401,
+   "aer": 0.1599,
+   "aer_cap": 0.0,
+   "null_precision": 0.0788,
+   "words": 39550,
+   "pred": 38854
+  },
+  "epistle": {
+   "precision": 0.8444,
+   "recall": 0.8792,
+   "f1": 0.8615,
+   "aer": 0.1385,
+   "aer_cap": 0.0,
+   "null_precision": 0.0759,
+   "words": 4102,
+   "pred": 4024
+  },
+  "narrative": {
+   "precision": 0.8234,
+   "recall": 0.8692,
+   "f1": 0.8457,
+   "aer": 0.1543,
+   "aer_cap": 0.0,
+   "null_precision": 0.0508,
+   "words": 16194,
+   "pred": 15972
+  },
+  "poetry": {
+   "precision": 0.7551,
+   "recall": 0.8609,
+   "f1": 0.8045,
+   "aer": 0.1955,
+   "aer_cap": 0.0,
+   "null_precision": 0.0952,
+   "words": 9285,
+   "pred": 9041
+  },
+  "prophecy": {
+   "precision": 0.8282,
+   "recall": 0.8812,
+   "f1": 0.8539,
+   "aer": 0.1461,
+   "aer_cap": 0.0,
+   "null_precision": 0.0902,
+   "words": 9969,
+   "pred": 9817
+  }
+ },
+ "kjv_calibration": [
+  {
+   "bin": "0.00-0.30",
+   "links": 535,
+   "mean_conf": 0.22717423747534543,
+   "accuracy": 0.2504672897196262
+  },
+  {
+   "bin": "0.30-0.50",
+   "links": 2528,
+   "mean_conf": 0.3885218169629789,
+   "accuracy": 0.33306962025316456
+  },
+  {
+   "bin": "0.50-0.60",
+   "links": 3072,
+   "mean_conf": 0.5388354291141159,
+   "accuracy": 0.4661458333333333
+  },
+  {
+   "bin": "0.60-0.70",
+   "links": 2176,
+   "mean_conf": 0.6428746954333295,
+   "accuracy": 0.5386029411764706
+  },
+  {
+   "bin": "0.70-0.80",
+   "links": 2074,
+   "mean_conf": 0.7393300840874827,
+   "accuracy": 0.6552555448408872
+  },
+  {
+   "bin": "0.80-0.90",
+   "links": 4443,
+   "mean_conf": 0.8527153913929953,
+   "accuracy": 0.7888813864505965
+  },
+  {
+   "bin": "0.90-0.95",
+   "links": 8075,
+   "mean_conf": 0.9264098700779865,
+   "accuracy": 0.9061300309597523
+  },
+  {
+   "bin": "0.95-1.00",
+   "links": 15951,
+   "mean_conf": 0.9720617305910522,
+   "accuracy": 0.9870854491881387
+  }
+ ],
+ "kjv_thresholds": [
+  {
+   "threshold": 0.0,
+   "precision": 0.8108817624954959,
+   "recall": 0.8715111615169705,
+   "f1": 0.8401039930671288,
+   "pred": 38854
+  },
+  {
+   "threshold": 0.3,
+   "precision": 0.8187061248988753,
+   "recall": 0.8678044867361898,
+   "f1": 0.8425406203840473,
+   "pred": 38319
+  },
+  {
+   "threshold": 0.4,
+   "precision": 0.8352281911740934,
+   "recall": 0.8575696384609001,
+   "f1": 0.8462514842566433,
+   "pred": 37118
+  },
+  {
+   "threshold": 0.5,
+   "precision": 0.8530077393758208,
+   "recall": 0.8445132914718818,
+   "f1": 0.8487392621834254,
+   "pred": 35791
+  },
+  {
+   "threshold": 0.6,
+   "precision": 0.8893303585072894,
+   "recall": 0.8049016624713009,
+   "f1": 0.8450123420937998,
+   "pred": 32719
+  },
+  {
+   "threshold": 0.7,
+   "precision": 0.9143175195625839,
+   "recall": 0.7724820890155183,
+   "f1": 0.837436650973101,
+   "pred": 30543
+  },
+  {
+   "threshold": 0.8,
+   "precision": 0.9331904878991183,
+   "recall": 0.7348897679179,
+   "f1": 0.8222531723924482,
+   "pred": 28469
+  },
+  {
+   "threshold": 0.9,
+   "precision": 0.959876800133189,
+   "recall": 0.637935326823601,
+   "f1": 0.7664722402246705,
+   "pred": 24026
+  }
+ ],
+ "kjv_errors": {
+  "counts": {
+   "adjacent source word": 2272,
+   "spurious (link, gold has none)": 3131,
+   "wrong source word": 1945,
+   "missed (no link, gold has one)": 428
+  },
+  "examples": {
+   "adjacent source word": [
+    "1 John 1:1 'with' pred τοῖς#9 (0.92) gold ἑωράκαμεν#8",
+    "1 John 1:1 'of' pred τοῦ#20 (0.51) gold περὶ#19",
+    "1 John 1:6 'do' pred οὐ#15 (0.81) gold ποιοῦμεν#16",
+    "1 John 1:8 'ourselves' pred πλανῶμεν#8 (0.74) gold ἑαυτοὺς#7",
+    "1 John 2:2 'the' pred τοῦ#19 (0.88) gold κόσμου.#20",
+    "1 John 2:3 'hereby' pred ἐν#2 (0.34) gold τούτῳ#3"
+   ],
+   "spurious (link, gold has none)": [
+    "1 John 1:2 'it' pred καὶ#7 (0.56) gold -",
+    "1 John 1:3 'is' pred μετὰ#21 (0.81) gold -",
+    "1 John 1:9 'our' pred ἡμῖν#12 (0.51) gold -",
+    "1 John 2:2 'the' pred τοῦ#19 (0.62) gold -",
+    "1 John 2:2 'sins' pred τοῦ#19 (0.53) gold -",
+    "1 John 2:2 'of' pred τοῦ#19 (0.63) gold -"
+   ],
+   "wrong source word": [
+    "1 John 1:2 'shew' pred μαρτυροῦμεν#8 (0.34) gold ἀπαγγέλλομεν#10",
+    "1 John 1:3 'truly' pred ἡμῶν·#14 (0.30) gold δὲ#18",
+    "1 John 1:4 'we' pred ἵνα#5 (0.42) gold γράφομεν#3",
+    "1 John 2:2 'and' pred ἡμῶν·#8 (0.56) gold δὲ#13",
+    "1 John 2:2 'whole' pred κόσμου.#20 (0.80) gold ὅλου#18",
+    "1 John 2:3 'do' pred γινώσκομεν#4 (0.83) gold ἐν#2"
+   ],
+   "missed (no link, gold has one)": [
+    "1 John 1:5 'all' pred - (0.34) gold οὐδεμία.#24",
+    "1 John 2:11 'goeth' pred - (0.57) gold ὑπάγει,#20",
+    "1 John 2:13 'known' pred - (0.34) gold ἐγνώκατε#5",
+    "1 John 3:1 'of' pred - (0.50) gold ποταπὴν#2",
+    "1 John 3:2 'sons' pred - (0.55) gold τέκνα#3",
+    "1 John 3:7 'man' pred - (0.63) gold μηδεὶς#2"
+   ]
+  }
+ },
+ "kjv_test_selftrained": {
+  "NT": {
+   "precision": 0.8498,
+   "recall": 0.8672,
+   "f1": 0.8584,
+   "aer": 0.1416,
+   "aer_cap": 0.0,
+   "null_precision": 0.1079,
+   "words": 18519,
+   "pred": 18124
+  },
+  "NT-epistle": {
+   "precision": 0.8645,
+   "recall": 0.8965,
+   "f1": 0.8802,
+   "aer": 0.1198,
+   "aer_cap": 0.0,
+   "null_precision": 0.135,
+   "words": 4102,
+   "pred": 4008
+  },
+  "NT-narrative": {
+   "precision": 0.837,
+   "recall": 0.8473,
+   "f1": 0.8421,
+   "aer": 0.1579,
+   "aer_cap": 0.0,
+   "null_precision": 0.0644,
+   "words": 8716,
+   "pred": 8524
+  },
+  "NT-prophecy": {
+   "precision": 0.8585,
+   "recall": 0.8772,
+   "f1": 0.8678,
+   "aer": 0.1322,
+   "aer_cap": 0.0,
+   "null_precision": 0.136,
+   "words": 5701,
+   "pred": 5592
+  },
+  "OT": {
+   "precision": 0.8101,
+   "recall": 0.9055,
+   "f1": 0.8552,
+   "aer": 0.1448,
+   "aer_cap": 0.0,
+   "null_precision": 0.0913,
+   "words": 21031,
+   "pred": 20557
+  },
+  "OT-narrative": {
+   "precision": 0.8431,
+   "recall": 0.9274,
+   "f1": 0.8832,
+   "aer": 0.1168,
+   "aer_cap": 0.0,
+   "null_precision": 0.0585,
+   "words": 7478,
+   "pred": 7380
+  },
+  "OT-poetry": {
+   "precision": 0.7768,
+   "recall": 0.8794,
+   "f1": 0.8249,
+   "aer": 0.1751,
+   "aer_cap": 0.0,
+   "null_precision": 0.1151,
+   "words": 9285,
+   "pred": 8978
+  },
+  "OT-prophecy": {
+   "precision": 0.8235,
+   "recall": 0.9214,
+   "f1": 0.8697,
+   "aer": 0.1303,
+   "aer_cap": 0.0,
+   "null_precision": 0.0777,
+   "words": 4268,
+   "pred": 4199
+  },
+  "all": {
+   "precision": 0.8287,
+   "recall": 0.8867,
+   "f1": 0.8567,
+   "aer": 0.1433,
+   "aer_cap": 0.0,
+   "null_precision": 0.095,
+   "words": 39550,
+   "pred": 38681
+  },
+  "epistle": {
+   "precision": 0.8645,
+   "recall": 0.8965,
+   "f1": 0.8802,
+   "aer": 0.1198,
+   "aer_cap": 0.0,
+   "null_precision": 0.135,
+   "words": 4102,
+   "pred": 4008
+  },
+  "narrative": {
+   "precision": 0.8399,
+   "recall": 0.8828,
+   "f1": 0.8608,
+   "aer": 0.1392,
+   "aer_cap": 0.0,
+   "null_precision": 0.0602,
+   "words": 16194,
+   "pred": 15904
+  },
+  "poetry": {
+   "precision": 0.7768,
+   "recall": 0.8794,
+   "f1": 0.8249,
+   "aer": 0.1751,
+   "aer_cap": 0.0,
+   "null_precision": 0.1151,
+   "words": 9285,
+   "pred": 8978
+  },
+  "prophecy": {
+   "precision": 0.8435,
+   "recall": 0.8952,
+   "f1": 0.8686,
+   "aer": 0.1314,
+   "aer_cap": 0.0,
+   "null_precision": 0.0956,
+   "words": 9969,
+   "pred": 9791
+  }
+ },
+ "kjv_selftrained_calibration": [
+  {
+   "bin": "0.00-0.30",
+   "links": 498,
+   "mean_conf": 0.2305360050390632,
+   "accuracy": 0.21285140562248997
+  },
+  {
+   "bin": "0.30-0.50",
+   "links": 1679,
+   "mean_conf": 0.4139885103796602,
+   "accuracy": 0.3377010125074449
+  },
+  {
+   "bin": "0.50-0.60",
+   "links": 2003,
+   "mean_conf": 0.5227335980572861,
+   "accuracy": 0.4268597104343485
+  },
+  {
+   "bin": "0.60-0.70",
+   "links": 2073,
+   "mean_conf": 0.654236810085774,
+   "accuracy": 0.4963820549927641
+  },
+  {
+   "bin": "0.70-0.80",
+   "links": 1869,
+   "mean_conf": 0.7555961372679759,
+   "accuracy": 0.6474050294275013
+  },
+  {
+   "bin": "0.80-0.90",
+   "links": 3103,
+   "mean_conf": 0.8510499145107481,
+   "accuracy": 0.7699000966806316
+  },
+  {
+   "bin": "0.90-0.95",
+   "links": 10668,
+   "mean_conf": 0.9244845737134109,
+   "accuracy": 0.8735470566179228
+  },
+  {
+   "bin": "0.95-1.00",
+   "links": 16788,
+   "mean_conf": 0.971755139580636,
+   "accuracy": 0.987610197760305
+  }
+ ],
+ "kjv_selftrained_thresholds": [
+  {
+   "threshold": 0.0,
+   "precision": 0.8287014296424601,
+   "recall": 0.8866974634173328,
+   "f1": 0.8567190506735086,
+   "pred": 38681
+  },
+  {
+   "threshold": 0.3,
+   "precision": 0.8367336249116099,
+   "recall": 0.8837653176952228,
+   "f1": 0.8596066402991901,
+   "pred": 38183
+  },
+  {
+   "threshold": 0.4,
+   "precision": 0.8474816299265197,
+   "recall": 0.8773477912090952,
+   "f1": 0.8621561378710448,
+   "pred": 37425
+  },
+  {
+   "threshold": 0.5,
+   "precision": 0.8596866096866097,
+   "recall": 0.8680811042571437,
+   "f1": 0.8638634643176657,
+   "pred": 36504
+  },
+  {
+   "threshold": 0.6,
+   "precision": 0.8848149329004956,
+   "recall": 0.8444303062155957,
+   "f1": 0.8641510502179698,
+   "pred": 34501
+  },
+  {
+   "threshold": 0.7,
+   "precision": 0.9096459849512767,
+   "recall": 0.815966363309452,
+   "f1": 0.8602633459222212,
+   "pred": 32428
+  },
+  {
+   "threshold": 0.8,
+   "precision": 0.9256847409928335,
+   "recall": 0.782495643274045,
+   "f1": 0.8480887423174936,
+   "pred": 30559
+  },
+  {
+   "threshold": 0.9,
+   "precision": 0.943291083916084,
+   "recall": 0.7164117175181876,
+   "f1": 0.8143443331708774,
+   "pred": 27456
+  }
+ ],
+ "kjv_selftrained_errors": {
+  "counts": {
+   "adjacent source word": 1949,
+   "spurious (link, gold has none)": 3076,
+   "wrong source word": 1601,
+   "missed (no link, gold has one)": 546
+  },
+  "examples": {
+   "adjacent source word": [
+    "1 John 1:1 'with' pred τοῖς#9 (0.91) gold ἑωράκαμεν#8",
+    "1 John 1:1 'of' pred τοῦ#20 (0.48) gold περὶ#19",
+    "1 John 1:6 'do' pred οὐ#15 (0.76) gold ποιοῦμεν#16",
+    "1 John 1:8 'ourselves' pred πλανῶμεν#8 (0.70) gold ἑαυτοὺς#7",
+    "1 John 2:2 'the' pred τοῦ#19 (0.90) gold κόσμου.#20",
+    "1 John 2:3 'hereby' pred ἐν#2 (0.26) gold τούτῳ#3"
+   ],
+   "spurious (link, gold has none)": [
+    "1 John 1:2 'it' pred καὶ#7 (0.46) gold -",
+    "1 John 1:3 'is' pred μετὰ#21 (0.81) gold -",
+    "1 John 1:9 'our' pred ἡμῖν#12 (0.50) gold -",
+    "1 John 2:2 'the' pred τοῦ#19 (0.62) gold -",
+    "1 John 2:2 'sins' pred τοῦ#19 (0.47) gold -",
+    "1 John 2:2 'of' pred τοῦ#19 (0.65) gold -"
+   ],
+   "wrong source word": [
+    "1 John 1:2 'shew' pred μαρτυροῦμεν#8 (0.35) gold ἀπαγγέλλομεν#10",
+    "1 John 1:3 'truly' pred ἡμῶν·#14 (0.19) gold δὲ#18",
+    "1 John 1:4 'we' pred ἵνα#5 (0.34) gold γράφομεν#3",
+    "1 John 1:5 'declare' pred ὅτι#13 (0.24) gold ἀναγγέλλομεν#11",
+    "1 John 2:2 'and' pred ἡμῶν·#8 (0.52) gold δὲ#13",
+    "1 John 2:2 'whole' pred κόσμου.#20 (0.81) gold ὅλου#18"
+   ],
+   "missed (no link, gold has one)": [
+    "1 John 1:5 'all' pred - (0.37) gold οὐδεμία.#24",
+    "1 John 2:13 'known' pred - (0.32) gold ἐγνώκατε#5",
+    "1 John 2:13 'Father' pred - (0.26) gold πατέρες,#3",
+    "1 John 3:1 'of' pred - (0.52) gold ποταπὴν#2",
+    "1 John 3:2 'sons' pred - (0.62) gold τέκνα#3",
+    "1 John 3:7 'man' pred - (0.69) gold μηδεὶς#2"
+   ]
+  }
+ },
+ "kjv_tag_resolution": {
+  "unique": 283021,
+  "untagged": 401553,
+  "ordered": 61814,
+  "added": 26988,
+  "ambiguous": 7629,
+  "missing": 6629
+ },
+ "ylt_test": {
+  "NT": {
+   "precision": 0.824,
+   "recall": 0.8545,
+   "f1": 0.839,
+   "aer": 0.1642,
+   "aer_cap": 0.0038,
+   "null_precision": 0.196,
+   "words": 36237,
+   "pred": 35252
+  },
+  "NT-epistle": {
+   "precision": 0.8148,
+   "recall": 0.8503,
+   "f1": 0.8322,
+   "aer": 0.1698,
+   "aer_cap": 0.0024,
+   "null_precision": 0.0828,
+   "words": 8323,
+   "pred": 8157
+  },
+  "NT-narrative": {
+   "precision": 0.829,
+   "recall": 0.8605,
+   "f1": 0.8445,
+   "aer": 0.1594,
+   "aer_cap": 0.0047,
+   "null_precision": 0.3055,
+   "words": 15348,
+   "pred": 14791
+  },
+  "NT-prophecy": {
+   "precision": 0.8243,
+   "recall": 0.8499,
+   "f1": 0.8369,
+   "aer": 0.1662,
+   "aer_cap": 0.0038,
+   "null_precision": 0.0964,
+   "words": 12566,
+   "pred": 12304
+  },
+  "OT": {
+   "precision": 0.8131,
+   "recall": 0.857,
+   "f1": 0.8345,
+   "aer": 0.17,
+   "aer_cap": 0.0055,
+   "null_precision": 0.0368,
+   "words": 56616,
+   "pred": 55722
+  },
+  "OT-narrative": {
+   "precision": 0.7979,
+   "recall": 0.8442,
+   "f1": 0.8204,
+   "aer": 0.1855,
+   "aer_cap": 0.0074,
+   "null_precision": 0.0219,
+   "words": 22087,
+   "pred": 21921
+  },
+  "OT-poetry": {
+   "precision": 0.8309,
+   "recall": 0.8753,
+   "f1": 0.8525,
+   "aer": 0.1505,
+   "aer_cap": 0.0037,
+   "null_precision": 0.0505,
+   "words": 22397,
+   "pred": 21906
+  },
+  "OT-prophecy": {
+   "precision": 0.8085,
+   "recall": 0.8469,
+   "f1": 0.8273,
+   "aer": 0.1769,
+   "aer_cap": 0.0052,
+   "null_precision": 0.0347,
+   "words": 12132,
+   "pred": 11895
+  },
+  "all": {
+   "precision": 0.8174,
+   "recall": 0.856,
+   "f1": 0.8362,
+   "aer": 0.1677,
+   "aer_cap": 0.0048,
+   "null_precision": 0.0964,
+   "words": 92853,
+   "pred": 90974
+  },
+  "epistle": {
+   "precision": 0.8148,
+   "recall": 0.8503,
+   "f1": 0.8322,
+   "aer": 0.1698,
+   "aer_cap": 0.0024,
+   "null_precision": 0.0828,
+   "words": 8323,
+   "pred": 8157
+  },
+  "narrative": {
+   "precision": 0.8104,
+   "recall": 0.8508,
+   "f1": 0.8301,
+   "aer": 0.175,
+   "aer_cap": 0.0063,
+   "null_precision": 0.1484,
+   "words": 37435,
+   "pred": 36712
+  },
+  "poetry": {
+   "precision": 0.8309,
+   "recall": 0.8753,
+   "f1": 0.8525,
+   "aer": 0.1505,
+   "aer_cap": 0.0037,
+   "null_precision": 0.0505,
+   "words": 22397,
+   "pred": 21906
+  },
+  "prophecy": {
+   "precision": 0.8165,
+   "recall": 0.8485,
+   "f1": 0.8322,
+   "aer": 0.1715,
+   "aer_cap": 0.0045,
+   "null_precision": 0.0624,
+   "words": 24698,
+   "pred": 24199
+  }
+ },
+ "bsb_dev_bsb_only": {
+  "precision": 0.8005,
+  "recall": 0.7916,
+  "f1": 0.796,
+  "aer": 0.2343,
+  "aer_cap": 0.0379,
+  "null_precision": 0.0672,
+  "words": 28948,
+  "pred": 28494
+ },
+ "bsb_dev_with_kjv": {
+  "precision": 0.8018,
+  "recall": 0.7915,
+  "f1": 0.7966,
+  "aer": 0.2338,
+  "aer_cap": 0.0379,
+  "null_precision": 0.0597,
+  "words": 28948,
+  "pred": 28441
+ },
+ "calibrator": [
+  [
+   0.0,
+   0.0
+  ],
+  [
+   0.23388642372328847,
+   0.0
+  ],
+  [
+   0.24748273307138222,
+   0.1
+  ],
+  [
+   0.31939860606747816,
+   0.225
+  ],
+  [
+   0.3264719099572064,
+   0.2692307692307692
+  ],
+  [
+   0.4132879994193261,
+   0.33587786259541985
+  ],
+  [
+   0.4598987997480288,
+   0.3436807095343681
+  ],
+  [
+   0.46608156219755176,
+   0.35135135135135137
+  ],
+  [
+   0.46842913659071955,
+   0.37037037037037035
+  ],
+  [
+   0.47250549471114883,
+   0.40425531914893614
+  ],
+  [
+   0.4894748799935195,
+   0.40654205607476634
+  ],
+  [
+   0.5471146931862415,
+   0.47737068965517243
+  ],
+  [
+   0.5501117439440647,
+   0.4878048780487805
+  ],
+  [
+   0.5512761210934566,
+   0.5
+  ],
+  [
+   0.5696120649760844,
+   0.5017543859649123
+  ],
+  [
+   0.5879001732599239,
+   0.5239852398523985
+  ],
+  [
+   0.6263863211112917,
+   0.5247349823321554
+  ],
+  [
+   0.7128355634833622,
+   0.5639913232104121
+  ],
+  [
+   0.716855797022112,
+   0.5714285714285714
+  ],
+  [
+   0.7179697403538108,
+   0.5789473684210527
+  ],
+  [
+   0.7362713462429631,
+   0.5936395759717314
+  ],
+  [
+   0.7442229847603462,
+   0.6170212765957447
+  ],
+  [
+   0.7587033625731642,
+   0.6233766233766234
+  ],
+  [
+   0.8282204210196839,
+   0.637007874015748
+  ],
+  [
+   0.8284298892684491,
+   0.6666666666666666
+  ],
+  [
+   0.874099714984887,
+   0.728448275862069
+  ],
+  [
+   0.8775881053271096,
+   0.7358490566037735
+  ],
+  [
+   0.9011287166703432,
+   0.7361516034985423
+  ],
+  [
+   0.9065771061366056,
+   0.7379679144385026
+  ],
+  [
+   0.9068709514977789,
+   0.75
+  ],
+  [
+   0.916763756680876,
+   0.7520435967302452
+  ],
+  [
+   0.9177867931619429,
+   0.7567567567567568
+  ],
+  [
+   0.9201205993592678,
+   0.7628865979381443
+  ],
+  [
+   0.9259070228246055,
+   0.8
+  ],
+  [
+   0.9308764419063378,
+   0.8026315789473685
+  ],
+  [
+   0.9346113827667344,
+   0.813953488372093
+  ],
+  [
+   0.9484993612644645,
+   0.814404432132964
+  ],
+  [
+   0.9522311715709656,
+   0.8270676691729323
+  ],
+  [
+   0.9598507850487404,
+   0.8411053540587219
+  ],
+  [
+   0.9626636074216371,
+   0.8455284552845529
+  ],
+  [
+   0.9636809524809127,
+   0.8604651162790697
+  ],
+  [
+   0.9717549312761744,
+   0.8684531059683313
+  ],
+  [
+   0.9796219225577476,
+   0.8954954954954955
+  ],
+  [
+   0.988711506407386,
+   0.9071222329162656
+  ],
+  [
+   0.9898135089329779,
+   0.9148351648351648
+  ],
+  [
+   0.9955735285493159,
+   0.9240858505564388
+  ],
+  [
+   0.9956183377779121,
+   0.9333333333333333
+  ],
+  [
+   0.9965421220748836,
+   0.9425770308123249
+  ],
+  [
+   0.998157428749998,
+   0.9444444444444444
+  ],
+  [
+   0.9981872111933575,
+   0.9473684210526315
+  ],
+  [
+   0.9981998492057681,
+   0.95
+  ],
+  [
+   0.9983425253619176,
+   0.9513513513513514
+  ],
+  [
+   0.9989163823389484,
+   0.9590909090909091
+  ],
+  [
+   0.9991350129659476,
+   0.9650655021834061
+  ],
+  [
+   0.999383870801423,
+   0.9651162790697675
+  ],
+  [
+   0.9998181145309022,
+   0.9689189189189189
+  ],
+  [
+   0.9998505464057532,
+   0.9764705882352941
+  ],
+  [
+   0.9998991507992602,
+   0.9782608695652174
+  ],
+  [
+   0.9999703771500791,
+   0.9827115559599636
+  ],
+  [
+   0.9999854730169998,
+   0.993006993006993
+  ],
+  [
+   0.9999979193444183,
+   1.0
+  ],
+  [
+   1.0,
+   1.0
+  ]
+ ]
+}

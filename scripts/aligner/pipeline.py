@@ -195,9 +195,11 @@ def bsb_rows(ctx: Context, model: Aligner, calib: Calibrator):
         for j, (e, g) in enumerate(zip(ex.english, ex.gold), 1):
             if g and (j - 1) in bad:
                 pos, conf = predicted[j - 1]
-                if pos is not None:
+                # Only when the aligner is itself fairly sure; otherwise the gold
+                # is more often a legitimate idiom ('Naomi' for 'the two of them').
+                if pos is not None and calib(conf) >= 0.5:
                     yield ex.key, j, ex.words[j - 1], pos, calib(conf), METHOD_MODEL
-                continue
+                    continue
             if g:
                 # One row per English word. When gold links it to several source
                 # words ('the evil one' -> article + adjective), keep the one the
