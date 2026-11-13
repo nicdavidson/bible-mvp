@@ -50,6 +50,7 @@ def init_db():
             # Run one-time migrations
             _migrate_commentary_links(conn)
             _migrate_word_alignment_variants(conn)
+            _migrate_commentary_sources(conn)
         except Exception as e:
             logger.error(f"Error checking database: {e}")
         finally:
@@ -82,6 +83,36 @@ def _migrate_word_alignment_variants(conn):
         logger.info("word_alignments variant columns added successfully")
     except Exception as e:
         logger.error(f"Error adding variant columns: {e}")
+
+
+COMMENTARY_SOURCES_DDL = """
+CREATE TABLE IF NOT EXISTS commentary_sources (
+    source TEXT PRIMARY KEY,      -- equals commentary_entries.source
+    short_name TEXT,              -- <= ~12 chars, for a phone chip ("Henry", "JFB", "K&D")
+    author TEXT,
+    year INTEGER,                 -- first publication
+    tradition TEXT,               -- short factual label ("Reformed", "Methodist", ...)
+    kind TEXT CHECK (kind IN ('verse', 'passage', 'chapter', 'notes')),
+    coverage TEXT,                -- "66 books", "OT only", "Psalms", ...
+    license TEXT,
+    attribution TEXT,
+    source_url TEXT,
+    sort_order INTEGER,
+    description TEXT
+);
+"""
+
+
+def _migrate_commentary_sources(conn):
+    """Create the commentary_sources metadata table on databases built before it existed.
+
+    Rows are written by scripts/import_commentary.py (one per imported source).
+    """
+    try:
+        conn.executescript(COMMENTARY_SOURCES_DDL)
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error creating commentary_sources: {e}")
 
 
 def _migrate_commentary_links(conn):
@@ -325,6 +356,8 @@ CREATE TABLE IF NOT EXISTS commentary_entries (
 CREATE INDEX IF NOT EXISTS idx_commentary_lookup
 ON commentary_entries(book, chapter, reference_start, reference_end);
 
+-- Commentary source metadata (one row per commentary_entries.source)
+""" + COMMENTARY_SOURCES_DDL + """
 -- Full-text search for commentary
 CREATE VIRTUAL TABLE IF NOT EXISTS commentary_fts USING fts5(
     searchable_text,

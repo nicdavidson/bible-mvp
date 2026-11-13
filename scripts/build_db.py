@@ -24,7 +24,8 @@ Data sources:
         - KJV/WEB translations  (GitHub raw files)
         - Strong's lexicon      (openscriptures GitHub)
         - KJV Strong's tags     (eBible.org eng-kjv2006 USFM, for the alignments step)
-        - Commentary            (HelloAO Bible API)
+        - Commentary            (HelloAO Bible API, CrossWire SWORD modules, Tyndale Open
+                                 Resources; cached in data/sources/)
         - Spurgeon devotionals  (CCEL)
 """
 import argparse
@@ -105,18 +106,41 @@ IMPORT_STEPS = [
     },
     {
         "name": "commentary_mh",
-        "description": "Matthew Henry Concise Commentary (65/66 books)",
-        "version": "1.0",
+        "description": "Matthew Henry Complete (HelloAO, 65 books + Song of Solomon from CrossWire MHC)",
+        "version": "2.0",
         "script": "import_commentary.py",
         "args": ["matthew-henry"],
     },
     {
         "name": "commentary_jg",
-        "description": "John Gill Exposition (28K+ verses)",
-        "version": "1.0",
+        "description": "John Gill Exposition (HelloAO, 66 books)",
+        "version": "2.0",
         "script": "import_commentary.py",
         "args": ["john-gill"],
     },
+    # More commentaries (see scripts/commentary_registry.py, docs/COMMENTARY_LIBRARY_2026-11.md)
+    *[
+        {
+            "name": step,
+            "description": f"{desc} commentary",
+            "version": "1.0",
+            "script": "import_commentary.py",
+            "args": [key],
+        }
+        for step, key, desc in [
+            ("commentary_jfb", "jamieson-fausset-brown", "Jamieson-Fausset-Brown (HelloAO)"),
+            ("commentary_kd", "keil-delitzsch", "Keil & Delitzsch OT (HelloAO)"),
+            ("commentary_calvin", "john-calvin", "Calvin (HelloAO)"),
+            ("commentary_clarke", "adam-clarke", "Adam Clarke (CrossWire)"),
+            ("commentary_barnes", "albert-barnes", "Barnes' Notes NT (CrossWire)"),
+            ("commentary_wesley", "john-wesley", "Wesley's Notes (CrossWire)"),
+            ("commentary_pnt", "peoples-nt", "People's New Testament (CrossWire)"),
+            ("commentary_scofield", "scofield", "Scofield 1917 notes (CrossWire)"),
+            ("commentary_tdavid", "treasury-of-david", "Treasury of David exposition (CrossWire)"),
+            ("commentary_catena", "catena-aurea", "Catena Aurea, Gospels (CrossWire)"),
+            ("commentary_tyndale", "tyndale", "Tyndale Open Study Notes (CC BY-SA)"),
+        ]
+    ],
     {
         "name": "speakers",
         "description": "Red letter speaker data (6,896 divine speech verses)",
@@ -347,13 +371,14 @@ def count_rows(conn, step_name):
         "alignments": "english_word_alignments",
         "strongs": "lexicon",
         "cross_refs": "cross_references",
-        "commentary_mh": "commentary_entries",
-        "commentary_jg": "commentary_entries",
         "speakers": "speaker_verses",
         "spurgeon": "devotionals",
         "naves": "naves_topics",
     }
-    table = table_map.get(step_name)
+    if step_name.startswith("commentary_"):
+        table = "commentary_entries"
+    else:
+        table = table_map.get(step_name)
     if not table:
         return 0
     try:
@@ -509,8 +534,9 @@ def main():
             sys.exit(1)
 
     # Network steps
-    NETWORK_STEPS = {"full_bibles", "web", "strongs", "alignments", "commentary_mh",
-                     "commentary_jg", "spurgeon"}
+    NETWORK_STEPS = {"full_bibles", "web", "strongs", "alignments", "spurgeon"} | {
+        s["name"] for s in IMPORT_STEPS if s["name"].startswith("commentary_")
+    }
 
     # Run each step
     completed = 0
