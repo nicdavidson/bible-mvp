@@ -69,6 +69,50 @@ class Stats(dict):
 # Loaders: each yields (book, chapter, verse_start, verse_end, text_with_placeholders)
 # ---------------------------------------------------------------------------
 
+_CALVIN_HEAD = re.compile(r"^\s*(?:[1-3] )?[A-Z][A-Za-z ]+ (\d+):(\d+)(?:\s*[-–]\s*(?:(\d+):)?(\d+))?\s*$")
+_CALVIN_NUM = re.compile(r"(?:^|\s)(\d{1,3})\.\s")
+
+
+def clean_calvin(text: str, start: int) -> tuple[str, int | None, bool]:
+    """HelloAO/CCEL Calvin section -> (commentary text, end verse from heading, text_skipped).
+
+    A section is: "Book C:V-W" heading, the verse text (CTS English, plus Latin in the
+    NT), Calvin's comments, then "Footnotes:" (translator's notes, dropped along with the
+    [n] markers)."""
+    paras = [p.strip() for p in text.split("\n\n") if p.strip()]
+    end = None
+    heading = paras and _CALVIN_HEAD.match(paras[0])
+    if heading:
+        m = heading
+        end = int(m.group(4)) if m.group(4) and not m.group(3) else None
+        if not m.group(4):
+            end = int(m.group(2))  # single-verse heading
+        paras = paras[1:]
+    if "Footnotes:" in paras:
+        paras = paras[:paras.index("Footnotes:")]
+    lo, hi = start, end or start
+    i = 0
+    if heading and end:
+        # Sections with a "Book C:V-W" heading print the verse text first (English, and
+        # Latin in the NT), numbered lo..hi. The commentary starts at the first numbered
+        # paragraph after verse `hi` has appeared whose number goes back down.
+        seen_hi = False
+        for j, p in enumerate(paras):
+            nums = [int(n) for n in _CALVIN_NUM.findall(" " + p[:2000])]
+            lead = re.match(r"\s*(\d+)\.\s", p)
+            if seen_hi and lead and int(lead.group(1)) < hi:
+                i = j
+                break
+            if seen_hi and lead and int(lead.group(1)) == hi and len(p) > 600:
+                i = j
+                break
+            if any(n >= hi for n in nums[:1] or []) or (len(nums) >= 2 and max(nums) >= hi):
+                seen_hi = True
+    body = "\n\n".join(paras[i:])
+    body = re.sub(r"\s?\[\d+\]", "", body)
+    return body, end, i > 0
+
+
 def load_helloao(cfg, v11n, stats):
     cid = cfg["helloao_id"]
     base = HELLOAO.format(id=cid)
@@ -89,7 +133,9 @@ def load_helloao(cfg, v11n, stats):
             if not data:
                 stats.bump("chapter_fetch_failed")
                 continue
-            for item in data.get("chapter", {}).get("content", []):
+            chapter = data.get("chapter", {})
+            items = []
+            for item in chapter.get("content", []):
                 if item.get("type") != "verse" or not item.get("content"):
                     continue
                 num = str(item.get("number"))
@@ -101,7 +147,30 @@ def load_helloao(cfg, v11n, stats):
                     start, end = int(a), int(b)
                 else:
                     start = end = int(num)
-                yield book, ch, start, end, plain_to_text("\n\n".join(parts))
+                text = "\n\n".join(parts)
+                if cfg.get("clean") == "calvin":
+                    text, heading_end, skipped = clean_calvin(text, start)
+                    if heading_end and heading_end > start:
+                        end = heading_end
+                    if skipped:
+                        stats.bump("calvin_sections_verse_text_removed")
+                items.append([start, end, text])
+            # HelloAO's chapter "introduction" is either a chapter outline (Henry) or, when
+            # the chapter has no verse-1 item, the verse-1 note itself (JFB). Prepend it to
+            # the verse-1 entry, or make it the verse-1 entry.
+            intro = chapter.get("introduction")
+            intro = intro if isinstance(intro, str) else ""
+            intro = re.sub(r"^\s*(?:[1-3] )?[A-Z][A-Za-z ]+ \d+:\d+(?:-\d+)?\s*\n", "", intro).strip()
+            if intro:
+                first = min(items, key=lambda x: x[0]) if items else None
+                if first and first[0] == 1:
+                    first[2] = intro + "\n\n" + first[2]
+                    stats.bump("chapter_intros_prepended")
+                else:
+                    items.append([1, 1, intro])
+                    stats.bump("chapter_intros_as_verse_1")
+            for start, end, text in sorted(items, key=lambda x: x[0]):
+                yield book, ch, start, end, plain_to_text(text)
 
 
 def _sword_module(name) -> SwordModule:
@@ -192,7 +261,17 @@ def fixup_barnes(e, raw, stats):
     return e, raw
 
 
-FIXUPS = {"barnes": fixup_barnes}
+def fixup_wesley(e, raw, stats):
+    """CrossWire Wesley: 1 Kings is empty and its first notes ("In the way", "His father")
+    sit in the 2 Samuel 24 slots; the one 2 Samuel 22 entry is the note on 21:22. Drop
+    those three misplaced entries."""
+    if e.book == "2 Samuel" and (e.chapter == 24 or (e.chapter == 22 and e.verse_start == 1)):
+        stats.bump("wesley_misplaced_entries_dropped")
+        return None
+    return e, raw
+
+
+FIXUPS = {"barnes": fixup_barnes, "wesley": fixup_wesley}
 
 
 _TD_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.S)

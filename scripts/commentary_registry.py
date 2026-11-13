@@ -65,15 +65,15 @@ COMMENTARIES = {
         "coverage": "66 books",
         "license": PD,
         "attribution": "Jamieson, Fausset and Brown, Commentary Critical and Explanatory on the "
-                       "Whole Bible (1871). CrossWire JFB module, from the CCEL text.",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=JFB",
+                       "Whole Bible (1871). Text from the HelloAO Free Use Bible API (matches the "
+                       "CCEL edition).",
+        "source_url": "https://bible.helloao.org/api/c/jamieson-fausset-brown/books.json",
         "sort_order": 30,
         "description": "A compact, phrase-by-phrase commentary by two Scottish Presbyterian "
                        "ministers and an Anglican scholar; brief notes on wording, history and "
                        "meaning.",
-        "loader": "sword",
-        "module": "JFB",
-        "strip_book_intros": True,
+        "loader": "helloao",
+        "helloao_id": "jamieson-fausset-brown",
     },
     "keil-delitzsch": {
         "source": "Keil & Delitzsch",
@@ -85,16 +85,16 @@ COMMENTARIES = {
         "coverage": "OT only",
         "license": PD,
         "attribution": "Keil and Delitzsch, Biblical Commentary on the Old Testament "
-                       "(English translation, T. & T. Clark, 1864-1878). CrossWire KD module, "
-                       "from the Wikisource transcription.",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=KD",
+                       "(English translation, T. & T. Clark, 1864-1878). Text from the HelloAO "
+                       "Free Use Bible API.",
+        "source_url": "https://bible.helloao.org/api/c/keil-delitzsch/books.json",
         "sort_order": 40,
         "description": "A detailed scholarly commentary on the Hebrew text of the Old Testament "
                        "by two German Lutheran professors; strong on language, history and "
                        "structure, usually by section rather than single verse.",
-        "loader": "sword",
-        "module": "KD",
-        "strip_book_intros": True,
+        "loader": "helloao",
+        "helloao_id": "keil-delitzsch",
+        "infer_ranges": True,
     },
     "john-calvin": {
         "source": "John Calvin",
@@ -102,19 +102,21 @@ COMMENTARIES = {
         "author": "John Calvin (1509-1564)",
         "year": 1540,
         "tradition": "Reformed",
-        "kind": "verse",
+        "kind": "passage",
         "coverage": "48 books",
         "license": PD,
         "attribution": "John Calvin, Commentaries (Latin/French 1540-1565; English translation, "
-                       "Calvin Translation Society, 1843-1855). CrossWire CalvinCommentaries "
-                       "module, from CCEL.",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=CalvinCommentaries",
+                       "Calvin Translation Society, 1843-1855). Text from the HelloAO Free Use "
+                       "Bible API (CCEL edition); inline verse text and translator footnotes removed.",
+        "source_url": "https://bible.helloao.org/api/c/john-calvin/books.json",
         "sort_order": 50,
         "description": "The Geneva Reformer's own commentaries, explaining the plain sense of the "
                        "text with doctrinal and pastoral application. Calvin wrote none on Judges "
                        "to Song of Solomon (except Psalms), 2-3 John or Revelation.",
-        "loader": "sword",
-        "module": "CalvinCommentaries",
+        "loader": "helloao",
+        "helloao_id": "john-calvin",
+        "clean": "calvin",
+        "infer_ranges": True,
     },
     "adam-clarke": {
         "source": "Adam Clarke",
@@ -164,7 +166,7 @@ COMMENTARIES = {
         "year": 1755,
         "tradition": "Methodist",
         "kind": "verse",
-        "coverage": "66 books",
+        "coverage": "64 books",
         "license": PD,
         "attribution": "John Wesley, Explanatory Notes upon the New Testament (1755) and upon "
                        "the Old Testament (1765). CrossWire Wesley module (electronic edition by "
@@ -175,6 +177,7 @@ COMMENTARIES = {
                        "readers; often a sentence or two per verse.",
         "loader": "sword",
         "module": "Wesley",
+        "fixup": "wesley",
     },
     "peoples-nt": {
         "source": "People's New Testament",
