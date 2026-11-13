@@ -1,0 +1,1435 @@
+{
+ "_about": "Hand-written natural questions a church reader might type, with verses a knowledgeable reader would expect near the top. Written by the semantic-search agent (2026-11), not by users or a pastor; small and opinionated. A good answer not listed here counts as a miss, so absolute scores understate quality; use the set to compare methods, not as a grade. Round two (2026-11-13): 'pooled_refs' adds verses judged relevant in pooled judging: the union of every evaluated method's top 10 (all models incl. fine-tuned, every fusion mode, keyword baselines; 3,861 unlisted candidates, judged blind to method by four sub-agents of the same model as the author; 75 more surfaced by the final tuning and the clean fine-tuned model were judged by the author) under tests/fixtures/pooled_judging_rubric.md; a 48-item random audit by the author agreed on all 48. 'refs' are unchanged; the evaluation reports both.",
+ "questions": [
+  {
+   "q": "what does the Bible say about anxiety",
+   "refs": [
+    "Philippians 4:6",
+    "Philippians 4:7",
+    "Matthew 6:34",
+    "Matthew 6:25",
+    "1 Peter 5:7",
+    "Psalms 55:22",
+    "Psalms 94:19"
+   ],
+   "pooled_refs": [
+    "Proverbs 12:25",
+    "Isaiah 35:4",
+    "Isaiah 41:10",
+    "Matthew 10:19",
+    "Mark 4:19",
+    "Luke 12:22",
+    "John 14:27",
+    "2 Timothy 1:7",
+    "Hebrews 13:6",
+    "1 Peter 3:14"
+   ]
+  },
+  {
+   "q": "where does Scripture talk about waiting on God",
+   "refs": [
+    "Isaiah 40:31",
+    "Psalms 27:14",
+    "Psalms 37:7",
+    "Lamentations 3:25",
+    "Lamentations 3:26",
+    "Psalms 130:5",
+    "Psalms 62:5",
+    "Micah 7:7"
+   ],
+   "pooled_refs": [
+    "Psalms 25:5",
+    "Psalms 33:20",
+    "Psalms 38:15",
+    "Psalms 39:7",
+    "Psalms 40:1",
+    "Psalms 59:9",
+    "Psalms 62:1",
+    "Psalms 119:166",
+    "Psalms 130:6",
+    "Isaiah 25:9",
+    "Isaiah 26:8",
+    "Isaiah 30:18",
+    "Isaiah 33:2",
+    "Isaiah 64:4",
+    "Hosea 12:6",
+    "Romans 8:25",
+    "Hebrews 6:15",
+    "James 5:7"
+   ]
+  },
+  {
+   "q": "verses about forgiving someone who keeps hurting you",
+   "refs": [
+    "Matthew 18:21",
+    "Matthew 18:22",
+    "Luke 17:3",
+    "Luke 17:4",
+    "Colossians 3:13",
+    "Ephesians 4:32",
+    "Matthew 6:14"
+   ],
+   "pooled_refs": [
+    "Leviticus 19:18",
+    "Matthew 6:12",
+    "Matthew 6:15",
+    "Matthew 18:35",
+    "Mark 11:25",
+    "Luke 6:37",
+    "Luke 11:4",
+    "Romans 12:19",
+    "2 Corinthians 2:7"
+   ]
+  },
+  {
+   "q": "God's promises when afraid",
+   "refs": [
+    "Isaiah 41:10",
+    "Joshua 1:9",
+    "Psalms 56:3",
+    "Psalms 23:4",
+    "Deuteronomy 31:6",
+    "2 Timothy 1:7",
+    "Psalms 27:1",
+    "Isaiah 43:1",
+    "Psalms 46:1"
+   ],
+   "pooled_refs": [
+    "Exodus 14:13",
+    "Deuteronomy 3:22",
+    "Deuteronomy 7:18",
+    "Deuteronomy 31:8",
+    "1 Chronicles 28:20",
+    "Psalms 34:4",
+    "Psalms 56:4",
+    "Psalms 56:11",
+    "Psalms 112:7",
+    "Isaiah 12:2",
+    "Isaiah 35:4",
+    "Isaiah 41:13",
+    "Jeremiah 1:8",
+    "Haggai 2:5",
+    "John 6:20",
+    "Hebrews 13:6"
+   ]
+  },
+  {
+   "q": "comfort for someone who is grieving a death",
+   "refs": [
+    "Matthew 5:4",
+    "Psalms 34:18",
+    "Revelation 21:4",
+    "2 Corinthians 1:3",
+    "2 Corinthians 1:4",
+    "1 Thessalonians 4:13",
+    "John 11:35",
+    "Psalms 147:3"
+   ],
+   "pooled_refs": [
+    "Job 5:11",
+    "Psalms 23:4",
+    "Isaiah 57:2",
+    "Isaiah 57:18",
+    "Isaiah 61:2",
+    "John 16:20"
+   ]
+  },
+  {
+   "q": "God makes bad things work out for good",
+   "refs": [
+    "Romans 8:28",
+    "Genesis 50:20",
+    "Jeremiah 29:11"
+   ],
+   "pooled_refs": [
+    "Jeremiah 32:42",
+    "Hebrews 2:10"
+   ]
+  },
+  {
+   "q": "how can I be saved",
+   "refs": [
+    "Romans 10:9",
+    "Romans 10:10",
+    "Ephesians 2:8",
+    "Ephesians 2:9",
+    "Acts 16:31",
+    "John 3:16",
+    "Acts 4:12",
+    "Acts 2:38"
+   ],
+   "pooled_refs": [
+    "Isaiah 45:22",
+    "Matthew 24:13",
+    "Mark 16:16",
+    "Luke 7:50",
+    "Acts 2:21",
+    "Acts 15:11",
+    "Romans 10:13",
+    "1 Corinthians 15:2",
+    "Ephesians 2:5",
+    "Titus 3:5",
+    "Hebrews 7:25",
+    "James 1:21"
+   ]
+  },
+  {
+   "q": "nothing can separate us from God's love",
+   "refs": [
+    "Romans 8:38",
+    "Romans 8:39",
+    "Romans 8:35",
+    "John 10:28"
+   ],
+   "pooled_refs": [
+    "Romans 8:37"
+   ]
+  },
+  {
+   "q": "God gives strength when I am weak",
+   "refs": [
+    "2 Corinthians 12:9",
+    "2 Corinthians 12:10",
+    "Isaiah 40:29",
+    "Philippians 4:13",
+    "Isaiah 40:31"
+   ],
+   "pooled_refs": [
+    "Nehemiah 6:9",
+    "Psalms 18:32",
+    "Psalms 28:7",
+    "Psalms 29:11",
+    "Psalms 46:1",
+    "Psalms 68:35",
+    "Psalms 71:16",
+    "Psalms 73:26",
+    "Psalms 118:13",
+    "Isaiah 12:2",
+    "Ezekiel 34:16",
+    "Romans 8:26",
+    "2 Corinthians 13:4",
+    "Ephesians 6:10",
+    "Hebrews 11:34"
+   ]
+  },
+  {
+   "q": "trust God instead of relying on my own understanding",
+   "refs": [
+    "Proverbs 3:5",
+    "Proverbs 3:6",
+    "Isaiah 55:8",
+    "Isaiah 55:9",
+    "Jeremiah 17:7"
+   ],
+   "pooled_refs": [
+    "Psalms 20:7",
+    "Psalms 62:8",
+    "Psalms 118:8",
+    "Proverbs 16:20",
+    "Isaiah 26:3",
+    "Isaiah 26:4",
+    "Isaiah 31:1",
+    "Isaiah 50:10",
+    "1 Corinthians 2:5",
+    "2 Corinthians 3:5"
+   ]
+  },
+  {
+   "q": "what is real love",
+   "refs": [
+    "1 Corinthians 13:4",
+    "1 Corinthians 13:5",
+    "1 Corinthians 13:6",
+    "1 Corinthians 13:7",
+    "1 John 4:8",
+    "1 John 4:16",
+    "John 15:13"
+   ],
+   "pooled_refs": [
+    "Song of Solomon 8:6",
+    "Luke 6:32",
+    "John 13:34",
+    "John 14:21",
+    "John 14:23",
+    "Romans 12:9",
+    "Romans 13:10",
+    "1 Corinthians 13:13",
+    "Colossians 3:14",
+    "1 Timothy 1:5",
+    "1 Peter 1:22",
+    "1 Peter 4:8",
+    "1 John 3:16",
+    "1 John 4:7",
+    "1 John 4:10",
+    "1 John 4:12",
+    "1 John 4:18",
+    "1 John 4:19",
+    "2 John 1:6"
+   ]
+  },
+  {
+   "q": "verses for when I can't sleep at night",
+   "refs": [
+    "Psalms 4:8",
+    "Psalms 3:5",
+    "Psalms 127:2",
+    "Proverbs 3:24",
+    "Psalms 121:4"
+   ],
+   "pooled_refs": [
+    "Psalms 4:4",
+    "Psalms 42:8",
+    "Psalms 63:6"
+   ]
+  },
+  {
+   "q": "how to deal with anger",
+   "refs": [
+    "Ephesians 4:26",
+    "James 1:19",
+    "James 1:20",
+    "Proverbs 15:1",
+    "Proverbs 29:11",
+    "Colossians 3:8",
+    "Proverbs 14:29"
+   ],
+   "pooled_refs": [
+    "Psalms 4:4",
+    "Psalms 37:8",
+    "Proverbs 15:18",
+    "Proverbs 19:19",
+    "Proverbs 22:24",
+    "Proverbs 29:8",
+    "Ecclesiastes 7:9",
+    "Ephesians 4:31"
+   ]
+  },
+  {
+   "q": "Jesus is the only way to God",
+   "refs": [
+    "John 14:6",
+    "Acts 4:12",
+    "1 Timothy 2:5"
+   ],
+   "pooled_refs": [
+    "John 1:18",
+    "John 17:3",
+    "1 Corinthians 3:11",
+    "1 John 5:5"
+   ]
+  },
+  {
+   "q": "God created everything",
+   "refs": [
+    "Genesis 1:1",
+    "John 1:3",
+    "Colossians 1:16",
+    "Hebrews 11:3",
+    "Psalms 33:6"
+   ],
+   "pooled_refs": [
+    "Genesis 1:21",
+    "Genesis 1:25",
+    "Genesis 1:27",
+    "Genesis 2:4",
+    "Nehemiah 9:6",
+    "Psalms 89:11",
+    "Proverbs 16:4",
+    "Isaiah 42:5",
+    "Isaiah 44:24",
+    "Isaiah 45:12",
+    "Isaiah 45:18",
+    "Jeremiah 10:12",
+    "Jeremiah 33:2",
+    "Jeremiah 51:15",
+    "Acts 7:50",
+    "Acts 17:24",
+    "Ephesians 3:9",
+    "Hebrews 3:4",
+    "Revelation 4:11",
+    "Revelation 10:6"
+   ]
+  },
+  {
+   "q": "what is faith",
+   "refs": [
+    "Hebrews 11:1",
+    "Hebrews 11:6",
+    "Romans 10:17",
+    "2 Corinthians 5:7"
+   ],
+   "pooled_refs": [
+    "Matthew 17:20",
+    "Romans 1:17",
+    "Romans 3:28",
+    "Galatians 2:20",
+    "Galatians 5:6",
+    "Philippians 3:9",
+    "Hebrews 11:3",
+    "Hebrews 11:4",
+    "Hebrews 11:7",
+    "James 2:17",
+    "James 2:18",
+    "James 2:22",
+    "James 2:26",
+    "1 Peter 1:21"
+   ]
+  },
+  {
+   "q": "love your enemies",
+   "refs": [
+    "Matthew 5:44",
+    "Luke 6:27",
+    "Luke 6:35",
+    "Romans 12:20",
+    "Proverbs 25:21"
+   ],
+   "pooled_refs": [
+    "Proverbs 24:17",
+    "Matthew 5:43",
+    "Matthew 5:46",
+    "Luke 6:32"
+   ]
+  },
+  {
+   "q": "the dangers of greed and loving money",
+   "refs": [
+    "1 Timothy 6:10",
+    "Hebrews 13:5",
+    "Matthew 6:24",
+    "Luke 12:15",
+    "Ecclesiastes 5:10"
+   ],
+   "pooled_refs": [
+    "Job 36:18",
+    "Psalms 62:10",
+    "Proverbs 1:19",
+    "Proverbs 11:4",
+    "Proverbs 15:27",
+    "Proverbs 28:25",
+    "Ecclesiastes 5:13",
+    "Isaiah 57:17",
+    "Ezekiel 7:19",
+    "Mark 4:19",
+    "1 Corinthians 6:10",
+    "Ephesians 5:3",
+    "Colossians 3:5",
+    "1 Timothy 6:9",
+    "1 Timothy 6:17"
+   ]
+  },
+  {
+   "q": "how should a husband treat his wife",
+   "refs": [
+    "Ephesians 5:25",
+    "Ephesians 5:28",
+    "Colossians 3:19",
+    "1 Peter 3:7"
+   ],
+   "pooled_refs": [
+    "Exodus 21:10",
+    "1 Corinthians 7:3",
+    "1 Corinthians 7:4",
+    "1 Corinthians 7:11",
+    "Ephesians 5:33"
+   ]
+  },
+  {
+   "q": "advice for raising children",
+   "refs": [
+    "Proverbs 22:6",
+    "Ephesians 6:4",
+    "Deuteronomy 6:6",
+    "Deuteronomy 6:7",
+    "Colossians 3:21"
+   ],
+   "pooled_refs": [
+    "Deuteronomy 4:9",
+    "Deuteronomy 11:19",
+    "Psalms 78:6",
+    "Proverbs 23:13",
+    "2 Corinthians 12:14",
+    "Titus 2:4"
+   ]
+  },
+  {
+   "q": "the Lord is my shepherd who cares for me",
+   "refs": [
+    "Psalms 23:1",
+    "John 10:11",
+    "John 10:14",
+    "Isaiah 40:11",
+    "Ezekiel 34:12"
+   ],
+   "pooled_refs": [
+    "Genesis 48:15",
+    "Psalms 8:4",
+    "Psalms 95:7",
+    "Psalms 100:3",
+    "Ezekiel 34:15",
+    "Ezekiel 34:31",
+    "Nahum 1:7",
+    "John 10:15",
+    "Hebrews 13:20",
+    "1 Peter 5:7"
+   ]
+  },
+  {
+   "q": "rest for people who are tired and worn out",
+   "refs": [
+    "Matthew 11:28",
+    "Matthew 11:29",
+    "Matthew 11:30",
+    "Isaiah 40:29",
+    "Hebrews 4:9"
+   ],
+   "pooled_refs": [
+    "Exodus 33:14",
+    "Psalms 116:7",
+    "Psalms 127:2",
+    "Proverbs 3:24",
+    "Isaiah 14:3",
+    "Isaiah 28:12",
+    "Jeremiah 31:25",
+    "Hebrews 4:10"
+   ]
+  },
+  {
+   "q": "fruit of the Spirit",
+   "refs": [
+    "Galatians 5:22",
+    "Galatians 5:23"
+   ],
+   "pooled_refs": [
+    "Ephesians 5:9"
+   ]
+  },
+  {
+   "q": "spiritual warfare and fighting the devil",
+   "refs": [
+    "Ephesians 6:11",
+    "Ephesians 6:12",
+    "Ephesians 6:13",
+    "2 Corinthians 10:4",
+    "James 4:7",
+    "1 Peter 5:8"
+   ],
+   "pooled_refs": [
+    "Matthew 4:11",
+    "Matthew 12:28",
+    "Mark 3:15",
+    "Luke 4:13",
+    "Romans 16:20",
+    "2 Corinthians 10:3",
+    "Ephesians 4:27",
+    "1 Timothy 6:12",
+    "1 John 3:8",
+    "Revelation 2:10",
+    "Revelation 12:7",
+    "Revelation 12:9"
+   ]
+  },
+  {
+   "q": "how to resist temptation",
+   "refs": [
+    "1 Corinthians 10:13",
+    "James 1:13",
+    "James 1:14",
+    "Matthew 26:41",
+    "Hebrews 4:15",
+    "James 4:7"
+   ],
+   "pooled_refs": [
+    "Matthew 6:13",
+    "Mark 14:38",
+    "Luke 11:4",
+    "Luke 22:40",
+    "Luke 22:46",
+    "1 Corinthians 6:18",
+    "1 Corinthians 7:5",
+    "Galatians 5:16",
+    "Hebrews 2:18",
+    "Hebrews 12:4",
+    "1 Peter 2:11",
+    "1 Peter 5:9"
+   ]
+  },
+  {
+   "q": "confessing my sins to God",
+   "refs": [
+    "1 John 1:9",
+    "Psalms 32:5",
+    "Proverbs 28:13",
+    "James 5:16",
+    "Psalms 51:1"
+   ],
+   "pooled_refs": [
+    "Leviticus 5:5",
+    "Leviticus 26:40",
+    "Joshua 7:19",
+    "Ezra 10:11",
+    "Nehemiah 1:6",
+    "Nehemiah 9:2",
+    "Psalms 38:18",
+    "Psalms 41:4",
+    "Psalms 51:3",
+    "Jeremiah 3:25",
+    "Daniel 9:4",
+    "Daniel 9:20",
+    "Hosea 14:2",
+    "Matthew 3:6",
+    "Mark 1:5",
+    "Luke 11:4",
+    "Acts 8:22"
+   ]
+  },
+  {
+   "q": "why read the Bible",
+   "refs": [
+    "Psalms 119:105",
+    "2 Timothy 3:16",
+    "Hebrews 4:12",
+    "Psalms 119:11",
+    "Joshua 1:8",
+    "2 Timothy 3:17"
+   ],
+   "pooled_refs": [
+    "Deuteronomy 17:19",
+    "Matthew 22:29",
+    "John 5:39",
+    "Acts 17:11",
+    "1 Timothy 4:13",
+    "2 Timothy 3:15",
+    "Revelation 1:3"
+   ]
+  },
+  {
+   "q": "praying when I don't know what to say",
+   "refs": [
+    "Romans 8:26",
+    "Romans 8:27",
+    "Matthew 6:7",
+    "Matthew 6:8"
+   ],
+   "pooled_refs": [
+    "Ecclesiastes 5:2",
+    "Luke 11:1",
+    "Luke 11:2"
+   ]
+  },
+  {
+   "q": "being content with what I have",
+   "refs": [
+    "Philippians 4:11",
+    "Philippians 4:12",
+    "Hebrews 13:5",
+    "1 Timothy 6:6",
+    "1 Timothy 6:8"
+   ],
+   "pooled_refs": [
+    "Psalms 16:6",
+    "Psalms 23:1",
+    "Ecclesiastes 3:22",
+    "Ecclesiastes 4:8",
+    "Ecclesiastes 5:18",
+    "Isaiah 55:2",
+    "Matthew 6:25"
+   ]
+  },
+  {
+   "q": "why do Christians suffer",
+   "refs": [
+    "Romans 5:3",
+    "Romans 5:4",
+    "James 1:2",
+    "James 1:3",
+    "1 Peter 1:6",
+    "1 Peter 1:7",
+    "2 Corinthians 4:17",
+    "1 Peter 4:12"
+   ],
+   "pooled_refs": [
+    "Acts 9:16",
+    "Romans 8:18",
+    "2 Corinthians 1:5",
+    "2 Corinthians 1:6",
+    "2 Corinthians 12:10",
+    "Philippians 1:29",
+    "Colossians 1:24",
+    "2 Timothy 3:12",
+    "Hebrews 12:7",
+    "1 Peter 2:19",
+    "1 Peter 2:20",
+    "1 Peter 2:21",
+    "1 Peter 3:14",
+    "1 Peter 3:17",
+    "1 Peter 4:1",
+    "1 Peter 4:13",
+    "1 Peter 4:16",
+    "1 Peter 4:19",
+    "Revelation 2:10"
+   ]
+  },
+  {
+   "q": "what will heaven be like",
+   "refs": [
+    "Revelation 21:4",
+    "Revelation 21:1",
+    "John 14:2",
+    "John 14:3",
+    "1 Corinthians 2:9",
+    "Revelation 22:5"
+   ],
+   "pooled_refs": [
+    "Isaiah 65:17",
+    "Daniel 12:3",
+    "Matthew 22:30",
+    "Mark 12:25",
+    "Luke 15:7",
+    "Luke 20:36",
+    "1 Corinthians 15:49",
+    "1 Thessalonians 4:17",
+    "2 Peter 3:13",
+    "1 John 3:2",
+    "Revelation 21:2"
+   ]
+  },
+  {
+   "q": "will the dead rise again",
+   "refs": [
+    "1 Corinthians 15:42",
+    "1 Corinthians 15:52",
+    "1 Corinthians 15:20",
+    "John 11:25",
+    "1 Thessalonians 4:16",
+    "John 5:28",
+    "John 5:29"
+   ],
+   "pooled_refs": [
+    "Isaiah 26:19",
+    "Matthew 22:31",
+    "Mark 12:25",
+    "Mark 12:26",
+    "John 5:25",
+    "John 11:23",
+    "John 11:24",
+    "1 Corinthians 6:14",
+    "1 Corinthians 15:12",
+    "1 Corinthians 15:13",
+    "1 Corinthians 15:16",
+    "1 Corinthians 15:21",
+    "1 Corinthians 15:29",
+    "2 Corinthians 1:9",
+    "Philippians 3:11",
+    "1 Thessalonians 4:14",
+    "Revelation 20:5"
+   ]
+  },
+  {
+   "q": "helping the poor and needy",
+   "refs": [
+    "Proverbs 19:17",
+    "James 2:15",
+    "James 2:16",
+    "1 John 3:17",
+    "Matthew 25:40",
+    "Proverbs 14:31",
+    "Deuteronomy 15:11"
+   ],
+   "pooled_refs": [
+    "Deuteronomy 24:14",
+    "Job 29:12",
+    "Psalms 41:1",
+    "Psalms 82:3",
+    "Psalms 82:4",
+    "Proverbs 22:9",
+    "Proverbs 22:22",
+    "Proverbs 28:27",
+    "Proverbs 31:9",
+    "Proverbs 31:20",
+    "Jeremiah 22:16",
+    "Ezekiel 16:49",
+    "Matthew 6:3",
+    "Luke 12:33"
+   ]
+  },
+  {
+   "q": "be careful what you say",
+   "refs": [
+    "James 3:5",
+    "James 3:6",
+    "James 3:8",
+    "Proverbs 18:21",
+    "Ephesians 4:29",
+    "Proverbs 21:23",
+    "James 1:26"
+   ],
+   "pooled_refs": [
+    "Leviticus 19:16",
+    "Deuteronomy 23:23",
+    "Psalms 34:13",
+    "Proverbs 4:24",
+    "Proverbs 6:2",
+    "Proverbs 24:28",
+    "Ecclesiastes 5:2",
+    "Ecclesiastes 5:6",
+    "2 Timothy 2:14",
+    "Titus 2:1"
+   ]
+  },
+  {
+   "q": "God knew me before I was born",
+   "refs": [
+    "Psalms 139:13",
+    "Psalms 139:14",
+    "Psalms 139:16",
+    "Jeremiah 1:5"
+   ],
+   "pooled_refs": [
+    "Psalms 22:10",
+    "Galatians 1:15"
+   ]
+  },
+  {
+   "q": "becoming a new person in Christ",
+   "refs": [
+    "2 Corinthians 5:17",
+    "Galatians 2:20",
+    "Ephesians 4:24",
+    "Romans 6:4"
+   ],
+   "pooled_refs": [
+    "Psalms 51:10",
+    "Ezekiel 18:31",
+    "Ezekiel 36:26",
+    "John 3:3",
+    "Romans 12:2",
+    "Galatians 3:27",
+    "Galatians 6:15",
+    "Colossians 3:1",
+    "Colossians 3:10",
+    "1 Peter 1:3"
+   ]
+  },
+  {
+   "q": "don't judge other people",
+   "refs": [
+    "Matthew 7:1",
+    "Matthew 7:2",
+    "Matthew 7:3",
+    "Luke 6:37",
+    "Romans 2:1",
+    "Romans 14:13",
+    "James 4:12"
+   ],
+   "pooled_refs": [
+    "John 7:24",
+    "Romans 2:3",
+    "Romans 14:10",
+    "1 Corinthians 5:12",
+    "James 2:13",
+    "James 4:11"
+   ]
+  },
+  {
+   "q": "pride and humility",
+   "refs": [
+    "James 4:6",
+    "1 Peter 5:5",
+    "1 Peter 5:6",
+    "Proverbs 16:18",
+    "Micah 6:8",
+    "Philippians 2:3"
+   ],
+   "pooled_refs": [
+    "2 Chronicles 32:26",
+    "Proverbs 11:2",
+    "Proverbs 15:33",
+    "Proverbs 16:19",
+    "Proverbs 18:12",
+    "Proverbs 21:24",
+    "Proverbs 22:4",
+    "Proverbs 29:23",
+    "Isaiah 2:11",
+    "Isaiah 2:17",
+    "Daniel 4:37",
+    "Matthew 23:12",
+    "Romans 12:16",
+    "Ephesians 4:2",
+    "Colossians 3:12",
+    "James 4:10",
+    "1 Peter 3:8"
+   ]
+  },
+  {
+   "q": "what does God want from me",
+   "refs": [
+    "Micah 6:8",
+    "Deuteronomy 10:12",
+    "Ecclesiastes 12:13",
+    "Matthew 22:37",
+    "Matthew 22:39"
+   ],
+   "pooled_refs": [
+    "1 Chronicles 28:9",
+    "Romans 12:1",
+    "1 John 3:22"
+   ]
+  },
+  {
+   "q": "the most important commandment",
+   "refs": [
+    "Matthew 22:37",
+    "Matthew 22:38",
+    "Matthew 22:39",
+    "Mark 12:30",
+    "Mark 12:31",
+    "Deuteronomy 6:5"
+   ],
+   "pooled_refs": [
+    "Deuteronomy 11:13",
+    "Joshua 22:5",
+    "Mark 12:29",
+    "Mark 12:33",
+    "John 13:34",
+    "John 15:12",
+    "Romans 13:9",
+    "1 John 3:23"
+   ]
+  },
+  {
+   "q": "God's mercy is new every morning",
+   "refs": [
+    "Lamentations 3:22",
+    "Lamentations 3:23"
+   ],
+   "pooled_refs": [
+    "Psalms 59:16",
+    "Psalms 90:14",
+    "Psalms 92:2",
+    "Isaiah 33:2"
+   ]
+  },
+  {
+   "q": "feeling lonely and abandoned",
+   "refs": [
+    "Deuteronomy 31:6",
+    "Hebrews 13:5",
+    "Matthew 28:20",
+    "Psalms 27:10",
+    "Isaiah 41:10",
+    "Joshua 1:5",
+    "Psalms 34:18"
+   ],
+   "pooled_refs": [
+    "Job 19:13",
+    "Psalms 22:2",
+    "Psalms 25:16",
+    "Psalms 31:12",
+    "Psalms 37:25",
+    "Psalms 68:6",
+    "Psalms 69:20",
+    "Psalms 88:5",
+    "Psalms 88:8",
+    "Psalms 102:7",
+    "Psalms 142:4",
+    "Isaiah 49:14",
+    "Mark 14:50",
+    "John 16:32",
+    "Acts 17:27",
+    "2 Timothy 1:15"
+   ]
+  },
+  {
+   "q": "asking God for wisdom",
+   "refs": [
+    "James 1:5",
+    "Proverbs 2:6",
+    "Proverbs 9:10",
+    "Proverbs 1:7"
+   ],
+   "pooled_refs": [
+    "1 Kings 3:11",
+    "2 Chronicles 1:11",
+    "Daniel 2:23",
+    "Ephesians 1:17",
+    "Colossians 1:9"
+   ]
+  },
+  {
+   "q": "working hard instead of being lazy",
+   "refs": [
+    "Proverbs 6:6",
+    "Proverbs 10:4",
+    "2 Thessalonians 3:10",
+    "Colossians 3:23",
+    "Proverbs 13:4"
+   ],
+   "pooled_refs": [
+    "Proverbs 12:24",
+    "Proverbs 12:27",
+    "Proverbs 13:11",
+    "Proverbs 19:15",
+    "Proverbs 21:5",
+    "Matthew 25:26",
+    "Acts 20:35",
+    "1 Corinthians 4:12",
+    "1 Thessalonians 2:9",
+    "2 Thessalonians 3:8",
+    "2 Thessalonians 3:11",
+    "2 Thessalonians 3:12",
+    "2 Timothy 2:6"
+   ]
+  },
+  {
+   "q": "praying for someone who is sick",
+   "refs": [
+    "James 5:14",
+    "James 5:15",
+    "Jeremiah 17:14",
+    "Psalms 103:3",
+    "James 5:16"
+   ],
+   "pooled_refs": [
+    "Psalms 35:13",
+    "John 11:3",
+    "Acts 28:8",
+    "3 John 1:2"
+   ]
+  },
+  {
+   "q": "Jesus died for our sins",
+   "refs": [
+    "Isaiah 53:5",
+    "1 Corinthians 15:3",
+    "Romans 5:8",
+    "1 Peter 2:24",
+    "1 Peter 3:18",
+    "2 Corinthians 5:21"
+   ],
+   "pooled_refs": [
+    "Romans 4:25",
+    "Romans 5:6",
+    "Romans 6:10",
+    "2 Corinthians 5:14",
+    "1 John 2:2",
+    "1 John 3:5",
+    "1 John 3:16",
+    "Revelation 1:5"
+   ]
+  },
+  {
+   "q": "saved by grace, not by good works",
+   "refs": [
+    "Ephesians 2:8",
+    "Ephesians 2:9",
+    "Titus 3:5",
+    "Romans 3:28",
+    "Galatians 2:16",
+    "Romans 11:6"
+   ],
+   "pooled_refs": [
+    "Acts 15:11",
+    "Romans 4:4",
+    "Galatians 2:21",
+    "Ephesians 2:5",
+    "Ephesians 2:10",
+    "2 Timothy 1:9",
+    "Titus 2:11"
+   ]
+  },
+  {
+   "q": "the Holy Spirit helps us",
+   "refs": [
+    "John 14:26",
+    "John 14:16",
+    "John 16:13",
+    "Acts 1:8",
+    "Romans 8:26"
+   ],
+   "pooled_refs": [
+    "Luke 12:12",
+    "Acts 2:4",
+    "Romans 5:5",
+    "Romans 8:16",
+    "Romans 8:27",
+    "1 Corinthians 2:10",
+    "1 Corinthians 2:12",
+    "2 Timothy 1:14",
+    "Titus 3:5"
+   ]
+  },
+  {
+   "q": "welcoming strangers",
+   "refs": [
+    "Hebrews 13:2",
+    "Romans 12:13",
+    "1 Peter 4:9",
+    "Leviticus 19:34",
+    "Matthew 25:35"
+   ],
+   "pooled_refs": [
+    "Exodus 22:21",
+    "Exodus 23:9",
+    "Deuteronomy 10:19",
+    "Job 31:32",
+    "Acts 28:2",
+    "3 John 1:5"
+   ]
+  },
+  {
+   "q": "Christians getting along with each other",
+   "refs": [
+    "Psalms 133:1",
+    "Ephesians 4:3",
+    "John 17:21",
+    "1 Corinthians 1:10",
+    "Philippians 2:2",
+    "Romans 12:16"
+   ],
+   "pooled_refs": [
+    "Acts 2:44",
+    "Romans 12:10",
+    "Romans 12:18",
+    "Romans 15:5",
+    "Romans 15:7",
+    "2 Corinthians 13:11",
+    "Ephesians 4:32",
+    "Ephesians 5:21",
+    "Colossians 3:15",
+    "Hebrews 10:25",
+    "James 4:1",
+    "1 Peter 2:17",
+    "1 John 4:11"
+   ]
+  },
+  {
+   "q": "God keeps his promises",
+   "refs": [
+    "Lamentations 3:23",
+    "Deuteronomy 7:9",
+    "1 Corinthians 1:9",
+    "2 Timothy 2:13",
+    "Hebrews 10:23",
+    "Numbers 23:19",
+    "Joshua 21:45"
+   ],
+   "pooled_refs": [
+    "Deuteronomy 4:31",
+    "Deuteronomy 7:12",
+    "Joshua 23:14",
+    "2 Samuel 7:28",
+    "1 Kings 8:24",
+    "1 Kings 8:56",
+    "2 Chronicles 6:15",
+    "Nehemiah 1:5",
+    "Psalms 105:42",
+    "Isaiah 38:7",
+    "Daniel 9:4",
+    "Romans 4:21",
+    "2 Corinthians 1:20",
+    "Titus 1:2",
+    "Hebrews 6:13",
+    "Hebrews 6:15",
+    "Hebrews 6:17",
+    "Hebrews 10:36",
+    "2 Peter 3:9"
+   ]
+  },
+  {
+   "q": "having joy even when life is hard",
+   "refs": [
+    "James 1:2",
+    "Habakkuk 3:17",
+    "Habakkuk 3:18",
+    "Philippians 4:4",
+    "Nehemiah 8:10",
+    "Romans 12:12"
+   ],
+   "pooled_refs": [
+    "Job 6:10",
+    "Psalms 30:5",
+    "Proverbs 15:15",
+    "Jeremiah 31:13",
+    "John 16:20",
+    "Romans 5:3",
+    "2 Corinthians 7:4",
+    "2 Corinthians 12:10",
+    "Colossians 1:11",
+    "1 Thessalonians 5:16",
+    "1 Peter 1:6"
+   ]
+  },
+  {
+   "q": "what the Bible teaches about marriage",
+   "refs": [
+    "Genesis 2:24",
+    "Matthew 19:5",
+    "Matthew 19:6",
+    "Ephesians 5:31",
+    "Hebrews 13:4"
+   ],
+   "pooled_refs": [
+    "Malachi 2:16",
+    "Matthew 5:32",
+    "Matthew 19:8",
+    "Matthew 19:9",
+    "Matthew 22:30",
+    "Mark 12:25",
+    "Luke 20:35",
+    "Romans 7:2",
+    "1 Corinthians 7:3",
+    "1 Corinthians 7:9",
+    "1 Corinthians 7:10",
+    "1 Corinthians 7:14",
+    "1 Corinthians 7:28",
+    "1 Corinthians 7:34",
+    "1 Corinthians 7:38",
+    "1 Corinthians 7:39",
+    "Ephesians 5:22",
+    "Ephesians 5:24",
+    "Ephesians 5:25",
+    "Colossians 3:18",
+    "Colossians 3:19",
+    "1 Timothy 4:3"
+   ]
+  },
+  {
+   "q": "God is in control of kings and nations",
+   "refs": [
+    "Romans 13:1",
+    "Daniel 2:21",
+    "Proverbs 21:1",
+    "Daniel 4:17"
+   ],
+   "pooled_refs": [
+    "2 Chronicles 20:6",
+    "Psalms 10:16",
+    "Psalms 18:47",
+    "Psalms 22:28",
+    "Psalms 33:10",
+    "Psalms 47:8",
+    "Psalms 96:10",
+    "Psalms 103:19",
+    "Psalms 110:5",
+    "Psalms 113:4",
+    "Psalms 135:10",
+    "Isaiah 37:16",
+    "Jeremiah 10:7",
+    "Jeremiah 10:10",
+    "Jeremiah 28:14",
+    "Daniel 2:37",
+    "Daniel 2:44",
+    "Daniel 2:47",
+    "1 Timothy 6:15"
+   ]
+  },
+  {
+   "q": "should Christians obey the government and pay taxes",
+   "refs": [
+    "Romans 13:1",
+    "Romans 13:7",
+    "Matthew 22:21",
+    "1 Peter 2:13",
+    "Titus 3:1"
+   ],
+   "pooled_refs": [
+    "Luke 20:25",
+    "Acts 5:29",
+    "Romans 13:6",
+    "1 Peter 2:17"
+   ]
+  },
+  {
+   "q": "not being afraid to die",
+   "refs": [
+    "1 Corinthians 15:55",
+    "Hebrews 2:15",
+    "Psalms 23:4",
+    "John 11:25",
+    "Philippians 1:21",
+    "2 Corinthians 5:8"
+   ],
+   "pooled_refs": [
+    "Matthew 10:28",
+    "Luke 12:4",
+    "John 11:26",
+    "Romans 14:8",
+    "Revelation 2:10"
+   ]
+  },
+  {
+   "q": "be still and let God fight for you",
+   "refs": [
+    "Psalms 46:10",
+    "Exodus 14:14",
+    "Isaiah 30:15",
+    "2 Chronicles 20:17"
+   ],
+   "pooled_refs": [
+    "Deuteronomy 1:30",
+    "Deuteronomy 3:22",
+    "Deuteronomy 20:4",
+    "Joshua 10:25",
+    "Joshua 23:10",
+    "Psalms 35:1",
+    "Isaiah 35:4",
+    "Jeremiah 1:19"
+   ]
+  },
+  {
+   "q": "God answers when we ask in prayer",
+   "refs": [
+    "Matthew 7:7",
+    "Matthew 7:8",
+    "Matthew 7:11",
+    "John 14:13",
+    "1 John 5:14",
+    "Jeremiah 33:3"
+   ],
+   "pooled_refs": [
+    "1 Samuel 1:27",
+    "1 Chronicles 14:10",
+    "2 Chronicles 1:7",
+    "Ezra 8:23",
+    "Job 33:26",
+    "Psalms 4:1",
+    "Psalms 17:6",
+    "Psalms 38:15",
+    "Psalms 66:19",
+    "Psalms 120:1",
+    "Matthew 21:22",
+    "Mark 11:24",
+    "Acts 10:31",
+    "2 Corinthians 1:11"
+   ]
+  },
+  {
+   "q": "how Jesus taught us to pray",
+   "refs": [
+    "Matthew 6:9",
+    "Matthew 6:10",
+    "Matthew 6:11",
+    "Matthew 6:12",
+    "Matthew 6:13",
+    "Luke 11:2"
+   ],
+   "pooled_refs": [
+    "Matthew 6:6",
+    "Luke 11:1",
+    "Luke 18:1"
+   ]
+  },
+  {
+   "q": "how much God loves the world",
+   "refs": [
+    "John 3:16",
+    "Romans 5:8",
+    "1 John 4:9",
+    "1 John 4:10",
+    "Ephesians 2:4"
+   ],
+   "pooled_refs": [
+    "Psalms 33:5",
+    "Psalms 103:11",
+    "John 3:17",
+    "John 12:47",
+    "1 John 3:1",
+    "1 John 4:8",
+    "1 John 4:11",
+    "1 John 4:16"
+   ]
+  },
+  {
+   "q": "let your light shine before others",
+   "refs": [
+    "Matthew 5:14",
+    "Matthew 5:16",
+    "John 8:12",
+    "Philippians 2:15"
+   ],
+   "pooled_refs": [
+    "Isaiah 60:1",
+    "Ephesians 5:8"
+   ]
+  },
+  {
+   "q": "keep going and don't give up",
+   "refs": [
+    "Hebrews 12:1",
+    "1 Corinthians 9:24",
+    "2 Timothy 4:7",
+    "Philippians 3:14",
+    "Galatians 6:9",
+    "Hebrews 10:36"
+   ],
+   "pooled_refs": [
+    "Deuteronomy 31:6",
+    "Deuteronomy 31:8",
+    "Joshua 1:9",
+    "Joshua 10:25",
+    "1 Chronicles 22:13",
+    "1 Chronicles 28:20",
+    "2 Chronicles 15:7",
+    "Matthew 24:13",
+    "Luke 11:8",
+    "Romans 12:11",
+    "2 Thessalonians 3:13",
+    "Hebrews 10:35",
+    "James 1:4",
+    "Revelation 2:26",
+    "Revelation 14:12"
+   ]
+  },
+  {
+   "q": "staying sexually pure",
+   "refs": [
+    "1 Corinthians 6:18",
+    "1 Thessalonians 4:3",
+    "Hebrews 13:4",
+    "Matthew 5:28",
+    "1 Corinthians 6:19"
+   ],
+   "pooled_refs": [
+    "Exodus 20:14",
+    "Deuteronomy 5:18",
+    "Psalms 119:9",
+    "Proverbs 7:5",
+    "Acts 15:29",
+    "Romans 13:13",
+    "1 Corinthians 7:1",
+    "1 Corinthians 7:2",
+    "Galatians 5:19",
+    "Ephesians 5:3",
+    "1 Thessalonians 4:7",
+    "1 Timothy 5:2",
+    "Hebrews 12:16"
+   ]
+  },
+  {
+   "q": "verses for depression when my soul is downcast",
+   "refs": [
+    "Psalms 42:11",
+    "Psalms 42:5",
+    "Psalms 34:18",
+    "Psalms 40:1",
+    "Psalms 40:2",
+    "Isaiah 61:3"
+   ],
+   "pooled_refs": [
+    "Psalms 18:6",
+    "Psalms 31:9",
+    "Psalms 43:5",
+    "Psalms 86:4",
+    "Psalms 94:19",
+    "Psalms 119:28",
+    "Psalms 143:7",
+    "Jeremiah 31:25",
+    "Lamentations 3:24",
+    "Micah 7:8",
+    "John 14:1",
+    "2 Corinthians 7:6"
+   ]
+  }
+ ]
+}

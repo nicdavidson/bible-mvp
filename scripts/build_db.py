@@ -185,8 +185,8 @@ IMPORT_STEPS = [
     },
     {
         "name": "naves",
-        "description": "Nave's Topical Bible (5,319 topics, 49K refs)",
-        "version": "1.0",
+        "description": "Nave's Topical Bible (5,319 topics, 76K refs)",
+        "version": "1.1",  # 1.1: keep same-book continuations ("PSA 37:5; 55:22"), +26K refs
         "script": "import_naves.py",
         "requires_data": "naves/NavesTopicalDictionary.csv",
     },
@@ -204,6 +204,15 @@ IMPORT_STEPS = [
         "description": "Word study tables: lemma profiles, collocates, topics, xrefs, samples",
         "version": "1.0",
         "script": "build_word_study.py",
+    },
+    {
+        # Needs numpy, onnxruntime, tokenizers; model pinned in backend/semantic.py and
+        # cached in data/models/ (docs/SEMANTIC_SEARCH_2026-11.md). Bump version on any
+        # change to the model, ALPHA, or unit texts.
+        "name": "embeddings",
+        "description": "Meaning-search vectors, one per BSB verse (int8 + sign bits)",
+        "version": "1.0",
+        "script": "build_embeddings.py",
     },
     {
         "name": "tidy",

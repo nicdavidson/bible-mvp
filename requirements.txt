@@ -1,3 +1,8 @@
 fastapi==0.128.8
 uvicorn[standard]==0.30.0
 slowapi==0.1.9
+# Meaning search (backend/semantic.py). Optional at runtime: without them the
+# /api/search/meaning endpoint falls back to keyword search.
+numpy==2.5.4
+onnxruntime==1.31.1
+tokenizers==0.23.3

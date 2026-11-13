@@ -18,6 +18,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .database import get_db_connection, get_writable_db_connection, init_db, DATABASE_PATH
 from .core import limiter
+from .release import search_etag
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,10 @@ app.mount("/static", StaticFiles(directory=frontend_path / "static"), name="stat
 # This enables free scaling via CDN (e.g. Cloudflare) without any code changes.
 CACHE_LONG = "public, max-age=86400"  # 24 hours for immutable content
 CACHE_SHORT = "public, max-age=3600"  # 1 hour for semi-dynamic content (devotionals)
+# Search depends on the loaded DB release and the image: 1 h, plus an ETag tied to both
+# (backend/release.py) so a client revalidates for free and a new release is never stale
+# for more than an hour. Handlers may set their own Cache-Control (fallbacks: no-store).
+CACHE_SEARCH = "public, max-age=3600"
 
 # Paths that serve immutable Bible data (passages, commentary, cross-refs, interlinear, lexicon)
 _CACHEABLE_PREFIXES = (
@@ -115,9 +120,20 @@ async def add_security_headers(request: Request, call_next):
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):
     """Add Cache-Control headers to API responses for CDN-friendly caching."""
-    response: Response = await call_next(request)
     path = request.url.path
-    if response.status_code == 200:
+    etag = None
+    if path.startswith("/api/search"):
+        etag = search_etag(str(request.url.path) + "?" + str(request.url.query))
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers={"ETag": etag,
+                                                      "Cache-Control": CACHE_SEARCH})
+    response: Response = await call_next(request)
+    if response.status_code == 200 and "cache-control" in response.headers:
+        pass  # the handler decided (e.g. no-store for a keyword fallback)
+    elif response.status_code == 200 and etag:
+        response.headers["Cache-Control"] = CACHE_SEARCH
+        response.headers["ETag"] = etag
+    elif response.status_code == 200:
         # Service worker must never be cached — browser needs to fetch fresh to detect updates
         if path == "/static/sw.js":
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -193,8 +209,10 @@ def root():
 
 from .routers import passages, words, devotional, plans, offline, crossref_map, topics, study  # noqa: E402
 from .routers import hymns, wordstudy  # noqa: E402
+from .routers import semantic as semantic_search  # noqa: E402
 
-for _r in (passages, words, devotional, plans, offline, crossref_map, topics, study, wordstudy, hymns):
+for _r in (passages, words, devotional, plans, offline, crossref_map, topics, study, wordstudy, hymns,
+           semantic_search):
     app.include_router(_r.router)
 
 @app.get("/map")
