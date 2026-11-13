@@ -2692,6 +2692,25 @@ textarea:focus:not(:focus-visible) {
         padding: 0.5rem 0.75rem;
         font-size: 0.8125rem;
     }
+}
+
+/* Phones: five tabs don't fit in one row; scroll them rather than wrap one onto a second */
+@media (max-width: 480px) {
+    .settings-nav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        /* the last tab fades at the edge: there is more to scroll to */
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+        mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+        padding-right: 16px;
+    }
+    .settings-nav::-webkit-scrollbar { display: none; }
+    .settings-nav-btn {
+        flex: 0 0 auto;
+        min-height: 44px;
+        padding: 0.5rem 0.625rem;
+    }
 
     .setting-row {
         flex-direction: column;

@@ -26,6 +26,7 @@ window.BibleModules = window.BibleModules || {};
         'brooks-summarized-bible', 'mackintosh-notes-on-the-pentateuch', 'larkin-on-revelation',
         'treasury-of-david',
     ];
+    const CHIP_MARGIN = 14;                 // the active chip never sits closer than this to an edge
     const chapterCache = new Map();         // "Book|ch|slug" -> entries (whole chapter)
     let paneObserver = null;
 
@@ -254,7 +255,35 @@ window.BibleModules = window.BibleModules || {};
         };
     }
 
-    window.BibleStudyText = { analyzeEntry, entryOutline, whoLine, parseRefParts };
+    // The reader's saved order merged with the library's default order. Saved slugs no
+    // longer in the library are dropped. A source the saved order doesn't know (added in a
+    // later release) goes where the default order puts it: straight after the nearest source
+    // that comes before it by default, or first if none does.
+    function mergeOrder(saved, defaults) {
+        const known = new Set(defaults);
+        const out = [];
+        for (const s of saved || []) if (known.has(s) && !out.includes(s)) out.push(s);
+        defaults.forEach((slug, i) => {
+            if (out.includes(slug)) return;
+            let at = 0;
+            for (let j = i - 1; j >= 0; j--) {
+                const k = out.indexOf(defaults[j]);
+                if (k >= 0) { at = k + 1; break; }
+            }
+            out.splice(at, 0, slug);
+        });
+        return out;
+    }
+
+    // Default rank: the owner's sort_order from the server; DEFAULT_ORDER when the metadata
+    // lacks one (offline with no metadata saved yet)
+    function defaultRank(src) {
+        if (Number.isFinite(src.sort_order) && src.sort_order < 1000) return src.sort_order;
+        const i = DEFAULT_ORDER.indexOf(src.slug);
+        return i >= 0 ? (i + 1) * 10 : 1e4;
+    }
+
+    window.BibleStudyText = { analyzeEntry, entryOutline, whoLine, parseRefParts, mergeOrder };
 
     // IndexedDB can hold the same entry under an old key (source:book:ch:start) and a new
     // one (…:start-end); keep one of each, ordered by start then span.
@@ -288,11 +317,13 @@ window.BibleModules = window.BibleModules || {};
             prevLabel: null,      // label of the study location Back returns to
             info: null,           // source shown in the info sheet
             peek: null,           // { ref, text, loading, error } for a reference tapped in commentary
-            manage: false,
+            all: false,           // the "All" sheet: every enabled source and what it has here
+            reveal: null,         // a hidden source opened by link: shown for this visit only
         },
+        studyPrefsRev: 0,         // bumped on every save, so views that read the prefs re-render
         studyPanes: {},           // slug -> { status, html, note, focusCount }
         studyHint: null,
-        studySourceMeta: [],      // every source's metadata (for credits in search results)          // { key, withComment, total } for the reader's selection
+        studySourceMeta: [],      // every source's metadata (credits in search results, Settings > Commentaries)
         _studyDepth: 0,
         _studyOpener: null,
         _studyGen: 0,
@@ -307,16 +338,26 @@ window.BibleModules = window.BibleModules || {};
             fetch('/api/commentary/sources').then(r => r.ok ? r.json() : null).then(d => {
                 if (d?.sources) { this.studySourceMeta = d.sources; writeJSON(META_KEY, d.sources); }
             }).catch(() => {});
+            // The chip area narrows when the swap or Hymns button appears after the view has
+            // placed the active chip (hymns load last): keep that chip in view
+            const chips = document.querySelector('#study-view .study-chips');
+            if (chips && window.ResizeObserver) {
+                new ResizeObserver(() => this.study.open && this.studyRevealChip(this.study.active, false)).observe(chips);
+            }
+            // Settings > Commentaries opened from the study view: back to the study view after
+            this.$watch('showSettings', (v) => { if (!v) this.studyResumeFromSettings(); });
             // Availability hint for the reader's selection (peek chip + action bar)
             this.$watch('highlightedVerses', () => this.studyRefreshHint());
             this.$watch('currentReference', () => this.studyRefreshHint());
         },
 
+        // Per device, in localStorage (wrapped: with storage blocked, defaults apply)
         studyPrefs() {
-            const p = readJSON(PREFS_KEY, {});
+            void this.studyPrefsRev;   // dependency: re-render when the prefs are saved
+            const p = readJSON(PREFS_KEY, {}) || {};
             return { order: Array.isArray(p.order) ? p.order : [], hidden: Array.isArray(p.hidden) ? p.hidden : [], last: p.last || null };
         },
-        studySavePrefs(p) { writeJSON(PREFS_KEY, p); },
+        studySavePrefs(p) { writeJSON(PREFS_KEY, p); this.studyPrefsRev++; },
 
         // Reader selection as a contiguous span: tapping 16 then 18 studies 16-18.
         studySelectionRef() {
@@ -376,8 +417,9 @@ window.BibleModules = window.BibleModules || {};
 
             Object.assign(this.study, {
                 open: true, loading: true, error: null, book: parsed.book, chapter: parsed.chapter,
-                vs: parsed.vs, ve: parsed.ve, peek: null, info: null, manage: false, stripCollapsed: false,
+                vs: parsed.vs, ve: parsed.ve, peek: null, info: null, all: false, stripCollapsed: false,
             });
+            if (!wasOpen) this.study.reveal = null;
             if (history === 'push') this.study.prevLabel = wasOpen ? prevLabel : null;
             if (dlg && !dlg.open) {
                 dlg.showModal();
@@ -402,9 +444,11 @@ window.BibleModules = window.BibleModules || {};
             // Whole-chapter study is shown as a range so the strip and steps work
             if (!parsed.vs) { this.study.vs = data.verse_start; this.study.ve = data.verse_end; }
 
-            const track = this.studyTrack();
             const prefs = this.studyPrefs();
             const want = [keepSource, prefs.last].map(x => x && slugify(x));
+            // A link to a source the reader has turned off still opens it, for this visit
+            if (source && want[0] && prefs.hidden.includes(want[0])) this.study.reveal = want[0];
+            const track = this.studyTrack();
             // Cross-references and Notes open by name (deep link, the reader's Refs/Note
             // buttons); otherwise the asked-for or remembered source if it has something on
             // the selection, else the first source in the track that does. A deep link to a
@@ -435,8 +479,7 @@ window.BibleModules = window.BibleModules || {};
                 this.studyScrollToSource(active, false);
                 if (active) {
                     if (!this.studyIsTool(active)) this.studyLoadPane(active);
-                    document.querySelector(`.study-chip[data-slug="${CSS.escape(active)}"]`)
-                        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    this.studyRevealChip(active, false);
                 }
                 if (!wasOpen) document.getElementById('study-title')?.focus({ preventScroll: true });
             });
@@ -467,7 +510,9 @@ window.BibleModules = window.BibleModules || {};
             this.study.open = false;
             this.study.peek = null;
             this.study.info = null;
-            this.study.manage = false;
+            this.study.all = false;
+            this.study.reveal = null;
+            this._studyResume = false;
             this._studyDepth = 0;
             this._studyGen++;
             if (paneObserver) { paneObserver.disconnect(); paneObserver = null; }
@@ -691,24 +736,31 @@ window.BibleModules = window.BibleModules || {};
         },
 
         // ---------- sources: order, availability, switching ----------
-        studyOrdered() {
-            const prefs = this.studyPrefs();
-            // The reader's saved order; a first-time reader gets DEFAULT_ORDER
-            const base = prefs.order.length ? prefs.order : DEFAULT_ORDER;
-            const rank = new Map(base.map((s, i) => [s, i]));
-            return this.study.sources
-                .map((s, i) => ({ s, i }))
-                .sort((a, b) => (rank.has(a.s.slug) ? rank.get(a.s.slug) : 1e4 + a.i) - (rank.has(b.s.slug) ? rank.get(b.s.slug) : 1e4 + b.i))
-                .map(x => x.s);
+        // Any list of sources (study.sources, or the metadata for Settings) in the reader's order
+        studyOrderOf(list) {
+            const defaults = [...list].sort((a, b) => defaultRank(a) - defaultRank(b)
+                || String(a.source).localeCompare(String(b.source))).map(s => s.slug);
+            const order = mergeOrder(this.studyPrefs().order, defaults);
+            const bySlug = new Map(list.map(s => [s.slug, s]));
+            return order.map(slug => bySlug.get(slug));
         },
-        studyTrack() {
-            const hidden = new Set(this.studyPrefs().hidden);
-            return this.studyOrdered().filter(s => !hidden.has(s.slug) && s.selection_entries > 0);
+        // Turned-off sources that exist. If every one is off (an old device, or a library
+        // that changed under it), none are: the study view never ends up with no sources.
+        studyHiddenOf(list) {
+            const slugs = new Set(list.map(s => s.slug));
+            const hidden = new Set(this.studyPrefs().hidden.filter(h => slugs.has(h)));
+            if (hidden.size >= slugs.size) hidden.clear();
+            return hidden;
         },
-        studyEmpty() {
-            const hidden = new Set(this.studyPrefs().hidden);
-            return this.studyOrdered().filter(s => !hidden.has(s.slug) && !(s.selection_entries > 0));
+        studyOrdered() { return this.studyOrderOf(this.study.sources); },
+        // Sources the reader reads: the rail, the swipe order and the All sheet
+        studyEnabled() {
+            const hidden = this.studyHiddenOf(this.study.sources);
+            return this.studyOrdered().filter(s => !hidden.has(s.slug) || s.slug === this.study.reveal);
         },
+        // The ones with something on the selection: chips and panes
+        studyTrack() { return this.studyEnabled().filter(s => s.selection_entries > 0); },
+        studyEmpty() { return this.studyEnabled().filter(s => !(s.selection_entries > 0)); },
         studyActiveSource() {
             return this.study.sources.find(s => s.slug === this.study.active) || null;
         },
@@ -750,12 +802,32 @@ window.BibleModules = window.BibleModules || {};
             }
             this.studyLoadPane(slug);
             if (scroll) this.studyScrollToSource(slug, true);
-            this.$nextTick(() => document.querySelector(`.study-chip[data-slug="${CSS.escape(slug)}"], .study-tool[data-slug="${CSS.escape(slug)}"]`)
-                ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' }));
+            this.studyRevealChip(slug, true);
+        },
+
+        // Scroll the chip row (only the row, nothing around it) so the active chip is fully
+        // in view with a margin. After layout: the row's width and contents change as the
+        // view settles (swap and Hymns buttons appear, chips re-render).
+        studyRevealChip(slug, smooth = false) {
+            if (!slug || this.studyIsTool(slug)) return;
+            this.$nextTick(() => requestAnimationFrame(() => {
+                const row = document.querySelector('#study-view .study-chips');
+                const chip = row?.querySelector(`.study-chip[data-slug="${CSS.escape(slug)}"]`);
+                if (!chip || !row.clientWidth) return;
+                const box = row.getBoundingClientRect();
+                const r = chip.getBoundingClientRect();
+                let dx = 0;
+                // Too wide for the margins (a narrow row): centred
+                if (r.width > box.width - 2 * CHIP_MARGIN) dx = (r.left + r.right - box.left - box.right) / 2;
+                else if (r.left < box.left + CHIP_MARGIN) dx = r.left - box.left - CHIP_MARGIN;
+                else if (r.right > box.right - CHIP_MARGIN) dx = r.right - box.right + CHIP_MARGIN;
+                if (Math.abs(dx) < 1) return;
+                row.scrollBy({ left: dx, behavior: smooth && !reduceMotion() ? 'smooth' : 'auto' });
+            }));
         },
 
         studySwap() {
-            if (this.study.previous && this.studySourceBySlug(this.study.previous)?.selection_entries > 0) {
+            if (this.study.previous && this.studyTrack().some(s => s.slug === this.study.previous)) {
                 this.studySelect(this.study.previous);
             }
         },
@@ -818,7 +890,7 @@ window.BibleModules = window.BibleModules || {};
             this.openStudy(`${book} ${chapter}:${vs}-${ve}`, { history: 'replace' });
         },
 
-        // ---------- source info + manage ----------
+        // ---------- source info ----------
         studyShowInfo(slug) {
             this.study.info = this.studySourceBySlug(slug || this.study.active);
             this.$nextTick(() => document.getElementById('study-info')?.showModal());
@@ -840,42 +912,129 @@ window.BibleModules = window.BibleModules || {};
             if (n) this.openStudy(`${this.study.book} ${this.study.chapter}:${n.start}-${n.end}`, { source: src.slug, history: 'push' });
         },
 
-        studyOpenManage() {
-            this.study.manage = true;
-            this.$nextTick(() => document.getElementById('study-manage')?.showModal());
+        // ---------- the All sheet: every enabled source and what it has here ----------
+        studyOpenAll() {
+            this.study.all = true;
+            this.$nextTick(() => {
+                const dlg = document.getElementById('study-all');
+                if (!dlg || dlg.open) return;
+                dlg.showModal();
+                // Start on the active source's row (the browser would pick the close button)
+                (dlg.querySelector('.study-all-item[aria-current="true"]') || dlg.querySelector('.study-all-item'))
+                    ?.focus({ preventScroll: false });
+            });
         },
-        studyCloseManage() {
-            document.getElementById('study-manage')?.close();
-            this.study.manage = false;
-            this.$nextTick(() => this.studyObservePanes());
+        studyCloseAll() {
+            document.getElementById('study-all')?.close();
+        },
+        // The dialog's close event (Done, Escape, Android back, a choice): focus back on All
+        studyAllClosed() {
+            this.study.all = false;
+            if (this.study.open && !this._studyResume) document.querySelector('#study-view .study-all-btn')?.focus({ preventScroll: true });
+        },
+        studyAllPick(slug) {
+            this.studyCloseAll();
+            this.studySelect(slug);
+        },
+        studyAllNearest(src) {
+            const n = src?.nearest;
+            this.studyCloseAll();
+            if (n) this.openStudy(`${this.study.book} ${this.study.chapter}:${n.start}-${n.end}`, { source: src.slug, history: 'push' });
+        },
+        // What a source has on the selection, in words, for the All sheet
+        studyAllScope(src) {
+            if (src.not_saved) return "Not saved for offline use";
+            if (!(src.selection_entries > 0)) return 'Nothing here';
+            const scope = this.studyChipScope(src);
+            if (scope === 'chapter') return `On the whole ${this.study.book === 'Psalms' ? 'psalm' : 'chapter'}`;
+            const m = scope.match(/^v(\d+)(?:–(\d+))?$/);
+            if (!m) return scope;
+            const lo = +m[1]; const hi = m[2] ? +m[2] : lo;
+            return lo === hi ? `Verse note, verse ${lo}` : `Passage note, verses ${lo}–${hi}`;
+        },
+        studyNearestLabel(n) { return n.start === n.end ? `verse ${n.start}` : `verses ${n.start}–${n.end}`; },
+
+        // ---------- Settings > Commentaries (per device) ----------
+        // From the study view: the view steps aside (Settings isn't in the top layer) and
+        // comes back where it was when Settings closes, with the changes applied.
+        studyChooseSources() {
+            this._studyResume = this.study.open;
+            this.studyCloseAll();
+            document.getElementById('study-view')?.close();
+            this.openSettings('commentaries');
+            this.$nextTick(() => {
+                const tab = document.querySelector('.settings-modal .settings-nav-btn.active');
+                tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                tab?.focus({ preventScroll: true });
+            });
+        },
+        studyResumeFromSettings() {
+            if (!this._studyResume) return;
+            this._studyResume = false;
+            if (!this.study.open) return;   // the reader went elsewhere meanwhile
+            // The track re-renders and is placed below; that isn't the reader swiping
+            this._studyProgrammatic = Date.now();
+            const dlg = document.getElementById('study-view');
+            if (dlg && !dlg.open) dlg.showModal();
+            // The source in view was turned off: the first one left that has something here
+            if (!this.studyIsTool(this.study.active) && !this.studyTrack().some(s => s.slug === this.study.active)) {
+                const next = this.studyTrack()[0]?.slug || null;
+                if (next) this.studySelect(next, { scroll: false });
+                else this.study.active = null;
+            }
+            this.$nextTick(() => {
+                this.studyObservePanes();
+                this.studyScrollToSource(this.study.active, false);
+                this.studyRevealChip(this.study.active, false);
+                document.querySelector('#study-view .study-all-btn')?.focus({ preventScroll: true });
+            });
+        },
+        // Every source in the library, in the reader's order (metadata: works without a study open)
+        studySettingsSources() {
+            const meta = (this.studySourceMeta || []).filter(m => m && m.slug);
+            return meta.length ? this.studyOrderOf(meta) : [];
+        },
+        studySettingsHidden() { return this.studyHiddenOf(this.studySettingsSources()); },
+        studyIsHidden(slug) { return this.studySettingsHidden().has(slug); },
+        // The last source still on can't be turned off
+        studyIsLastShown(slug) {
+            const list = this.studySettingsSources();
+            const hidden = this.studySettingsHidden();
+            return !hidden.has(slug) && list.length - hidden.size <= 1;
         },
         studyMove(slug, dir) {
-            const order = this.studyOrdered().map(s => s.slug);
+            const order = this.studySettingsSources().map(s => s.slug);
             const i = order.indexOf(slug); const j = i + dir;
             if (i < 0 || j < 0 || j >= order.length) return;
             [order[i], order[j]] = [order[j], order[i]];
             this.studySavePrefs({ ...this.studyPrefs(), order });
-            this.study.sources = [...this.study.sources];   // re-render order
+            // Keep focus on the arrow pressed; at the end of the list, on the other one
             this.$nextTick(() => {
-                document.querySelector(`#study-manage [data-move="${CSS.escape(slug)}:${dir}"]`)?.focus();
-                this.studyScrollToSource(this.study.active, false);
+                const btn = document.querySelector(`[data-move="${CSS.escape(slug)}:${dir}"]`);
+                (btn && !btn.disabled ? btn : document.querySelector(`[data-move="${CSS.escape(slug)}:${-dir}"]`))?.focus();
             });
         },
-        studyIsHidden(slug) { return this.studyPrefs().hidden.includes(slug); },
         studyToggleHidden(slug) {
+            if (this.studyIsLastShown(slug)) return;
             const prefs = this.studyPrefs();
-            const hidden = new Set(prefs.hidden);
+            const hidden = this.studySettingsHidden();
             hidden.has(slug) ? hidden.delete(slug) : hidden.add(slug);
             this.studySavePrefs({ ...prefs, hidden: [...hidden] });
-            this.study.sources = [...this.study.sources];
-            if (hidden.has(slug) && this.study.active === slug) {
-                this.study.active = this.studyTrack()[0]?.slug || null;
-                if (this.study.active) this.studyLoadPane(this.study.active);
-            }
         },
-        studyResetOrder() {
-            this.studySavePrefs({ ...this.studyPrefs(), order: [], hidden: [] });
-            this.study.sources = [...this.study.sources];
+        studyResetSources() {
+            const { last } = this.studyPrefs();
+            this.studySavePrefs({ order: [], hidden: [], last });
+        },
+        // "John Gill (1697–1771) · 1746 · Baptist (Particular Baptist)"
+        studyMetaLine(src) {
+            const author = String(src.author || '').replace(/(\d)-(\d)/g, '$1–$2');
+            return [author, src.year, src.tradition].filter(Boolean).join(' · ');
+        },
+        // First sentence of the description
+        studyBlurb(src) {
+            const d = String(src.description || '');
+            const m = d.match(/^.*?[.!?](?=\s|$)/);
+            return m ? m[0] : d;
         },
 
         // ---------- references inside commentary ----------

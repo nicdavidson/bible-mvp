@@ -1041,6 +1041,9 @@
                     <button @click="settingsTab = 'general'" :class="{ active: settingsTab === 'general' }" class="settings-nav-btn">
                         General
                     </button>
+                    <button @click="settingsTab = 'commentaries'" :class="{ active: settingsTab === 'commentaries' }" class="settings-nav-btn">
+                        Commentaries
+                    </button>
                     <button @click="settingsTab = 'tags'" :class="{ active: settingsTab === 'tags' }" class="settings-nav-btn">
                         Tags
                         <span class="tag-count-badge" x-show="tags.length > 0" x-text="tags.length"></span>
@@ -1261,6 +1264,44 @@
                             </div>
                             <button type="button" class="btn-reset-colors setting-tour-btn" @click="showSettings = false; tourStart()">Show the walkthrough</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Commentaries: which sources the study view shows, and in what order (modules/study.js) -->
+                <div class="settings-content" x-show="settingsTab === 'commentaries'">
+                    <div class="settings-section">
+                        <h4>Commentaries</h4>
+                        <p class="settings-description">Choose which commentaries the study view shows, and in what order. Saved on this device.</p>
+                        <p class="settings-description" x-show="!studySettingsSources().length">Open the study view once while online to see the commentaries.</p>
+                        <ol class="cm-list">
+                            <template x-for="(src, i) in studySettingsSources()" :key="'cm-' + src.slug">
+                                <li class="cm-row" :data-slug="src.slug" :class="{ 'is-off': studyIsHidden(src.slug) }">
+                                    <div class="cm-text">
+                                        <div class="cm-name" :id="'cm-name-' + src.slug" x-text="src.source"></div>
+                                        <div class="cm-meta" x-text="studyMetaLine(src)"></div>
+                                        <div class="cm-desc" x-show="src.description" x-text="studyBlurb(src)"></div>
+                                    </div>
+                                    <div class="cm-controls">
+                                        <label class="toggle-switch cm-switch" :title="studyIsLastShown(src.slug) ? 'At least one commentary stays on' : ''">
+                                            <input type="checkbox" role="switch" :checked="!studyIsHidden(src.slug)"
+                                                   :disabled="studyIsLastShown(src.slug)" @change="studyToggleHidden(src.slug); $event.target.checked = !studyIsHidden(src.slug)"
+                                                   :aria-label="'Show ' + src.source">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                        <div class="cm-move">
+                                            <button type="button" class="cm-move-btn" :data-move="src.slug + ':-1'" @click="studyMove(src.slug, -1)" :disabled="i === 0" :aria-label="'Move ' + src.source + ' up'">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+                                            </button>
+                                            <button type="button" class="cm-move-btn" :data-move="src.slug + ':1'" @click="studyMove(src.slug, 1)" :disabled="i === studySettingsSources().length - 1" :aria-label="'Move ' + src.source + ' down'">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </li>
+                            </template>
+                        </ol>
+                        <p class="settings-description cm-rule">At least one commentary stays on. A link to a commentary you've turned off still opens it.</p>
+                        <button type="button" class="btn-reset-colors cm-reset" @click="studyResetSources()">Reset to default</button>
                     </div>
                 </div>
 
@@ -2694,29 +2735,27 @@
             </section>
 
             <nav class="study-rail" aria-label="Commentary sources">
-                <button type="button" class="study-swap" x-show="study.previous && studySourceBySlug(study.previous)?.selection_entries > 0"
+                <button type="button" class="study-swap" x-show="study.previous && studyTrack().some(s => s.slug === study.previous)"
                         @click="studySwap()" :aria-label="'Switch back to ' + (studySourceBySlug(study.previous)?.source || '')">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg>
-                    <span x-text="studySourceBySlug(study.previous)?.short_name"></span>
+                    <span class="study-swap-name" x-text="studySourceBySlug(study.previous)?.short_name"></span>
                 </button>
-                <div class="study-chips">
-                    <template x-for="src in studyTrack()" :key="'chip-' + src.slug">
-                        <button type="button" class="study-chip" :data-slug="src.slug" :aria-pressed="study.active === src.slug ? 'true' : 'false'"
-                                :aria-label="studyChipLabel(src)" @click="study.active === src.slug ? studyShowInfo(src.slug) : studySelect(src.slug)">
-                            <span class="study-chip-name" x-text="src.short_name"></span>
-                            <span class="study-chip-scope" x-text="studyChipScope(src)"></span>
-                        </button>
-                    </template>
-                    <template x-if="studyEmpty().length && !study.loading">
-                        <span class="study-chips-gap">Nothing on <span x-text="study.vs === study.ve ? 'v' + study.vs : 'these verses'"></span></span>
-                    </template>
-                    <template x-for="src in studyEmpty()" :key="'chip-e-' + src.slug">
-                        <button type="button" class="study-chip is-empty" :data-slug="src.slug" :aria-label="studyChipLabel(src)" @click="studyShowInfo(src.slug)">
-                            <span class="study-chip-name" x-text="src.short_name"></span>
-                        </button>
-                    </template>
-                    <button type="button" class="study-icon-btn study-manage-btn" @click="studyOpenManage()" aria-label="Choose and order commentary sources">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+                <!-- Chips: only sources with something on the selection, in the reader's order.
+                     All (pinned, never scrolled away) lists every source, the rest included. -->
+                <div class="study-sources">
+                    <div class="study-chips" role="group" aria-label="Commentaries on these verses">
+                        <template x-for="src in studyTrack()" :key="'chip-' + src.slug">
+                            <button type="button" class="study-chip" :data-slug="src.slug" :aria-pressed="study.active === src.slug ? 'true' : 'false'"
+                                    :aria-label="studyChipLabel(src)" @click="study.active === src.slug ? studyShowInfo(src.slug) : studySelect(src.slug)">
+                                <span class="study-chip-name" x-text="src.short_name"></span>
+                                <span class="study-chip-scope" x-text="studyChipScope(src)"></span>
+                            </button>
+                        </template>
+                        <span class="study-chips-none" x-show="!study.loading && !studyTrack().length">Nothing here</span>
+                    </div>
+                    <button type="button" class="study-all-btn" @click="studyOpenAll()" aria-haspopup="dialog"
+                            :aria-label="'All commentaries: ' + studyEnabled().length + ', ' + studyTrack().length + ' with something here'">
+                        <span>All</span><span class="study-all-count" x-text="studyEnabled().length || ''"></span>
                     </button>
                 </div>
                 <!-- Pinned at the thumb end: Scripture's own links and the reader's notes (modules/study_panes.js) -->
@@ -2787,7 +2826,7 @@
                 </template>
                 <div class="study-empty" x-show="!study.loading && !study.error && studyTrack().length === 0">
                     <p class="study-empty-title">No commentary on <span x-text="studyRefLabel()"></span> yet</p>
-                    <p x-show="studyEmpty().length">Tap a source below to see where it comments nearby, or try a wider range of verses.</p>
+                    <p x-show="studyEmpty().length">Tap All below to see where each commentary comments nearby, or try a wider range of verses.</p>
                 </div>
                 <div class="study-empty" x-show="study.loading"><div class="loading-spinner"></div></div>
                 <div class="study-empty" x-show="study.error">
@@ -3106,38 +3145,47 @@
             </template>
         </dialog>
 
-        <!-- Choose and order sources -->
-        <dialog id="study-manage" class="study-sheet" aria-labelledby="study-manage-title" @close="study.manage = false" @click.self="studyCloseManage()">
-            <div class="study-sheet-inner" x-show="study.manage">
+        <!-- All: every source the reader has on, what each has on the selection (modules/study.js) -->
+        <dialog id="study-all" class="study-sheet" aria-labelledby="study-all-title" @close="studyAllClosed()" @click.self="studyCloseAll()">
+            <div class="study-sheet-inner" x-show="study.all">
                 <div class="study-sheet-head">
-                    <h3 id="study-manage-title">Your sources</h3>
-                    <button type="button" class="study-icon-btn" @click="studyCloseManage()" aria-label="Done">
+                    <h3 id="study-all-title">Commentaries on <span x-text="studyRefLabel()"></span></h3>
+                    <button type="button" class="study-icon-btn" @click="studyCloseAll()" aria-label="Close">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
                     </button>
                 </div>
-                <p class="study-sheet-hint">Sources show in this order. Turn off the ones you don't read.</p>
-                <ol class="study-manage-list">
-                    <template x-for="(src, i) in studyOrdered()" :key="'m-' + src.slug">
-                        <li :class="{ 'is-hidden': studyIsHidden(src.slug) }">
-                            <label class="study-manage-name">
-                                <input type="checkbox" :checked="!studyIsHidden(src.slug)" @change="studyToggleHidden(src.slug)">
-                                <span>
-                                    <span x-text="src.source"></span>
-                                    <small x-text="studyKindLabel(src.kind)"></small>
-                                </span>
-                            </label>
-                            <button type="button" class="study-icon-btn" :data-move="src.slug + ':-1'" @click="studyMove(src.slug, -1)" :disabled="i === 0" :aria-label="'Move ' + src.source + ' up'">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
-                            </button>
-                            <button type="button" class="study-icon-btn" :data-move="src.slug + ':1'" @click="studyMove(src.slug, 1)" :disabled="i === studyOrdered().length - 1" :aria-label="'Move ' + src.source + ' down'">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-                            </button>
+                <ul class="study-all-list">
+                    <template x-for="src in (study.all ? studyEnabled() : [])" :key="'all-' + src.slug">
+                        <li :data-slug="src.slug" :class="{ 'is-empty': !(src.selection_entries > 0) }">
+                            <template x-if="src.selection_entries > 0">
+                                <button type="button" class="study-all-item" @click="studyAllPick(src.slug)"
+                                        :aria-current="study.active === src.slug ? 'true' : 'false'">
+                                    <span class="study-all-top">
+                                        <span class="study-all-short" x-text="src.short_name"></span>
+                                        <span class="study-all-scope" x-text="studyAllScope(src)"></span>
+                                        <span class="study-all-here" x-show="study.active === src.slug">Showing</span>
+                                    </span>
+                                    <span class="study-all-name" x-text="src.source"></span>
+                                    <span class="study-all-trad" x-show="src.tradition" x-text="src.tradition"></span>
+                                </button>
+                            </template>
+                            <template x-if="!(src.selection_entries > 0)">
+                                <div class="study-all-item">
+                                    <span class="study-all-top">
+                                        <span class="study-all-short" x-text="src.short_name"></span>
+                                        <span class="study-all-scope" x-text="studyAllScope(src)"></span>
+                                    </span>
+                                    <span class="study-all-name" x-text="src.source"></span>
+                                    <span class="study-all-trad" x-show="src.tradition" x-text="src.tradition"></span>
+                                    <button type="button" class="study-text-btn study-all-nearest" x-show="src.nearest" @click="studyAllNearest(src)"
+                                            x-text="src.nearest ? 'Nearest note: study ' + studyNearestLabel(src.nearest) : ''"></button>
+                                </div>
+                            </template>
                         </li>
                     </template>
-                </ol>
+                </ul>
                 <div class="study-sheet-actions">
-                    <button type="button" class="study-primary-btn" @click="studyCloseManage()">Done</button>
-                    <button type="button" class="study-text-btn" @click="studyResetOrder()">Reset to default order</button>
+                    <button type="button" class="study-text-btn study-all-choose" @click="studyChooseSources()">Choose commentaries…</button>
                 </div>
             </div>
         </dialog>

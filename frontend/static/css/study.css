@@ -198,7 +198,7 @@ dialog.study-view::backdrop { background: var(--color-bg); }
     align-items: center;
     gap: 4px;
     min-height: var(--study-rail-h);
-    padding: 6px 4px calc(6px + env(safe-area-inset-bottom)) 8px;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom)) 2px;
     border-top: 1px solid var(--color-border);
     background: var(--color-surface);
 }
@@ -210,8 +210,12 @@ dialog.study-view::backdrop { background: var(--color-bg); }
     gap: 6px;
     overflow-x: auto;
     scrollbar-width: none;
-    padding: 2px;
-    scroll-padding-inline: 12px;
+    /* Room at both ends, so the first and last chips can sit clear of the fades below
+       (study.js keeps the active chip CHIP_MARGIN from either edge) */
+    padding: 2px 12px 2px 8px;
+    /* A chip cut by the edge fades out instead of ending hard against All */
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 6px, #000 calc(100% - 10px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 6px, #000 calc(100% - 10px), transparent 100%);
 }
 .study-chips::-webkit-scrollbar { display: none; }
 .study-chip {
@@ -242,19 +246,40 @@ dialog.study-view::backdrop { background: var(--color-bg); }
     color: var(--color-surface);
 }
 .study-chip[aria-pressed="true"] .study-chip-scope { color: inherit; opacity: 0.8; }
-.study-chip.is-empty {
-    border-style: dashed;
-    background: transparent;
-    color: var(--study-meta);
-    font-weight: 500;
-}
-.study-chips-gap {
+.study-chips-none {
     flex: none;
-    padding: 0 2px 0 8px;
-    font: 500 0.75rem var(--font-sans);
+    padding: 0 8px;
+    font: 500 0.8rem var(--font-sans);
     color: var(--study-meta);
     white-space: nowrap;
 }
+/* Chips and All share the space left of the tools; All never scrolls away */
+.study-sources {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.study-all-btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+    font: 600 0.85rem var(--font-sans);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.study-all-count { font-weight: 500; color: var(--study-meta); font-variant-numeric: tabular-nums; }
+.study-all-btn:hover { background: var(--color-surface-hover); }
 .study-swap {
     flex: none;
     display: inline-flex;
@@ -304,7 +329,6 @@ dialog.study-view::backdrop { background: var(--color-bg); }
 .study-tool[aria-pressed="true"] { background: var(--color-text); color: var(--color-surface); }
 .study-tool[aria-pressed="true"] .study-tool-label { color: inherit; }
 .study-tool:hover:not([aria-pressed="true"]) { background: var(--color-surface-hover); }
-.study-chips .study-manage-btn { color: var(--study-meta); }
 
 /* Phones: commentary is the main use, so the tools give it room. Each tool keeps its icon
    and count (its name is in aria-label and its pane's title); the short label goes. With
@@ -320,6 +344,29 @@ dialog.study-view::backdrop { background: var(--color-bg); }
     }
     .study-chip { padding: 0 12px; gap: 5px; }
     .study-chips { gap: 5px; }
+    /* The swap button is its icon (its aria-label names the source): the chips need the room */
+    .study-swap { min-width: 44px; justify-content: center; padding: 0 8px; }
+    .study-swap-name {
+        position: absolute; width: 1px; height: 1px; overflow: hidden;
+        clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+    }
+    /* All stacks its count under the word, like the tools beside it */
+    .study-all-btn {
+        flex-direction: column;
+        gap: 0;
+        width: 44px;
+        min-height: 48px;
+        padding: 0;
+        border-radius: 10px;
+        line-height: 1.1;
+    }
+    .study-all-count { font-size: 0.75rem; }
+}
+@media (max-width: 380px) {
+    .study-chip { padding: 0 10px; gap: 4px; }
+    .study-chip-scope { font-size: 0.74rem; }
+    .study-chips { gap: 4px; padding-left: 6px; }
+    .study-sources { gap: 2px; }
 }
 
 /* ---------- panes (scroll-snap carousel: swipe between sources) ---------- */
@@ -796,26 +843,84 @@ dialog.study-sheet[open] { animation: study-sheet-in 0.18s ease-out; }
 .study-peek-error { color: var(--color-text-secondary); }
 #study-peek .study-verses { max-height: 40dvh; overflow-y: auto; }
 
-.study-manage-list { list-style: none; margin: 4px 0 0; padding: 0; max-height: 55dvh; overflow-y: auto; }
-.study-manage-list li {
+/* All: every enabled source and what it has on the selection */
+.study-all-list { list-style: none; margin: 0 -8px; padding: 0; max-height: 62dvh; overflow-y: auto; overscroll-behavior: contain; }
+.study-all-list li + li { border-top: 1px solid var(--color-border); }
+.study-all-item {
     display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 4px 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 8px;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    text-align: left;
+}
+button.study-all-item { cursor: pointer; }
+button.study-all-item:hover { background: var(--color-surface-hover); }
+.study-all-item[aria-current="true"] { background: var(--color-bg-secondary); box-shadow: inset 3px 0 0 var(--color-text); }
+.study-all-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; width: 100%; }
+.study-all-short { font: 650 1rem var(--font-sans); }
+.study-all-scope { font-size: 0.85rem; color: var(--study-meta); font-variant-numeric: tabular-nums; }
+.study-all-here { margin-left: auto; font: 600 0.75rem var(--font-sans); text-transform: uppercase; letter-spacing: 0.04em; }
+.study-all-name { font: 0.92rem/1.35 var(--study-font); }
+.study-all-trad { font-size: 0.8rem; color: var(--study-meta); }
+.study-all-list li.is-empty .study-all-short,
+.study-all-list li.is-empty .study-all-name { color: var(--study-meta); }
+.study-all-nearest { min-height: 44px; margin: 2px 0 -8px; padding: 0; }
+.study-all-choose { min-height: 44px; }
+
+/* Settings > Commentaries: switch and up/down for each source (index.html, modules/study.js) */
+.cm-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.cm-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 12px 0;
     border-bottom: 1px solid var(--color-border);
 }
-.study-manage-list li.is-hidden .study-manage-name { color: var(--study-meta); }
-.study-manage-name {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 44px;
+.cm-name { font-weight: 600; color: var(--color-text); }
+.cm-meta { font-size: 0.8rem; color: var(--color-text-secondary); }
+.cm-desc {
+    margin-top: 2px;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+.cm-row.is-off .cm-name, .cm-row.is-off .cm-meta, .cm-row.is-off .cm-desc { opacity: 0.55; }
+.cm-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+/* The app's switch is 44x24; the label gives it a 44px-tall target */
+.cm-switch.toggle-switch { margin: 0; height: 44px; width: 52px; }
+.cm-switch .toggle-slider { top: 10px; bottom: 10px; left: 4px; right: 4px; }
+.cm-switch input:focus-visible + .toggle-slider { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.cm-switch input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
+.cm-move { display: flex; gap: 2px; }
+.cm-move-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    color: var(--color-text);
     cursor: pointer;
 }
-.study-manage-name input { width: 20px; height: 20px; accent-color: var(--color-text); flex: none; }
-.study-manage-name small { display: block; font-size: 0.78rem; color: var(--study-meta); }
+.cm-move-btn:hover:not(:disabled) { background: var(--color-surface-hover); }
+.cm-move-btn:disabled { opacity: 0.3; cursor: default; }
+.cm-move-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.cm-rule { margin-top: 12px; }
+.cm-reset { margin-top: 4px; min-height: 44px; }
 
 /* ---------- entry points in the reader ---------- */
 .action-bar-study, .action-bar-xrefs { position: relative; }
