@@ -46,7 +46,9 @@ SHIFT_CHECKS = {
     "Catena Aurea": ("marker", r"\s*Ver\.\s*(\d+)"),
     "Tyndale Study Notes": ("marker", r"\s*\d+:(\d+)"),
     "John Calvin": ("marker", r"\s*(\d+)\.\s"),
-    "Keil & Delitzsch": ("selfref", None),
+    # HelloAO K&D entries often open with a "Gen 7:1-12" heading. (Self-references are a weak
+    # signal for K&D: it often opens by referring to the neighbouring verse.)
+    "Keil & Delitzsch": ("marker", r"\s*(?:[1-3] )?[A-Z][a-z]+\.? \d+:(\d+)"),
     "Matthew Henry": ("selfref", None),
     "Scofield Notes (1917)": ("lemma1", r"\s*([A-Za-z][^\n]{2,40})\n"),
 }
