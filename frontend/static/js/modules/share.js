@@ -19,8 +19,7 @@ window.BibleModules.share = {
             if (this.currentPlan) {
                 const today = this.getTodaysPlanDay();
                 if (today) {
-                    this.planDay = today;
-                    this.startPlanReading();
+                    this.readPlanDay(today);
                 } else {
                     // Fallback to opening the reading plan modal
                     this.openReadingPlan();

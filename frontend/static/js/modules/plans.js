@@ -128,27 +128,6 @@ window.BibleModules.plans = {
             }
         },
 
-        // Restore reading plan state from URL (used on page load and popstate)
-        async restorePlanFromURL(planId, day, history = 'replace') {
-            try {
-                // Load the plan data
-                const response = await fetch(`/api/reading-plans/${planId}`);
-                if (response.ok) {
-                    this.currentPlan = await response.json();
-                    this.planDay = Math.max(1, Math.min(day, this.currentPlan.duration_days));
-                    // Start reading the plan
-                    await this.startPlanReading({ history });
-                } else {
-                    console.error('Plan not found:', planId);
-                    // Fallback to home
-                    window.history.replaceState({}, '', '/');
-                }
-            } catch (err) {
-                console.error('Failed to restore plan from URL:', err);
-                window.history.replaceState({}, '', '/');
-            }
-        },
-
         // Show start date picker before starting plan
         planStartDate: '',  // For the date picker input
         showPlanStartPicker: false,
@@ -161,6 +140,9 @@ window.BibleModules.plans = {
             this.planStartDate = `${year}-01-01`;
             this.pendingPlanId = planId;
             this.showPlanStartPicker = true;
+            // It renders below the plan list: bring it into view so "Start" visibly did something (P2-7)
+            this.$nextTick(() => document.querySelector('.plan-start-picker')
+                ?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
         },
 
         async confirmStartPlan() {
@@ -456,16 +438,42 @@ window.BibleModules.plans = {
             return [ref];
         },
 
-        // Load all passages for the day into the main reader view
-        async startPlanReading({ history = 'push' } = {}) {
-            this.error = null;  // a stale passage error hid the whole plan reading (P0-4)
+        // Read a plan day (or the current one) in the reader: one navigation (modules/nav.js)
+        readPlanDay(day = this.planDay, section = null) {
             if (!this.currentPlan) return;
+            return this.navigate({ plan: { id: this.currentPlan.id, day } }, { kind: 'read', section });
+        },
 
-            const readings = this.getPlanDayReadings(this.planDay);
-            if (!readings) return;
+        // Previous/next day in plan reading (header arrows, swipes, arrow keys). Moving
+        // doesn't mark the day complete; only the explicit button does.
+        planStep(dir) {
+            const day = this.planDay + dir;
+            if (!this.currentPlan || day < 1 || day > this.currentPlan.duration_days) return;
+            this.readPlanDay(day);   // "Complete & Next" is the button that marks a day read
+        },
 
+        // Load all passages for a plan day into the main reader view. Called only by
+        // navigate(); returns true when the day is on screen.
+        async _loadPlanDay({ id, day }) {
+            this.error = null;  // a stale passage error hid the whole plan reading (P0-4)
             // Plan loading is a navigation — invalidate stale loaders (B4)
             const gen = ++this._loadGeneration;
+            if (this.currentPlan?.id !== id) {
+                try {
+                    const response = await fetch(`/api/reading-plans/${encodeURIComponent(id)}`);
+                    if (!response.ok) throw new Error(`plan ${id}: HTTP ${response.status}`);
+                    const plan = await response.json();
+                    if (gen !== this._loadGeneration) return false;
+                    this.currentPlan = plan;
+                } catch (err) {
+                    console.error('Failed to load plan:', err);
+                    if (gen === this._loadGeneration) this.showToast("Couldn't open that reading plan.", 'error');
+                    return false;
+                }
+            }
+            this.planDay = Math.max(1, Math.min(day, this.currentPlan.duration_days));
+            const readings = this.getPlanDayReadings(this.planDay);
+            if (!readings) return false;
 
             this.showReadingPlan = false;
             this.loading = true;
@@ -590,12 +598,14 @@ window.BibleModules.plans = {
             }
 
             // Bail if the user navigated away while the plan was loading (B4)
-            if (gen !== this._loadGeneration) return;
+            if (gen !== this._loadGeneration) return false;
 
             // Set combined verses in the main reader
             this.verses = allVerses;
             this.currentReference = `${this.currentPlan.name} - Day ${this.planDay}`;
             this.highlightedVerses = [];
+            this.selectionContext = null;
+            this.verseTopics = [];
             this.crossRefs = allCrossRefs;
             this.combinedCrossRefs = allCrossRefs;  // Store for restoration after verse deselect
             this.loading = false;
@@ -620,11 +630,14 @@ window.BibleModules.plans = {
             ));
 
             this.interlinearData = {};
-            const interlinearResults = await interlinearPromise;
+            interlinearPromise.then((results) => this._setPlanInterlinear(results, gen));
+            this.$nextTick(() => this.observeVerses());
+            return true;
+        },
 
+        _setPlanInterlinear(interlinearResults, gen) {
             // User navigated away mid-load — do not clobber their state (B4)
             if (gen !== this._loadGeneration) return;
-
             const interlinearMap = {};
             for (const { chapterInfo, data } of interlinearResults) {
                 if (data?.has_interlinear && data.verses) {
@@ -638,36 +651,15 @@ window.BibleModules.plans = {
                 }
             }
             this.interlinearData = interlinearMap;
-
-            // Setup scroll-based verse tracking
-            this.$nextTick(() => {
-                this.observeVerses();
-            });
-
-            // Update URL to reflect plan reading state
-            this.updateURL(history === 'push');
         },
 
-        exitPlanReadingMode() {
-            this.planReadingMode = false;
-            this.combinedPlanReading = false;
-            this.wasInPlanReading = false;
-            this.planReadings = [];
-            this.planReadingSections = [];
-            this.planReadingChapters = [];
-            // Go back to plan view if a plan is active, otherwise load Genesis 1
-            if (this.currentPlan) {
-                this.showReadingPlan = true;
-            } else {
-                this.referenceInput = 'Genesis 1';
-                this.loadPassage();
-            }
-        },
-
-        // Return to plan reading after navigating away (e.g., clicking a cross-ref)
-        returnToPlanReading() {
-            this.wasInPlanReading = false;
-            this.startPlanReading();
+        // Leave plan reading for ordinary reading, at the chapter in hand: the one with
+        // the selected verse, else the day's first chapter (P2-8: one exit, not two).
+        exitPlanReading() {
+            if (!this.combinedPlanReading) return;
+            const ch = this.selectionContext || this.planReadingChapters[0];
+            if (ch) this.navigate(`${ch.book} ${ch.chapter}`, { kind: 'read' });
+            else this.goHome();
         },
 
         markPlanDayAndContinue() {
@@ -677,21 +669,17 @@ window.BibleModules.plans = {
 
             // Move to next day or show completion
             if (this.planDay < (this.currentPlan?.duration_days || 365)) {
-                this.planDay++;
-                this.startPlanReading();
+                this.readPlanDay(this.planDay + 1);
             } else {
-                this.exitPlanReadingMode();
+                this.exitPlanReading();
                 this.showToast('Plan complete! Congratulations!', 'success');
             }
         },
 
-        // Navigate to a specific passage from the plan (opens in reader)
-        goToPlanPassage(ref) {
-            this.showReadingPlan = false;
-            this.planReadingMode = false;
-            // The passage API has no chapter ranges: "Genesis 1-3" -> "Genesis 1" (P0-4)
-            this.referenceInput = ref.replace(/^(.+?\s\d+)-\d+$/, '$1');
-            this.loadPassage();
+        // A reading in the plan list ("Genesis 1-3", "Psalms 5"): open the day's reading
+        // at that section, so the plan bar, Next Day and progress stay with it (P0-4).
+        goToPlanPassage(type) {
+            this.readPlanDay(this.planDay, type);
         },
 
         formatPlanDate(planId) {

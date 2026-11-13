@@ -14,6 +14,7 @@
     <link rel="apple-touch-icon" href="/static/icons/icon.svg">
     <link rel="stylesheet" href="/static/css/style.css?v=__SW_VERSION__">
     <link rel="stylesheet" href="/static/css/study.css?v=__SW_VERSION__">
+    <link rel="stylesheet" href="/static/css/nav.css?v=__SW_VERSION__">
     <script src="/static/vendor/supabase-2.117.2.min.js"></script>
     <script src="/config.js"></script>
     <script src="/static/js/supabase-client.js?v=__SW_VERSION__"></script>
@@ -46,6 +47,10 @@
                     <span class="side-menu-icon">📖</span>
                     <span>Get in the Word</span>
                 </button>
+                <button @click="showSideMenu = false; ttsPlaying ? ttsStop() : ttsPlay()" class="side-menu-item side-menu-tts" x-show="currentReference && 'speechSynthesis' in window">
+                    <span class="side-menu-icon" x-text="ttsPlaying ? '⏹' : '▶'"></span>
+                    <span x-text="ttsPlaying ? 'Stop reading aloud' : 'Read aloud'"></span>
+                </button>
                 <button @click="showSideMenu = false; enterImmersiveMode()" class="side-menu-item" x-show="currentReference">
                     <span class="side-menu-icon">⛶</span>
                     <span>Immersive Reading</span>
@@ -71,7 +76,7 @@
             <div class="side-menu-section" x-show="readingHistory.length > 0">
                 <div class="side-menu-section-label">Recent</div>
                 <template x-for="(item, idx) in getRecentHistory(5)" :key="'menu-hist-' + idx">
-                    <button @click="loadReference(item.reference); showSideMenu = false" class="side-menu-item side-menu-history-item">
+                    <button @click="navigate(item.reference, { kind: 'read' })" class="side-menu-item side-menu-history-item">
                         <span class="side-menu-icon">📄</span>
                         <span x-text="item.reference"></span>
                         <span class="side-menu-history-time" x-text="formatHistoryTime(item.timestamp)"></span>
@@ -131,104 +136,30 @@
             </button>
         </div>
         <div class="header-center">
-            <div class="reference-input">
-                <button @click="toggleBookPicker" class="btn-picker" title="Browse books">
-                    <span class="picker-icon">📖</span>
-                </button>
-                <div class="autocomplete-wrapper">
-                    <input
-                        type="search"
-                        enterkeyhint="go"
-                        x-model="referenceInput"
-                        x-ref="referenceInput"
-                        @input="updateSuggestions"
-                        @keydown="handleInputKeydown"
-                        @blur="hideSuggestions"
-                        @focus="updateSuggestions"
-                        placeholder="Enter reference (e.g., John 3:16)"
-                        class="input-reference"
-                        autocomplete="off"
-                    >
-                    <ul class="autocomplete-dropdown" x-show="showSuggestions" x-transition>
-                        <template x-for="(book, index) in bookSuggestions" :key="book">
-                            <li
-                                @mousedown.prevent="selectSuggestion(book)"
-                                :class="{ 'selected': index === selectedSuggestionIndex }"
-                                class="autocomplete-item"
-                                x-text="book"
-                            ></li>
-                        </template>
-                    </ul>
-                </div>
-                <select x-model="translation" class="select-translation" title="Bible Translation" x-show="!parallelMode">
-                    <option value="BSB">BSB - Berean Standard</option>
-                    <option value="WEB">WEB - World English</option>
-                    <option value="KJV">KJV - King James</option>
-                </select>
-                <button class="btn-parallel"
-                        :class="{ active: parallelMode }"
-                        @click="toggleParallelMode()"
-                        title="Compare translations side by side">
-                    Parallel
-                </button>
-                <button @click="loadPassage" class="btn-go">Go</button>
-            </div>
-
-            <!-- Book Picker Dropdown -->
-            <div class="book-picker-dropdown" x-show="showBookPicker" x-transition @click.outside="showBookPicker = false">
-                <div class="picker-content">
-                    <!-- Translation selector (mobile only - shown via CSS) -->
-                    <div class="picker-translation-mobile">
-                        <label>Translation:</label>
-                        <select x-model="translation" class="picker-translation-select">
-                            <option value="BSB">BSB - Berean Standard Bible</option>
-                            <option value="WEB">WEB - World English Bible</option>
-                            <option value="KJV">KJV - King James Version</option>
-                        </select>
-                    </div>
-                    <!-- Book selection -->
-                    <div class="picker-books" x-show="!pickerSelectedBook">
-                        <div class="picker-section">
-                            <h4>Old Testament</h4>
-                            <div class="picker-book-grid">
-                                <template x-for="book in otBooks" :key="book">
-                                    <button @click="selectPickerBook(book)" class="picker-book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
-                                </template>
-                            </div>
-                        </div>
-                        <div class="picker-section">
-                            <h4>New Testament</h4>
-                            <div class="picker-book-grid">
-                                <template x-for="book in ntBooks" :key="book">
-                                    <button @click="selectPickerBook(book)" class="picker-book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Chapter selection -->
-                    <div class="picker-chapters" x-show="pickerSelectedBook">
-                        <div class="picker-header">
-                            <button @click="pickerSelectedBook = null" class="picker-back-btn">← Back</button>
-                            <span class="picker-book-title" x-text="pickerSelectedBook"></span>
-                        </div>
-                        <div class="picker-chapter-grid">
-                            <template x-for="ch in getChaptersArray(pickerSelectedBook)" :key="ch">
-                                <button @click="selectPickerChapter(ch)" class="picker-chapter-btn" x-text="ch"></button>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- The running head: where you are; tap to go somewhere else (modules/nav.js) -->
+            <button type="button" class="nav-title" @click="openPicker()" aria-haspopup="dialog"
+                    :aria-label="'Go to a passage. Now reading ' + navTitle() + ', ' + translation">
+                <span class="nav-title-ref" x-text="navTitle()"></span>
+                <span class="nav-title-tr" x-text="translation" x-show="currentBook || combinedPlanReading"></span>
+                <svg class="nav-title-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <button class="btn-parallel"
+                    :class="{ active: parallelMode }"
+                    @click="toggleParallelMode()"
+                    x-show="currentBook"
+                    title="Compare translations side by side">
+                Parallel
+            </button>
         </div>
         <div class="header-right">
             <div class="offline-indicator" :class="isOnline ? 'online' : 'offline'" @click="openSettingsFromMenu('offline')" :title="isOnline ? 'Online' : 'Offline - using cached data'">
                 <span class="status-dot"></span>
                 <span class="offline-label" x-text="isOnline ? '' : 'Offline'"></span>
             </div>
-            <button @click="ttsPlaying ? ttsStop() : ttsPlay()" class="btn-icon" :title="ttsPlaying ? 'Stop reading' : 'Read aloud'" x-show="currentReference && 'speechSynthesis' in window">
+            <button @click="ttsPlaying ? ttsStop() : ttsPlay()" class="btn-icon header-tts" :title="ttsPlaying ? 'Stop reading' : 'Read aloud'" x-show="currentReference && 'speechSynthesis' in window">
                 <span x-text="ttsPlaying ? '⏹' : '▶'"></span>
             </button>
-            <button @click="enterImmersiveMode()" class="btn-icon" title="Immersive reading (F)" x-show="currentReference">
+            <button @click="enterImmersiveMode()" class="btn-icon header-immersive" title="Immersive reading (F)" x-show="currentReference">
                 <span class="immersive-enter-icon">⛶</span>
             </button>
             <button @click="openSearch()" class="btn-icon" title="Search (/)">
@@ -240,9 +171,14 @@
     <!-- Main Content -->
     <main class="main-content" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
         <!-- Bible Text Panel -->
-        <section class="panel panel-text">
-            <div class="panel-header">
-                <h2 @click="currentReference && toggleChapterJump()" x-text="currentReference || 'Select a passage'" :class="{ 'clickable-ref': currentReference }" :title="currentReference ? 'Tap to jump to chapter' : ''"></h2>
+        <section class="panel panel-text" :class="{ 'is-home': verses.length === 0 && !loading && !error }">
+            <div class="panel-header" x-show="verses.length > 0 || loading || error">
+                <h2 class="passage-title">
+                    <button type="button" class="passage-title-btn" x-show="currentBook && !combinedPlanReading"
+                            @click="openPicker({ step: 'chapters' })" :aria-label="currentReference + ': choose another chapter'"
+                            x-text="currentReference"></button>
+                    <span x-show="!currentBook || combinedPlanReading" x-text="combinedPlanReading ? currentPlan?.name : 'Choose a passage'"></span>
+                </h2>
                 <div class="header-controls" x-show="currentReference">
                     <label class="interlinear-toggle-header" x-show="combinedPlanReading || otBooks.includes(currentBook) || ntBooks.includes(currentBook)" title="Show Hebrew/Greek text">
                         <input type="checkbox" x-model="showInterlinear">
@@ -255,19 +191,14 @@
                     </div>
                 </div>
                 <div class="nav-buttons" x-show="currentReference">
-                    <button @click="previousChapter" class="btn-nav" title="Previous chapter">← Ch</button>
-                    <button @click="previousVerse" class="btn-nav" title="Previous verse" :disabled="!canGoPrevVerse()">← V</button>
-                    <button @click="nextVerse" class="btn-nav" title="Next verse" :disabled="!canGoNextVerse()">V →</button>
-                    <button @click="nextChapter" class="btn-nav" title="Next chapter">Ch →</button>
-                </div>
-            </div>
-
-            <!-- Chapter Jump Grid -->
-            <div class="chapter-jump-grid" x-show="showChapterJump && currentReference" x-transition @click.outside="showChapterJump = false">
-                <div class="picker-chapter-grid">
-                    <template x-for="ch in getChaptersArray(currentBook)" :key="'jump-' + ch">
-                        <button @click="jumpToChapter(ch)" class="picker-chapter-btn" :class="{ 'current-chapter': ch === currentChapter }" x-text="ch"></button>
-                    </template>
+                    <button @click="previousChapter()" class="btn-nav" :disabled="!prevLabel() || (combinedPlanReading && planDay <= 1)"
+                            :aria-label="'Previous: ' + prevLabel()" :title="prevLabel()"
+                            x-text="combinedPlanReading ? '← Day' : '← Ch'"></button>
+                    <button @click="previousVerse" class="btn-nav" title="Previous verse" :disabled="!canGoPrevVerse()" x-show="!combinedPlanReading">← V</button>
+                    <button @click="nextVerse" class="btn-nav" title="Next verse" :disabled="!canGoNextVerse()" x-show="!combinedPlanReading">V →</button>
+                    <button @click="nextChapter()" class="btn-nav" :disabled="!nextLabel() || (combinedPlanReading && planDay >= (currentPlan?.duration_days || 365))"
+                            :aria-label="'Next: ' + nextLabel()" :title="nextLabel()"
+                            x-text="combinedPlanReading ? 'Day →' : 'Ch →'"></button>
                 </div>
             </div>
 
@@ -291,11 +222,17 @@
                 <button @click="ttsStop()" class="btn-tts btn-tts-stop" title="Stop">⏹</button>
             </div>
 
-            <!-- "Return to Plan" bar (shown when navigated away from plan reading) - sticky below header -->
-            <div x-show="wasInPlanReading && currentPlan && !combinedPlanReading" class="plan-return-bar">
-                <span class="return-hint">You were reading Day <span x-text="planDay"></span><span x-show="getPlanDayDate(planDay)" x-text="' (' + getPlanDayDate(planDay) + ')'"></span> of <span x-text="currentPlan?.name"></span></span>
-                <button @click="returnToPlanReading()" class="btn-return-plan">Return to Plan Reading</button>
-                <button @click="wasInPlanReading = false" class="btn-dismiss-return" title="Dismiss">×</button>
+            <!-- The way back after a jump (cross-ref, search hit, topic, note link...). Clears
+                 when reading on (next chapter, picker) or on dismiss; Back agrees with it. -->
+            <div class="return-chip" x-show="navReturn" x-cloak role="region" aria-label="Way back">
+                <button type="button" class="return-chip-back" @click="navGoBack()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+                    <span>Back to <span class="return-chip-place" x-text="navReturn?.label"></span></span>
+                </button>
+                <button type="button" class="return-chip-results" x-show="navReturn?.search && searchResults.length" @click="navReopenSearch()">Results</button>
+                <button type="button" class="return-chip-dismiss" @click="navDismissReturn()" aria-label="Dismiss: stay here">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
             </div>
 
             <!-- Plan reading header bar (shown when in combined plan reading mode) - sticky below header -->
@@ -303,7 +240,7 @@
                 <div class="plan-day-progress" aria-hidden="true">
                     <div class="plan-day-progress-fill" :style="'width:' + Math.round(100 * planDay / (currentPlan?.duration_days || 365)) + '%'"></div>
                 </div>
-                <button @click="exitPlanReading()" class="btn-exit-plan" title="Exit to normal Bible view">✕<span class="exit-label"> Exit</span></button>
+                <button @click="exitPlanReading()" class="btn-exit-plan" title="Leave the plan and keep reading this chapter">✕<span class="exit-label"> Exit</span></button>
                 <div class="plan-reading-info">
                     <div class="plan-title-row">
                         <span class="plan-name" x-text="currentPlan?.name"></span>
@@ -343,72 +280,15 @@
                 </div>
                 <div x-show="error" class="error" x-text="error"></div>
 
-                <!-- Book selector when no passage loaded -->
-                <div x-show="!loading && !error && verses.length === 0" class="book-selector">
-                    <!-- Reading History -->
-                    <div class="reading-history-section" x-show="readingHistory.length > 0">
-                        <div class="history-header">
-                            <h3>Recent</h3>
-                            <button @click="clearHistory()" class="btn-clear-history" title="Clear history">Clear</button>
-                        </div>
-                        <div class="history-list">
-                            <template x-for="(item, idx) in getRecentHistory(8)" :key="'hist-' + idx">
-                                <button @click="loadReference(item.reference)" class="history-item">
-                                    <span class="history-ref" x-text="item.reference"></span>
-                                    <span class="history-meta">
-                                        <span class="history-translation" x-text="item.translation"></span>
-                                        <span class="history-time" x-text="formatHistoryTime(item.timestamp)"></span>
-                                    </span>
-                                </button>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- Bookmarks -->
-                    <div class="bookmarks-section" x-show="bookmarks.length > 0">
-                        <h3>Bookmarks</h3>
-                        <div class="bookmarks-list">
-                            <template x-for="(bm, idx) in bookmarks.slice(0, 6)" :key="'bm-' + idx">
-                                <div class="bookmark-item">
-                                    <button @click="goToBookmark(bm)" class="bookmark-ref-btn">
-                                        <span class="bookmark-ref" x-text="bm.reference"></span>
-                                        <span class="bookmark-preview" x-text="bm.preview + '...'"></span>
-                                    </button>
-                                    <button @click="removeBookmark(bm.reference)" class="btn-remove-bookmark" title="Remove">&times;</button>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <p class="book-selector-intro" x-show="!homePickerBook">Select a book to begin reading:</p>
-                    <!-- Chapter picker for selected book -->
-                    <div class="home-chapter-picker" x-show="homePickerBook">
-                        <div class="home-chapter-header">
-                            <button @click="homePickerBook = null" class="picker-back-btn">← Books</button>
-                            <span class="picker-book-title" x-text="homePickerBook"></span>
-                        </div>
-                        <div class="picker-chapter-grid">
-                            <template x-for="ch in getChaptersArray(homePickerBook)" :key="'home-ch-' + ch">
-                                <button @click="selectHomeChapter(ch)" class="picker-chapter-btn" x-text="ch"></button>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="book-section" x-show="!homePickerBook">
-                        <h3>Old Testament</h3>
-                        <div class="book-grid">
-                            <template x-for="book in otBooks" :key="book">
-                                <button @click="selectHomeBook(book)" class="book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="book-section" x-show="!homePickerBook">
-                        <h3>New Testament</h3>
-                        <div class="book-grid">
-                            <template x-for="book in ntBooks" :key="book">
-                                <button @click="selectHomeBook(book)" class="book-btn" :class="'genre-' + getBookGenre(book)" x-text="book"></button>
-                            </template>
-                        </div>
-                    </div>
+                <!-- Home: no passage loaded. Pick up where you left off, or choose a passage. -->
+                <div x-show="!loading && !error && verses.length === 0" class="home">
+                    <h2 class="home-title">What would you like to read?</h2>
+                    <button type="button" class="home-continue" x-show="readingHistory.length > 0"
+                            @click="navigate(readingHistory[0]?.reference, { kind: 'read' })">
+                        <span class="home-continue-label">Continue reading</span>
+                        <span class="home-continue-ref" x-text="readingHistory[0]?.reference"></span>
+                    </button>
+                    <div class="home-picker" data-picker-slot></div>
                 </div>
 
                 <!-- Share mode toolbar -->
@@ -543,7 +423,7 @@
                 x-transition:leave="action-bar-leave"
                 x-transition:leave-start="action-bar-leave-start"
                 x-transition:leave-end="action-bar-leave-end"
-                @click.outside="if (!$event.target.closest('.verse-box, .highlight-picker, .study-peek, .panel-resources')) clearVerseSelection()"
+                @click.outside="if (!$event.target.closest('.verse-box, .highlight-picker, .study-peek, .panel-resources, .return-chip, .nav-buttons, .header, dialog')) clearVerseSelection()"
                 x-ref="actionBar"
             >
                 <div class="action-bar-label" x-text="getSelectionLabel()"></div>
@@ -584,7 +464,7 @@
         </section>
 
         <!-- Resources Panel -->
-        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed, 'peeking': !resourcesPanelExpanded && highlightedVerses.length > 0 && (studyHint?.withComment.length > 0 || crossRefs.length > 0 || verseTopics.length > 0 || getRelevantNotes().length > 0) }" :style="sheetDragStyle" x-ref="resourcesPanel">
+        <section class="panel panel-resources" :class="{ 'is-home': verses.length === 0 && !loading, 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed, 'peeking': !resourcesPanelExpanded && highlightedVerses.length > 0 && (studyHint?.withComment.length > 0 || crossRefs.length > 0 || verseTopics.length > 0 || getRelevantNotes().length > 0) }" :style="sheetDragStyle" x-ref="resourcesPanel">
             <!-- Sidebar toggle button (tablet/desktop only) -->
             <button
                 class="btn-sidebar-toggle"
@@ -712,7 +592,7 @@
                                 <div class="study-ref-grid" x-show="crossRefs.length > 0">
                                     <template x-for="(ref, idx) in getStudyCrossRefs()" :key="'study-xref-' + idx">
                                         <a href="#"
-                                           @click.prevent="loadReference(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse)"
+                                           @click.prevent="navigate(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, { kind: 'jump' })"
                                            x-text="ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse"></a>
                                     </template>
                                 </div>
@@ -757,7 +637,7 @@
                                     <span x-show="!noteEditMode">Select Verses</span>
                                     <span x-show="noteEditMode">Done Selecting</span>
                                 </button>
-                                <span x-show="noteEditMode" class="select-hint">Click verses to select them</span>
+                                <span x-show="noteEditMode" class="select-hint">Tap verses to add them to this note</span>
                             </div>
 
                             <!-- Reference display -->
@@ -911,6 +791,7 @@
                             <span class="empty-state-hint">This verse has no linked references</span>
                         </div>
                     </template>
+                    <p class="crossref-for" x-show="crossRefs.length > 0 && !combinedPlanReading">Cross-references for <span x-text="getStudyReferenceLabel()"></span></p>
                     <!-- Sort & Filter controls -->
                     <div class="crossref-controls" x-show="crossRefs.length > 0">
                         <div class="crossref-sort-btns">
@@ -928,7 +809,7 @@
                                 <span class="crossref-source" x-show="combinedPlanReading && ref._sourceRef" x-text="ref._sourceBook + ' ' + ref._sourceChapter + ':' + ref.source_verse + ' →'"></span>
                                 <a
                                     href="#"
-                                    @click.prevent="loadReference(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse)"
+                                    @click.prevent="navigate(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, { kind: 'jump' })"
                                     x-text="ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse"
                                 ></a>
                                 <span class="crossref-votes" x-show="crossRefSort === 'relevance' && ref.votes" x-text="ref.votes"></span>
@@ -1127,7 +1008,7 @@
                             <li>
                                 <a
                                     href="#"
-                                    @click.prevent="loadReference(occ.book + ' ' + occ.chapter + ':' + occ.verse)"
+                                    @click.prevent="navigate(occ.book + ' ' + occ.chapter + ':' + occ.verse, { kind: 'jump' })"
                                     x-text="occ.book + ' ' + occ.chapter + ':' + occ.verse"
                                 ></a>
                             </li>
@@ -1204,10 +1085,10 @@
         <div class="immersive-controls-bottom"
              x-show="immersiveControlsVisible"
              x-transition.opacity.duration.200ms>
-            <button @click.stop="combinedPlanReading ? immersivePlanPrev() : previousChapter()" class="immersive-nav-btn" :disabled="combinedPlanReading && planDay <= 1">
+            <button @click.stop="previousChapter()" class="immersive-nav-btn" :disabled="combinedPlanReading && planDay <= 1">
                 &larr; <span x-text="combinedPlanReading ? 'Prev Day' : 'Previous'"></span>
             </button>
-            <button @click.stop="combinedPlanReading ? immersivePlanNext() : nextChapter()" class="immersive-nav-btn" :disabled="combinedPlanReading && planDay >= (currentPlan?.duration_days || 365)">
+            <button @click.stop="nextChapter()" class="immersive-nav-btn" :disabled="combinedPlanReading && planDay >= (currentPlan?.duration_days || 365)">
                 <span x-text="combinedPlanReading ? 'Next Day' : 'Next'"></span> &rarr;
             </button>
         </div>
@@ -1246,6 +1127,12 @@
                         <option value="commentary">Commentary</option>
                     </select>
                 </div>
+
+                <!-- The query is a reference: offer to go there (P1-7) -->
+                <button type="button" class="search-goto" x-show="BibleRef.parse(searchQuery).chapter"
+                        @click="navigate(searchQuery, { kind: 'jump' })">
+                    Go to <span x-text="BibleRef.parse(searchQuery).chapter ? BibleRef.format(BibleRef.parse(searchQuery)) : ''"></span>
+                </button>
 
                 <!-- Loading indicator -->
                 <div x-show="searchLoading" class="search-loading">
@@ -2413,63 +2300,30 @@
                                 <!-- Main/Chronological reading -->
                                 <div class="reading-item" x-show="getPlanDayReadings(planDay)?.chronological">
                                     <span class="reading-type">Main Reading</span>
-                                    <button class="reading-ref" @click="goToPlanPassage(getPlanDayReadings(planDay)?.chronological)" x-text="getPlanDayReadings(planDay)?.chronological"></button>
+                                    <button class="reading-ref" @click="goToPlanPassage('chronological')" x-text="getPlanDayReadings(planDay)?.chronological"></button>
                                 </div>
 
                                 <!-- Psalms -->
                                 <div class="reading-item" x-show="getPlanDayReadings(planDay)?.psalms">
                                     <span class="reading-type">Psalms</span>
-                                    <button class="reading-ref" @click="goToPlanPassage(getPlanDayReadings(planDay)?.psalms)" x-text="getPlanDayReadings(planDay)?.psalms"></button>
+                                    <button class="reading-ref" @click="goToPlanPassage('psalms')" x-text="getPlanDayReadings(planDay)?.psalms"></button>
                                 </div>
 
                                 <!-- Proverbs -->
                                 <div class="reading-item" x-show="getPlanDayReadings(planDay)?.proverbs">
                                     <span class="reading-type">Proverbs</span>
-                                    <button class="reading-ref" @click="goToPlanPassage(getPlanDayReadings(planDay)?.proverbs)" x-text="getPlanDayReadings(planDay)?.proverbs"></button>
+                                    <button class="reading-ref" @click="goToPlanPassage('proverbs')" x-text="getPlanDayReadings(planDay)?.proverbs"></button>
                                 </div>
                             </div>
 
                             <!-- Start combined reading button -->
-                            <button @click="startPlanReading()" class="btn-start-reading">
+                            <button @click="readPlanDay()" class="btn-start-reading">
                                 Read All Together
                             </button>
                         </div>
                     </div>
                 </template>
             </div>
-        </div>
-    </div>
-
-    <!-- Plan Reading Mode Overlay (shows all passages combined) -->
-    <div class="plan-reading-overlay" x-show="planReadingMode" x-transition>
-        <div class="plan-reading-header">
-            <button @click="exitPlanReadingMode()" class="btn-exit-plan-reading">← Back</button>
-            <div class="plan-reading-title">
-                <span x-text="currentPlan?.name"></span>
-                <span class="plan-reading-day" x-text="'Day ' + planDay"></span>
-            </div>
-            <button @click="markPlanDayAndContinue()" class="btn-mark-complete">
-                <span x-text="isDayCompleted(planDay) ? 'Next Day →' : 'Complete & Next →'"></span>
-            </button>
-        </div>
-        <div class="plan-reading-content">
-            <template x-for="(reading, idx) in planReadings" :key="'pr-' + idx">
-                <div class="plan-reading-section">
-                    <div class="reading-section-header">
-                        <span class="reading-section-label" x-text="reading.label"></span>
-                        <span class="reading-section-ref" x-text="reading.reference"></span>
-                    </div>
-                    <div class="reading-section-verses">
-                        <template x-for="(verse, vIdx) in reading.verses" :key="'prv-' + idx + '-' + vIdx">
-                            <span class="plan-verse">
-                                <span x-show="verse._chapterStart" class="chapter-divider" x-text="verse._chapterRef"></span>
-                                <sup class="verse-num" x-text="verse.verse"></sup>
-                                <span x-text="verse.text"></span>
-                            </span>
-                        </template>
-                    </div>
-                </div>
-            </template>
         </div>
     </div>
 
@@ -2521,7 +2375,7 @@
                             <template x-for="(mv, idx) in memoryVerses" :key="'mv-' + idx">
                                 <div class="memory-verse-item">
                                     <div class="memory-verse-info">
-                                        <button @click="showMemoryTool = false; loadReference(mv.reference)" class="memory-verse-ref" x-text="mv.reference"></button>
+                                        <button @click="navigate(mv.reference, { kind: 'jump' })" class="memory-verse-ref" x-text="mv.reference"></button>
                                         <span class="memory-verse-preview" x-text="mv.text.substring(0, 60) + '...'"></span>
                                         <div class="memory-verse-meta">
                                             <span class="memory-interval" x-text="mv.interval >= 21 ? 'Mastered' : (mv.interval + 'd interval')"></span>
@@ -2812,6 +2666,120 @@
         </dialog>
     </dialog>
 
+    <!-- Passage picker (modules/nav.js). One template, two places: the dialog below and
+         Home. The script after the dialog copies it into each [data-picker-slot] before
+         Alpine starts, so both are the same component with the same behaviour. -->
+    <template id="picker-template">
+        <div class="picker" data-picker-root x-id="['picker']">
+            <form class="picker-type" role="search" @submit.prevent="pickerSubmit($event)">
+                <label class="visually-hidden" :for="$id('picker')">Type a book or a reference</label>
+                <svg class="picker-type-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input class="picker-input" type="search" enterkeyhint="go" autocomplete="off" autocapitalize="words"
+                       spellcheck="false" :id="$id('picker')" x-model="picker.query"
+                       placeholder="Type a book or reference, like rom 8:28">
+            </form>
+            <button type="button" class="picker-go" x-show="pickerTyped()?.ref" @click="_pickerGo(pickerTyped().ref)">
+                Go to <span x-text="pickerTyped()?.ref"></span>
+            </button>
+            <p class="picker-hint" x-show="pickerTyped()?.error" x-text="pickerTyped()?.error" aria-live="polite"></p>
+
+            <div class="picker-bar" x-show="picker.step === 'books' && !picker.query">
+                <div class="picker-tabs" role="group" aria-label="Show">
+                    <button type="button" :aria-pressed="picker.tab === 'books'" @click="picker.tab = 'books'">Books</button>
+                    <button type="button" :aria-pressed="picker.tab === 'recent'" @click="picker.tab = 'recent'">Recent</button>
+                </div>
+                <div class="picker-translation" role="group" aria-label="Translation">
+                    <template x-for="tr in ['BSB', 'WEB', 'KJV']" :key="tr">
+                        <button type="button" :aria-pressed="translation === tr" @click="translation = tr" x-text="tr"
+                                :title="{ BSB: 'Berean Standard Bible', WEB: 'World English Bible', KJV: 'King James Version' }[tr]"></button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Books (typing filters them) -->
+            <div class="picker-books" x-show="picker.step === 'books' && (picker.tab === 'books' || picker.query)">
+                <template x-for="t in ['ot', 'nt']" :key="t">
+                    <section class="picker-testament" x-show="pickerBooks(t).length">
+                        <h3 x-text="t === 'ot' ? 'Old Testament' : 'New Testament'"></h3>
+                        <div class="picker-book-grid">
+                            <template x-for="book in pickerBooks(t)" :key="book">
+                                <button type="button" class="picker-book" :data-book="book"
+                                        :class="{ 'is-current': book === currentBook }"
+                                        :aria-current="book === currentBook ? 'true' : null"
+                                        :style="'--genre: var(--genre-' + getBookGenre(book) + ')'"
+                                        @click="pickBook(book, $event)" x-text="book"></button>
+                            </template>
+                        </div>
+                    </section>
+                </template>
+                <p class="picker-empty" x-show="picker.query && !pickerTyped()?.ref && !pickerBooks('ot').length && !pickerBooks('nt').length">No book starts with “<span x-text="picker.query"></span>”.</p>
+            </div>
+
+            <!-- Chapters of one book -->
+            <div class="picker-chapters" x-show="picker.step === 'chapters' && !picker.query">
+                <div class="picker-chapters-head">
+                    <button type="button" class="picker-all-books" @click="pickerAllBooks($event)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                        All books
+                    </button>
+                    <h3 x-text="picker.book"></h3>
+                </div>
+                <div class="picker-chapter-grid" role="group" :aria-label="(picker.book || '') + ' chapters'">
+                    <template x-for="ch in pickerChapters()" :key="picker.book + '-' + ch">
+                        <button type="button" class="picker-chapter"
+                                :class="{ 'is-current': picker.book === currentBook && ch === currentChapter }"
+                                :aria-current="picker.book === currentBook && ch === currentChapter ? 'true' : null"
+                                :aria-label="picker.book + ' ' + ch" @click="pickChapter(ch)" x-text="ch"></button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Recent passages and bookmarks -->
+            <div class="picker-recent" x-show="picker.step === 'books' && picker.tab === 'recent' && !picker.query">
+                <p class="picker-empty" x-show="!readingHistory.length">Passages you read will be listed here.</p>
+                <ul class="picker-list" x-show="readingHistory.length">
+                    <template x-for="(item, idx) in getRecentHistory(12)" :key="'r-' + idx">
+                        <li><button type="button" @click="pickRecent(item)">
+                            <span class="picker-list-ref" x-text="item.reference"></span>
+                            <span class="picker-list-meta" x-text="item.translation + ', ' + formatHistoryTime(item.timestamp)"></span>
+                        </button></li>
+                    </template>
+                </ul>
+                <template x-if="bookmarks.length">
+                    <div>
+                        <h3>Bookmarks</h3>
+                        <ul class="picker-list">
+                            <template x-for="(bm, idx) in bookmarks.slice(0, 12)" :key="'b-' + idx">
+                                <li><button type="button" @click="goToBookmark(bm)">
+                                    <span class="picker-list-ref" x-text="bm.reference"></span>
+                                    <span class="picker-list-meta" x-text="bm.preview"></span>
+                                </button></li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+
+    <dialog id="passage-picker" class="picker-sheet" closedby="any" aria-labelledby="picker-title">
+        <div class="picker-sheet-head">
+            <span class="picker-grabber" aria-hidden="true"></span>
+            <h2 id="picker-title">Go to a passage</h2>
+            <button type="button" class="picker-close" @click="closePicker()" aria-label="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="picker-sheet-body" data-picker-slot></div>
+    </dialog>
+    <script>
+        // Before Alpine (deferred) starts: one picker template, every slot
+        (() => {
+            const tpl = document.getElementById('picker-template');
+            document.querySelectorAll('[data-picker-slot]').forEach(slot => slot.append(tpl.content.cloneNode(true)));
+        })();
+    </script>
+
     <!-- Toast Container -->
     <div class="toast-container">
         <template x-for="toast in toasts" :key="toast.id">
@@ -2832,6 +2800,7 @@
     <script src="/static/js/modules/plans.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study_extras.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/nav.js?v=__SW_VERSION__"></script>
     <script src="/static/js/app.js?v=__SW_VERSION__"></script>
     <script>
         // Show cache toast notification

@@ -197,6 +197,7 @@ window.BibleModules.study_extras = {
 
         // ========== READING HISTORY ==========
 
+        // One entry per chapter: reading John 3:16 after John 3 moves it up, not a second line
         addToHistory(reference, translation) {
             if (!reference) return;
             const entry = {
@@ -204,13 +205,13 @@ window.BibleModules.study_extras = {
                 translation: translation || this.translation,
                 timestamp: Date.now()
             };
-            // Remove duplicate if exists
-            this.readingHistory = this.readingHistory.filter(h => h.reference !== reference);
+            const chapterOf = (ref) => String(ref).replace(/:.*$/, '');
+            this.readingHistory = this.readingHistory.filter(h => chapterOf(h.reference) !== chapterOf(reference));
             // Add to front
             this.readingHistory.unshift(entry);
             // Keep max 50 entries
             if (this.readingHistory.length > 50) this.readingHistory = this.readingHistory.slice(0, 50);
-            localStorage.setItem('readingHistory', JSON.stringify(this.readingHistory));
+            try { localStorage.setItem('readingHistory', JSON.stringify(this.readingHistory)); } catch { /* quota */ }
         },
 
         clearHistory() {
@@ -271,6 +272,7 @@ window.BibleModules.study_extras = {
         },
 
         goToBookmark(bookmark) {
-            this.loadReference(bookmark.reference);
+            this.closePicker();
+            this.navigate(bookmark.reference, { kind: 'read' });
         },
 };

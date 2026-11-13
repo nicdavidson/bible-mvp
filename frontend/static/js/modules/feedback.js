@@ -168,7 +168,11 @@ window.BibleModules.feedback = {
                     }
                     break;
                 case 'Enter':
-                    if (this.selectedResultIndex >= 0 && this.selectedResultIndex < resultCount) {
+                    if (this.selectedResultIndex < 0 && BibleRef.parse(this.searchQuery).chapter) {
+                        // "John 3:16" typed into search: go there
+                        event.preventDefault();
+                        this.navigate(this.searchQuery, { kind: 'jump' });
+                    } else if (this.selectedResultIndex >= 0 && this.selectedResultIndex < resultCount) {
                         event.preventDefault();
                         this.goToSearchResult(this.searchResults[this.selectedResultIndex]);
                     } else if (resultCount > 0) {
@@ -220,11 +224,8 @@ window.BibleModules.feedback = {
                 const ref = result.verse
                     ? `${result.book} ${result.chapter}:${result.verse}`
                     : `${result.book} ${result.chapter}`;
-                this.loadReference(ref);
-                this.showSearch = false;
-                this.searchQuery = '';
-                this.searchResults = [];
-                this.searchPerformed = false;
+                // The query and results stay, so the return chip can reopen them (P1-7)
+                this.navigate(ref, { kind: 'jump', fromSearch: true });
             }
         },
 
@@ -403,7 +404,7 @@ window.BibleModules.feedback = {
                 event.preventDefault();
                 const ref = link.dataset.ref;
                 if (ref) {
-                    this.loadReference(ref);
+                    this.navigate(ref, { kind: 'jump' });
                 }
             }
         },

@@ -1,76 +1,15 @@
 """Browser flow test for the study view (Playwright, headless Chromium).
 
-Starts the app on a free local port against the worktree DB, then: selects a verse
+Uses the shared server and browser (conftest.py), then: selects a verse
 range in John 3, opens the study view, switches sources (and back, keeping scroll
 position), follows a reference inside commentary, comes back with Back, checks the
 deep link, and closes to the reader.
 
 Skips when Playwright or its browser is not installed.
 """
-import os
-import socket
-import subprocess
-import sys
-import time
-import urllib.request
-from pathlib import Path
-
 import pytest
 
-sync_api = pytest.importorskip("playwright.sync_api")
-
-ROOT = Path(__file__).resolve().parents[2]
-
-
-def _free_port():
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-@pytest.fixture(scope="module")
-def server():
-    port = _free_port()
-    env = {**os.environ, "SUPABASE_URL": "", "APP_ENV": "test"}
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", str(port)],
-        cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    base = f"http://127.0.0.1:{port}"
-    for _ in range(100):
-        try:
-            urllib.request.urlopen(f"{base}/api/health", timeout=1)
-            break
-        except Exception:
-            time.sleep(0.2)
-    else:
-        proc.kill()
-        pytest.skip("app server did not start")
-    yield base
-    proc.terminate()
-    proc.wait(timeout=10)
-
-
-@pytest.fixture(scope="module")
-def browser():
-    with sync_api.sync_playwright() as p:
-        try:
-            b = p.chromium.launch()
-        except Exception as e:  # browser binary not installed
-            pytest.skip(f"chromium not available: {e}")
-        yield b
-        b.close()
-
-
-@pytest.fixture
-def page(browser):
-    ctx = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True,
-                              service_workers="block")
-    pg = ctx.new_page()
-    errors = []
-    pg.on("pageerror", lambda e: errors.append(str(e)))
-    yield pg
-    ctx.close()
-    assert not errors, errors
+pytest.importorskip("playwright.sync_api")
 
 
 def _path(pg):
@@ -144,10 +83,11 @@ def test_select_range_study_switch_follow_ref_and_back(server, page):
     assert _path(page).endswith("/John/3/16-18?study=john-gill")
     page.wait_for_selector('.study-pane[data-slug="john-gill"] .study-pane-body p')
 
-    # Close returns to the reader, focus back on the Study button, nothing reloaded
+    # Close returns to the reader, selection kept, nothing reloaded
     page.tap(".study-bar .study-icon-btn")
     page.wait_for_function("!document.getElementById('study-view').open")
-    assert _path(page) == "/John/3"
+    assert _path(page) == "/John/3/16-18"
+    assert page.evaluate("Alpine.$data(document.body).highlightedVerses") == [16, 17, 18]
     assert page.evaluate("Alpine.$data(document.body).currentReference").startswith("John 3")
 
 

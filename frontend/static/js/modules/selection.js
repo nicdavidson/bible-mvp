@@ -99,33 +99,6 @@ window.BibleModules.selection = {
             return this.highlightedVerses.includes(verseNum) && this.verseInSelectionScope(verseObj);
         },
 
-        // Update URL with clean path format (/Book/Chapter/Verse or /plan/PlanId/Day)
-        // usePush=true creates a new history entry (for chapter navigation);
-        // usePush=false uses replaceState (for verse selection within same chapter)
-        updateURL(usePush = false) {
-            // Never push an entry for the page we're already on: re-pushing the
-            // same path is what made Back loop on one chapter (P0-1).
-            const go = (path) => {
-                if (usePush && path !== window.location.pathname) window.history.pushState({}, '', path);
-                else window.history.replaceState({}, '', path);
-            };
-            // If in combined plan reading mode, use plan URL format
-            if (this.combinedPlanReading && this.currentPlan) {
-                go(`/plan/${this.currentPlan.id}/${this.planDay}`);
-                return;
-            }
-
-            if (!this.currentBook || !this.currentChapter) return;
-
-            const bookSlug = this.currentBook.replace(/\s+/g, '-');
-            const verse = this.highlightedVerses.length === 1 ? this.highlightedVerses[0] : null;
-            const path = verse
-                ? `/${bookSlug}/${this.currentChapter}/${verse}`
-                : `/${bookSlug}/${this.currentChapter}`;
-
-            go(path);
-        },
-
         // Copy verse to clipboard
         async copyVerse(verse) {
             const text = `"${verse.text}" — ${this.currentBook} ${this.currentChapter}:${verse.verse} ${this.translation}`;

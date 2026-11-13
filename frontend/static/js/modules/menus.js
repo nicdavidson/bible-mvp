@@ -16,37 +16,6 @@ window.BibleModules.menus = {
             }
         },
 
-        // Home screen (Recent, Bookmarks, book grid) is just "no passage loaded";
-        // give it a real route so it's reachable again (P1-2, P1-8).
-        goHome({ history = 'push' } = {}) {
-            this.showSideMenu = false;
-            this.currentView = 'reader';
-            this.exitPlanReading();
-            this._loadGeneration++;  // drop any in-flight passage load
-            Object.assign(this, {
-                verses: [], currentBook: null, currentChapter: null, currentReference: '',
-                referenceInput: '', highlightedVerses: [], error: null, loading: false,
-            });
-            if (history === 'push' && window.location.pathname !== '/') window.history.pushState({}, '', '/');
-            window.scrollTo(0, 0);
-        },
-
-        // Exit plan reading mode and return to normal Bible view
-        exitPlanReading() {
-            this.combinedPlanReading = false;
-            this.planReadingMode = false;
-            this.wasInPlanReading = false;
-            // Clear the combined reading data
-            this.planReadingSections = [];
-            this.planReadingChapters = [];
-            this.combinedCrossRefs = [];
-            this.combinedNotes = [];
-            // Keep the current reference if we have one, otherwise go to welcome view
-            if (!this.currentBook) {
-                this.verses = [];
-            }
-        },
-
         // Open settings from side menu
         openSettingsFromMenu(tab = 'general') {
             this.showSideMenu = false;
@@ -79,10 +48,7 @@ window.BibleModules.menus = {
 
         // Go to verse from Share Jesus modal
         goToVerseFromModal(ref) {
-            this.showShareJesus = false;
-            this.exitPlanReading();
-            this.referenceInput = ref;
-            this.loadPassage();
+            this.navigate(ref, { kind: 'jump' });
         },
 
         // ========== Single Verse View (Reusable) ==========
@@ -177,9 +143,8 @@ window.BibleModules.menus = {
             this.singleVerseMode = false;
             this.singleVerseFullPassage = true;
 
-            // Navigate to the passage with the verse highlighted
-            this.referenceInput = verse.ref;
-            await this.loadPassage();
+            // Read the passage with the verse highlighted; the bar above is the way back
+            await this.navigate(verse.ref, { kind: 'read' });
         },
 
         // Return to single verse mode from full passage view

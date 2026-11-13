@@ -266,7 +266,6 @@ function bibleApp() {
         ntBooks: NT_BOOKS,
 
         // State
-        referenceInput: '',
         translation: 'BSB',
         currentReference: '',
         currentBook: '',
@@ -304,17 +303,7 @@ function bibleApp() {
         searchDebounceTimer: null,
         selectedResultIndex: -1,
 
-        // Autocomplete state
-        bookSuggestions: [],
-        showSuggestions: false,
-        selectedSuggestionIndex: -1,
-
-        // Book picker state
-        showBookPicker: false,
-        pickerSelectedBook: null,
         bookChapters: BOOK_CHAPTERS,
-        homePickerBook: null,
-        showChapterJump: false,
 
         // Bottom sheet drag state
         sheetDragStyle: '',
@@ -471,13 +460,10 @@ function bibleApp() {
         planProgressSynced: false,  // Whether plan progress has been synced from Supabase
         planLoading: false,
         planDay: 1,  // Currently viewing day
-        planReadingMode: false,  // True when reading a plan (shows all passages together)
-        planReadings: [],  // Passages loaded for current plan day
         combinedPlanReading: false,  // True when showing plan readings in main reader format
         selectionContext: null,      // {book, chapter} the current selection belongs to (combined plan mode)
         planReadingSections: [],  // Section info for combined reading: [{label, reference, startIndex}]
         planReadingChapters: [],  // Chapters being read in combined mode: [{book, chapter}]
-        wasInPlanReading: false,  // True when user navigated away from plan reading (for "return" button)
         combinedCrossRefs: [],  // Store all cross-refs for combined reading (to restore after verse deselect)
         combinedNotes: [],  // Store notes for combined reading chapters
 
@@ -622,53 +608,11 @@ function bibleApp() {
             await this.loadNotes();
             await this.loadTags();
 
-            // Check URL for initial reference - support plan URLs, path-based refs, and ?ref= formats
-            const planURL = this.parsePlanURL();
-            if (planURL) {
-                // Restore reading plan state from URL
-                await this.restorePlanFromURL(planURL.planId, planURL.day, 'replace');
-            } else {
-                const pathRef = this.parsePathReference();
-                if (pathRef) {
-                    this.referenceInput = pathRef;
-                    const studySource = new URLSearchParams(window.location.search).get('study');
-                    await this.loadPassage({ history: 'replace' });
-                    // Deep link to the study view: /John/3/16-18?study=john-gill
-                    if (studySource !== null) this.openStudy(pathRef, { source: studySource, history: 'replace' });
-                } else {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const ref = urlParams.get('ref');
-                    if (ref) {
-                        this.referenceInput = ref;
-                        await this.loadPassage({ history: 'replace' });
-                    }
-                }
-            }
-
-            // Handle browser back/forward
-            window.addEventListener('popstate', (e) => {
-                if (this.studyHandlePop(e)) return;  // study view entries (modules/study.js)
-                const planURL = this.parsePlanURL();
-                if (planURL) {
-                    this.restorePlanFromURL(planURL.planId, planURL.day, 'replace');
-                } else if (window.location.pathname === '/') {
-                    this.goHome({ history: 'none' });
-                } else {
-                    const pathRef = this.parsePathReference();
-                    if (pathRef) {
-                        // Exit plan reading mode if navigating to a regular passage
-                        if (this.combinedPlanReading) {
-                            this.combinedPlanReading = false;
-                            this.planReadingMode = false;
-                        }
-                        this.referenceInput = pathRef;
-                        this.loadPassage({ history: 'replace' });
-                    }
-                }
-            });
-
             // Study view: dialog Esc/back handling + selection availability hint
             this.studyInit();
+
+            // Open whatever the address bar names, and own Back/Forward (modules/nav.js)
+            await this.navInit();
 
             // Setup keyboard shortcuts
             this.setupKeyboardShortcuts();
@@ -757,7 +701,7 @@ function bibleApp() {
                 'showPathToChrist', 'showShareModal', 'showShareJesus',
                 'showFeedback', 'showSearch', 'showMemoryTool',
                 'showReadingPlan', 'showSettings', 'showGuide', 'showAbout',
-                'showBookPicker', 'showChapterJump', 'showSideMenu'
+                'showSideMenu'
             ];
             for (const f of flags) {
                 if (this[f]) { this[f] = false; return true; }
@@ -791,6 +735,7 @@ function bibleApp() {
                     const delta = y - lastY;
                     lastY = y;
                     if (this.anyModalOpen && this.anyModalOpen()) return;
+                    if (Date.now() - (this._navScrolledAt || 0) < 800) return;   // navigation placed the page
                     if (y < 60) document.body.classList.remove('reading-immersed');
                     else if (delta > 6) document.body.classList.add('reading-immersed');
                     else if (delta < -6) document.body.classList.remove('reading-immersed');
@@ -800,8 +745,8 @@ function bibleApp() {
 
         setupKeyboardShortcuts() {
             document.addEventListener('keydown', (e) => {
-                // The study view is a modal <dialog>: it owns its keys (Esc = back)
-                if (this.study?.open) return;
+                // The study view and the picker are modal <dialog>s: they own their keys
+                if (this.study?.open || this.picker.open) return;
                 // Ignore if typing in an input
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     // But allow Escape to blur inputs
@@ -828,15 +773,13 @@ function bibleApp() {
                     case 'ArrowLeft':
                         if (this.currentReference) {
                             e.preventDefault();
-                            if (this.immersiveMode && this.combinedPlanReading) this.immersivePlanPrev();
-                            else this.previousChapter();
+                            this.previousChapter();   // a plan day in plan reading
                         }
                         break;
                     case 'ArrowRight':
                         if (this.currentReference) {
                             e.preventDefault();
-                            if (this.immersiveMode && this.combinedPlanReading) this.immersivePlanNext();
-                            else this.nextChapter();
+                            this.nextChapter();
                         }
                         break;
                     case 'ArrowUp':
@@ -884,7 +827,7 @@ function bibleApp() {
                         break;
                     case 'g':
                         e.preventDefault();
-                        this.$refs.referenceInput?.focus();
+                        this.openPicker({ focusInput: true });
                         break;
                     case ' ':
                         // Space = play/pause TTS
@@ -898,158 +841,6 @@ function bibleApp() {
                         break;
                 }
             });
-        },
-
-        // Parse path-based reference from URL (e.g., /John/3/16 or /John/3)
-        parsePathReference() {
-            const path = window.location.pathname;
-            // Match /Book/Chapter, /Book/Chapter/Verse, or /Book/Chapter/First-Last
-            const match = path.match(/^\/([^\/]+)\/(\d+)(?:\/(\d+(?:-\d+)?))?$/);
-            if (match) {
-                const book = decodeURIComponent(match[1]).replace(/-/g, ' ');
-                const chapter = match[2];
-                const verse = match[3];
-                return verse ? `${book} ${chapter}:${verse}` : `${book} ${chapter}`;
-            }
-            return null;
-        },
-
-        // Parse plan URL (e.g., /plan/chronological/45)
-        parsePlanURL() {
-            const path = window.location.pathname;
-            const match = path.match(/^\/plan\/([^\/]+)\/(\d+)$/);
-            if (match) {
-                return {
-                    planId: decodeURIComponent(match[1]),
-                    day: parseInt(match[2])
-                };
-            }
-            return null;
-        },
-
-        // Autocomplete: filter books based on input
-        updateSuggestions() {
-            const input = this.referenceInput.trim().toLowerCase();
-
-            // Only show suggestions if typing a book name (no chapter yet)
-            if (!input || /\d/.test(input)) {
-                this.bookSuggestions = [];
-                this.showSuggestions = false;
-                return;
-            }
-
-            this.bookSuggestions = BIBLE_BOOKS.filter(book =>
-                book.toLowerCase().startsWith(input)
-            ).slice(0, 6);
-
-            this.showSuggestions = this.bookSuggestions.length > 0;
-            this.selectedSuggestionIndex = -1;
-        },
-
-        // Autocomplete: select a suggestion
-        selectSuggestion(book) {
-            this.referenceInput = book + ' ';
-            this.showSuggestions = false;
-            this.bookSuggestions = [];
-            // Focus back on input for chapter entry
-            this.$nextTick(() => {
-                this.$refs.referenceInput?.focus();
-            });
-        },
-
-        // Autocomplete: handle keyboard navigation
-        handleInputKeydown(event) {
-            if (!this.showSuggestions) {
-                if (event.key === 'Enter') {
-                    this.loadPassage();
-                }
-                return;
-            }
-
-            switch (event.key) {
-                case 'ArrowDown':
-                    event.preventDefault();
-                    this.selectedSuggestionIndex = Math.min(
-                        this.selectedSuggestionIndex + 1,
-                        this.bookSuggestions.length - 1
-                    );
-                    break;
-                case 'ArrowUp':
-                    event.preventDefault();
-                    this.selectedSuggestionIndex = Math.max(
-                        this.selectedSuggestionIndex - 1,
-                        -1
-                    );
-                    break;
-                case 'Enter':
-                case 'Tab':
-                    if (this.selectedSuggestionIndex >= 0) {
-                        event.preventDefault();
-                        this.selectSuggestion(this.bookSuggestions[this.selectedSuggestionIndex]);
-                    } else if (this.bookSuggestions.length === 1) {
-                        event.preventDefault();
-                        this.selectSuggestion(this.bookSuggestions[0]);
-                    } else if (event.key === 'Enter') {
-                        this.showSuggestions = false;
-                        this.loadPassage();
-                    }
-                    break;
-                case 'Escape':
-                    this.showSuggestions = false;
-                    break;
-            }
-        },
-
-        // Hide suggestions when clicking outside
-        hideSuggestions() {
-            setTimeout(() => {
-                this.showSuggestions = false;
-            }, 150);
-        },
-
-        // Book picker methods
-        toggleBookPicker() {
-            this.showBookPicker = !this.showBookPicker;
-            if (this.showBookPicker) {
-                this.pickerSelectedBook = null;
-            }
-        },
-
-        selectPickerBook(book) {
-            this.pickerSelectedBook = book;
-        },
-
-        selectPickerChapter(chapter) {
-            const ref = `${this.pickerSelectedBook} ${chapter}`;
-            this.showBookPicker = false;
-            this.pickerSelectedBook = null;
-            // Use loadReference to properly handle plan reading state
-            this.loadReference(ref);
-        },
-
-        selectHomeBook(book) {
-            const chapters = BOOK_CHAPTERS[book] || 1;
-            if (chapters === 1) {
-                this.homePickerBook = null;
-                this.loadReference(book + ' 1');
-            } else {
-                this.homePickerBook = book;
-            }
-        },
-
-        selectHomeChapter(ch) {
-            const ref = this.homePickerBook + ' ' + ch;
-            this.homePickerBook = null;
-            this.loadReference(ref);
-        },
-
-        toggleChapterJump() {
-            this.showChapterJump = !this.showChapterJump;
-        },
-
-        jumpToChapter(ch) {
-            this.showChapterJump = false;
-            this.loadReference(this.currentBook + ' ' + ch);
         },
 
         getChapterCount(book) {
@@ -1163,286 +954,140 @@ function bibleApp() {
             }
         },
 
-        // Load a passage
-        // history: 'push' for user navigation, 'replace' when restoring a URL
-        // (page load, browser Back/Forward) so restoring never adds entries (P0-1).
-        async loadPassage({ history = 'push' } = {}) {
-            // Capture once: click.outside handlers can rewrite referenceInput while
-            // we await below, which used to reload the old chapter (P0-2).
-            const ref = (this.referenceInput || '').trim();
-            if (!ref) return;
-            this._historyMode = history;
-
-            // Dismiss mobile keyboard
-            this.$refs.referenceInput?.blur();
-            this.showChapterJump = false;
-
-            // Stop TTS when navigating to new passage
+        // Load one passage into the reader. r is canonical ({ book, chapter, vs, ve },
+        // from BibleRef.parse). Pure state: history, Recent and scrolling belong to
+        // navigate() (modules/nav.js), the only caller. Returns true when this load
+        // is what the reader now shows, false when it failed or a newer one replaced it.
+        // keepOnError: leave the current passage up and say why in a toast instead.
+        async loadPassage(r, { keepOnError = false } = {}) {
+            if (document.activeElement?.tagName === 'INPUT') document.activeElement.blur();  // dismiss the phone keyboard
             if (this.ttsPlaying) this.ttsStop();
-
             this.loading = true;
             this.error = null;
             this.selectedWord = null;
-
             // Invalidate stale async loaders from prior navigations (B4)
             const gen = ++this._loadGeneration;
+            const ref = BibleRef.format(r);
+            const os = window.offlineStorage;
+            const fail = (message) => {
+                if (gen !== this._loadGeneration) return false;
+                this.loading = false;
+                if (keepOnError) this.showToast(message, 'error');
+                else { this.error = message; this.verses = []; }
+                return false;
+            };
+            const notSaved = `${r.book} ${r.chapter} isn't saved for offline use. Open it once while online, or download it in Settings.`;
+            const fromCache = async () => {
+                try { return await os?.getChapterVerses(this.translation, r.book, r.chapter); } catch { return null; }
+            };
 
-            // Parse book/chapter (and optional :verse or :start-end) from input
-            // BEFORE fetch so offline fallback has correct values
-            const refMatch = ref.match(/^(.+?)\s+(\d+)(?::(\d+)(?:-(\d+))?)?/);
-            // Canonical name so "rom 8:28" doesn't become currentBook "rom" (P1-3)
-            const inputBook = normalizeBookName(refMatch ? refMatch[1] : ref);
-            const inputChapter = refMatch ? parseInt(refMatch[2]) : 1;
-            const inputVerse = refMatch && refMatch[3] ? parseInt(refMatch[3]) : null;
-            const inputVerseEnd = refMatch && refMatch[4]
-                ? Math.max(inputVerse, parseInt(refMatch[4])) : inputVerse;
-
-            // If forced offline, skip fetch entirely and go straight to IndexedDB
-            if (this.forcedOffline) {
-                await this._loadFromCache(inputBook, inputChapter);
-                return;
-            }
-
-            // Cache-first: if auto-cache is on and we have cached data, show it instantly
-            // then refresh from API in the background
-            if (this.autoCacheEnabled && window.offlineStorage) {
-                try {
-                    const cached = await window.offlineStorage.getChapterVerses(
-                        this.translation, inputBook, inputChapter
-                    );
-                    if (cached && cached.length > 0) {
-                        // Show cached data immediately (html precomputed once per assignment)
-                        this.verses = cached.map(v => ({ verse: v.verse, text: v.text, html: this.formatVerseText(v.text) }));
-                        // Preserve requested verse/range so cross-ref clicks keep
-                        // their highlight on the cache-first path (B2)
-                        if (inputVerse) {
-                            const available = new Set(cached.map(v => v.verse));
-                            const hv = [];
-                            for (let v = inputVerse; v <= inputVerseEnd; v++) {
-                                if (available.has(v)) hv.push(v);
-                            }
-                            this.highlightedVerses = hv;
-                            this.currentReference = inputVerseEnd > inputVerse
-                                ? `${inputBook} ${inputChapter}:${inputVerse}-${inputVerseEnd}`
-                                : `${inputBook} ${inputChapter}:${inputVerse}`;
-                        } else {
-                            this.highlightedVerses = [];
-                            this.currentReference = `${inputBook} ${inputChapter}`;
-                        }
-                        this.parseCurrentReference();
-                        this.rebuildVerseColorMap();
-                        this.crossRefs = [];
-                        this.speakerVerses = [];
-                        this.referenceInput = this.currentReference;
-                        this.addToHistory(this.currentReference, this.translation);
-                        this.updateURL(this._historyMode === 'push');
-                        this.observeVerses();
-                        this.loading = false;
-
-                        // Scroll to highlighted verse (same behavior as network path)
-                        if (this.highlightedVerses.length > 0) {
-                            this.$nextTick(() => {
-                                const firstHighlighted = document.getElementById(`verse-${this.highlightedVerses[0]}`);
-                                if (firstHighlighted) {
-                                    firstHighlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                }
-                            });
-                        }
-
-                        // Load cached interlinear/cross-refs
-                        await this.loadInterlinearData();
-                        try {
-                            const cachedRefs = await window.offlineStorage.getChapterCrossRefs(inputBook, inputChapter);
-                            if (gen === this._loadGeneration && cachedRefs?.length > 0) this.crossRefs = cachedRefs;
-                        } catch (e) { /* silent */ }
-
-                        // Background refresh from API (fire-and-forget)
-                        this._backgroundRefresh(inputBook, inputChapter, gen);
-                        return;
-                    }
-                } catch (e) {
-                    // Cache check failed, fall through to normal fetch
+            // Cache first when offline is forced, or auto-cache has the chapter: show it
+            // at once and refresh from the network in the background
+            if (this.forcedOffline || (this.autoCacheEnabled && os)) {
+                const cached = await fromCache();
+                if (gen !== this._loadGeneration) return false;
+                if (cached?.length) {
+                    this._showPassage(r, cached, {});
+                    this._loadCachedCrossRefs(r, gen);
+                    if (!this.forcedOffline) this._backgroundRefresh(r, gen);
+                    return true;
                 }
+                if (this.forcedOffline) return fail(notSaved);
             }
 
+            let response;
             try {
-                const response = await fetch(
-                    `/api/passage/${encodeURIComponent(ref)}?translation=${this.translation}`
-                );
-
-                if (!response.ok) {
-                    let detail = 'Failed to load passage';
-                    try { const data = await response.json(); detail = data.detail || detail; } catch {}
-                    // The server answered: show its message, not "not cached" (P0-4)
-                    if (gen === this._loadGeneration) {
-                        this.error = response.status === 404 ? `Couldn't find "${ref}". ${detail}` : detail;
-                        this.verses = [];
-                    }
-                    return;
-                }
-
-                const data = await response.json();
-                if (gen !== this._loadGeneration) return;  // superseded by newer navigation (B4)
-                this.currentReference = data.reference;
-                this.referenceInput = data.reference;
-                // Precompute rendered html once per assignment (P5) instead of per render
-                this.verses = (data.verses || []).map(v => ({ ...v, html: this.formatVerseText(v.text) }));
-                this.crossRefs = data.cross_references || [];
-                this.highlightedVerses = data.highlighted_verses || [];
-                this.speakerVerses = data.speaker_verses || [];
-
-                // Parse reference for navigation
-                this.parseCurrentReference();
-                this.rebuildVerseColorMap();
-
-                // Track in reading history
-                this.addToHistory(this.currentReference, this.translation);
-
-                // Update URL with clean path format (new chapter = new history entry)
-                this.updateURL(this._historyMode === 'push');
-
-                // Load interlinear data if available. Lazy by default (P3): the
-                // payload is ~50KB/chapter and the feature is off by default.
-                // Eager only when the toggle is already on, or when auto-cache
-                // needs the data for offline storage.
-                if ((this.showInterlinear || this.autoCacheEnabled)
-                        && (OT_BOOKS.includes(this.currentBook) || NT_BOOKS.includes(this.currentBook))) {
-                    await this.loadInterlinearData();
-                } else {
-                    this.interlinearData = {};
-                    this._interlinearRef = null;
-                }
-
-                // Scroll to highlighted verse if any
-                if (this.highlightedVerses.length > 0) {
-                    this.$nextTick(() => {
-                        const firstHighlighted = document.getElementById(`verse-${this.highlightedVerses[0]}`);
-                        if (firstHighlighted) {
-                            firstHighlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    });
-                }
-
-                // Setup scroll-based verse tracking
-                this.observeVerses();
-
-                // Load parallel data if parallel mode is active
-                if (this.parallelMode) {
-                    this.loadParallelPassage();
-                }
-
-                // Auto-cache: save to IndexedDB for offline use
-                if (this.autoCacheEnabled && window.offlineStorage && this.currentBook && this.currentChapter) {
-                    this._autoCacheCurrentChapter();
-                }
-
+                response = await fetch(`/api/passage/${encodeURIComponent(ref)}?translation=${this.translation}`);
             } catch (err) {
-                // Network failed — try IndexedDB fallback (skip if superseded, B4)
-                if (gen === this._loadGeneration) {
-                    await this._loadFromCache(inputBook, inputChapter, err.message);
-                }
-            } finally {
-                // A newer navigation owns the spinner if gen moved on (B4)
-                if (gen === this._loadGeneration) this.loading = false;
+                // Network down: whatever was saved for offline
+                const cached = await fromCache();
+                if (gen !== this._loadGeneration) return false;
+                if (!cached?.length) return fail(notSaved);
+                this._showPassage(r, cached, {});
+                this._loadCachedCrossRefs(r, gen);
+                this.showToast('Loaded from offline cache', 'info');
+                return true;
             }
+            if (gen !== this._loadGeneration) return false;
+            if (!response.ok) {
+                // The server answered: show its message, not "not cached" (P0-4)
+                let detail = 'Failed to load passage';
+                try { detail = (await response.json()).detail || detail; } catch { /* not JSON */ }
+                return fail(response.status === 404 ? `Couldn't find ${ref}. ${detail}` : detail);
+            }
+            const data = await response.json();
+            if (gen !== this._loadGeneration) return false;
+            const interlinear = this._showPassage(r, data.verses || [], {
+                crossRefs: data.cross_references || [],
+                speakers: data.speaker_verses || [],
+                highlighted: data.highlighted_verses,
+            });
+            // Auto-cache: save to IndexedDB for offline use (with the interlinear words)
+            if (this.autoCacheEnabled && os) {
+                interlinear.then(() => gen === this._loadGeneration && this._autoCacheCurrentChapter());
+            }
+            return true;
         },
 
-        // Load passage from IndexedDB cache (used by offline fallback and forced offline mode)
-        async _loadFromCache(book, chapter, errorMsg = null) {
-            if (!window.offlineStorage) {
-                this.error = errorMsg || 'Offline storage not available';
-                this.verses = [];
-                this.loading = false;
-                return;
+        // Put a loaded chapter on screen (network or cache path alike)
+        _showPassage(r, verses, { crossRefs = [], speakers = [], highlighted = null }) {
+            this.verses = verses.map(v => ({ verse: v.verse, text: v.text, html: this.formatVerseText(v.text) }));
+            const available = new Set(verses.map(v => v.verse));
+            let hv = highlighted;
+            if (!hv) {
+                hv = [];
+                for (let v = r.vs || 0; r.vs && v <= (r.ve || r.vs); v++) if (available.has(v)) hv.push(v);
             }
-            try {
-                const cached = await window.offlineStorage.getChapterVerses(
-                    this.translation, book, chapter
-                );
-                if (cached && cached.length > 0) {
-                    this.verses = cached.map(v => ({ verse: v.verse, text: v.text, html: this.formatVerseText(v.text) }));
-                    this.currentReference = `${book} ${chapter}`;
-                    this.parseCurrentReference();
-                    this.rebuildVerseColorMap();
-                    this.crossRefs = [];
-                    this.highlightedVerses = [];
-                    this.speakerVerses = [];
-                    this.referenceInput = this.currentReference;
-                    this.updateURL(this._historyMode === 'push');
-                    this.observeVerses();
-
-                    // Load cached cross-refs
-                    try {
-                        const cachedRefs = await window.offlineStorage.getChapterCrossRefs(book, chapter);
-                        if (cachedRefs?.length > 0) this.crossRefs = cachedRefs;
-                    } catch (e) { /* silent */ }
-
-                    // Load cached interlinear (lazy unless shown or auto-cache wants it — P3)
-                    if (this.showInterlinear || this.autoCacheEnabled) {
-                        await this.loadInterlinearData();
-                    } else {
-                        this.interlinearData = {};
-                        this._interlinearRef = null;
-                    }
-
-                    this.error = null;
-                    this.showToast('Loaded from offline cache', 'info');
-                } else {
-                    this.error = `${book} ${chapter} is not cached for offline use. Read it while online first, or download from Settings.`;
-                    this.verses = [];
-                }
-            } catch (cacheErr) {
-                console.error('IndexedDB fallback failed:', cacheErr);
-                this.error = errorMsg || 'Failed to load from cache';
-                this.verses = [];
-            } finally {
-                this.loading = false;
-            }
+            this.highlightedVerses = hv;
+            this.selectionContext = null;
+            this.currentBook = r.book;
+            this.currentChapter = r.chapter;
+            this.currentReference = hv.length
+                ? BibleRef.format({ book: r.book, chapter: r.chapter, vs: hv[0], ve: hv[hv.length - 1] })
+                : `${r.book} ${r.chapter}`;
+            this.crossRefs = crossRefs;
+            this.speakerVerses = speakers;
+            this.verseTopics = [];
+            if (hv.length) this.loadTopicsForVerse(hv[0]);
+            this.rebuildVerseColorMap();
+            this.observeVerses();
+            this.loading = false;
+            if (this.parallelMode) this.loadParallelPassage();
+            // Interlinear is lazy (P3) unless shown, or auto-cache wants it for offline
+            if (this.showInterlinear || this.autoCacheEnabled) return this.loadInterlinearData();
+            this.interlinearData = {};
+            this._interlinearRef = null;
+            return Promise.resolve();
         },
 
-        // Background refresh: fetch fresh data from API and update cache (does not update UI unless data changed significantly)
-        async _backgroundRefresh(book, chapter, gen) {
+        // Cross-references saved with an offline chapter (for the highlighted verses if any)
+        async _loadCachedCrossRefs(r, gen) {
             try {
-                const ref = `${book} ${chapter}`;
+                const vv = this.highlightedVerses;
+                const refs = vv.length
+                    ? await window.offlineStorage.getChapterCrossRefs(r.book, r.chapter, vv[0], vv[vv.length - 1])
+                    : await window.offlineStorage.getChapterCrossRefs(r.book, r.chapter);
+                if (gen === this._loadGeneration && refs?.length > 0) this.crossRefs = refs;
+            } catch (e) { /* silent */ }
+        },
+
+        // Background refresh after a cache hit: cross-refs and red-letter data aren't
+        // cached with the verses, and the cached chapter is re-saved fresh.
+        async _backgroundRefresh(r, gen) {
+            try {
                 const response = await fetch(
-                    `/api/passage/${encodeURIComponent(ref)}?translation=${this.translation}`
+                    `/api/passage/${encodeURIComponent(BibleRef.format(r))}?translation=${this.translation}`
                 );
                 if (!response.ok) return;
                 const data = await response.json();
-
                 // Stale response after fast navigation — do not clobber state (B4)
-                if (gen !== undefined && gen !== this._loadGeneration) return;
-
-                // Update cross-refs and speaker data silently (these aren't cached initially)
-                if (data.cross_references?.length > 0) {
-                    this.crossRefs = data.cross_references;
-                }
-                if (data.speaker_verses?.length > 0) {
-                    this.speakerVerses = data.speaker_verses;
-                }
-
-                // Re-cache the fresh data
-                if (window.offlineStorage) {
-                    this._autoCacheCurrentChapter();
-                }
+                if (gen !== this._loadGeneration) return;
+                if (data.cross_references?.length > 0) this.crossRefs = data.cross_references;
+                if (data.speaker_verses?.length > 0) this.speakerVerses = data.speaker_verses;
+                if (window.offlineStorage) this._autoCacheCurrentChapter();
             } catch (err) {
                 // Silent — background refresh is best-effort
             }
-        },
-
-        // Load a reference (from cross-ref click, etc.)
-        async loadReference(ref) {
-            this.showChapterJump = false;
-            // Exit combined plan reading mode when navigating to a different reference
-            // but remember we were in it so user can return
-            if (this.combinedPlanReading) {
-                this.wasInPlanReading = true;
-                this.combinedPlanReading = false;
-                this.planReadingSections = [];
-                this.planReadingChapters = [];
-            }
-            this.referenceInput = ref;
-            await this.loadPassage();
         },
 
         // Toggle parallel translation mode
@@ -1688,7 +1333,7 @@ function bibleApp() {
             if (link) {
                 event.preventDefault();
                 const ref = link.dataset.ref;
-                if (ref) this.loadReference(ref);
+                if (ref) this.navigate(ref, { kind: 'jump' });
             }
         },
 
@@ -1697,7 +1342,7 @@ function bibleApp() {
             const vs = ref.verse_start;
             const ve = ref.verse_end && ref.verse_end !== vs ? ref.verse_end : null;
             const refStr = ve ? `${ref.book} ${ref.chapter}:${vs}-${ve}` : `${ref.book} ${ref.chapter}:${vs}`;
-            this.loadReference(refStr);
+            this.navigate(refStr, { kind: 'jump' });
         },
 
         // Select a verse from a verse reference (e.g., clicking "v. 3" in commentary)
@@ -1720,44 +1365,6 @@ function bibleApp() {
             if (match) {
                 this.currentBook = match[1];
                 this.currentChapter = parseInt(match[2]);
-            }
-        },
-
-        // Navigate to previous chapter
-        previousChapter() {
-            if (this.loading || !this.currentBook) return;  // combined plan mode has no current book (P0-5)
-            if (this.currentChapter > 1) {
-                // Go to previous chapter in same book
-                this.referenceInput = `${this.currentBook} ${this.currentChapter - 1}`;
-                this.loadPassage();
-            } else {
-                // At chapter 1, go to last chapter of previous book
-                const bookIndex = BIBLE_BOOKS.indexOf(this.currentBook);
-                if (bookIndex > 0) {
-                    const prevBook = BIBLE_BOOKS[bookIndex - 1];
-                    const lastChapter = BOOK_CHAPTERS[prevBook] || 1;
-                    this.referenceInput = `${prevBook} ${lastChapter}`;
-                    this.loadPassage();
-                }
-            }
-        },
-
-        // Navigate to next chapter
-        nextChapter() {
-            if (this.loading || !this.currentBook) return;
-            const maxChapter = BOOK_CHAPTERS[this.currentBook] || 1;
-            if (this.currentChapter < maxChapter) {
-                // Go to next chapter in same book
-                this.referenceInput = `${this.currentBook} ${this.currentChapter + 1}`;
-                this.loadPassage();
-            } else {
-                // At last chapter, go to first chapter of next book
-                const bookIndex = BIBLE_BOOKS.indexOf(this.currentBook);
-                if (bookIndex < BIBLE_BOOKS.length - 1) {
-                    const nextBook = BIBLE_BOOKS[bookIndex + 1];
-                    this.referenceInput = `${nextBook} 1`;
-                    this.loadPassage();
-                }
             }
         },
 
@@ -1798,7 +1405,6 @@ function bibleApp() {
             // Update state
             this.highlightedVerses = [verseNum];
             this.currentReference = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
-            this.referenceInput = this.currentReference;
             this.selectedWord = null;
 
             // Update URL
@@ -1897,7 +1503,6 @@ function bibleApp() {
                 this.crossRefs = this.combinedCrossRefs;
             } else if (this.currentBook && this.currentChapter) {
                 this.currentReference = `${this.currentBook} ${this.currentChapter}`;
-                this.referenceInput = this.currentReference;
                 this.updateURL();
             }
         },
@@ -2041,7 +1646,6 @@ function bibleApp() {
                     this.currentBook = verse._book;
                     this.currentChapter = verse._chapter;
                     this.currentReference = `${verse._book} ${verse._chapter}:${verseNum}`;
-                    this.referenceInput = this.currentReference;
 
                     // Load cross-refs and topics for just this verse (concurrently)
                     await Promise.all([
@@ -2054,7 +1658,6 @@ function bibleApp() {
 
             // Update reference display
             this.currentReference = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
-            this.referenceInput = this.currentReference;
 
             // Update URL
             this.updateURL();
@@ -2130,8 +1733,7 @@ function bibleApp() {
         },
 
         navigateFromPath(reference) {
-            this.showPathToChrist = false;
-            this.loadReference(reference);
+            this.navigate(reference, { kind: 'jump' });
         },
 
         // Show verse preview on hover (desktop only)
@@ -2644,26 +2246,8 @@ function bibleApp() {
         immersiveTouchEnd(e) {
             const diff = e.changedTouches[0].screenX - this.immersiveTouchStartX;
             if (Math.abs(diff) > 80) {
-                if (this.combinedPlanReading) {
-                    if (diff > 0) this.immersivePlanPrev();
-                    else this.immersivePlanNext();
-                } else {
-                    if (diff > 0) this.previousChapter();
-                    else this.nextChapter();
-                }
-            }
-        },
-
-        immersivePlanPrev() {
-            if (this.planDay > 1) {
-                this.planDay--;
-                this.startPlanReading();
-            }
-        },
-
-        immersivePlanNext() {
-            if (this.planDay < (this.currentPlan?.duration_days || 365)) {
-                this.markPlanDayAndContinue();
+                if (diff > 0) this.previousChapter();   // a plan day in plan reading
+                else this.nextChapter();
             }
         },
 

@@ -16,6 +16,8 @@ uvicorn backend.main:app --reload
 ## Key Files
 - `frontend/index.html` — The entire HTML/Alpine.js app (monolith)
 - `frontend/static/js/app.js` — Main app logic (~3,200 lines) with Alpine.js `bibleApp()` component
+- `frontend/static/js/modules/nav.js` — the only way the reader changes passage: `navigate(target, { kind: 'read'|'jump'|'stay', source })`, history/Back, the return chip, the passage picker, `BibleRef.parse()` (canonical references). Don't set `currentBook`/`verses` or call `loadPassage()` from anywhere else.
+- `frontend/static/js/modules/wordlink.js` — when a tapped word's Hebrew/Greek link is shown as fact (confidence rule)
 - `frontend/static/js/offline-storage.js` — IndexedDB wrapper for offline caching
 - `frontend/static/sw.js` — Service worker (network-first for API, cache-first for static)
 - `frontend/static/css/style.css` — All styles (~5,900 lines)

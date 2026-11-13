@@ -409,9 +409,9 @@ window.BibleModules = window.BibleModules || {};
             const depth = this._studyDepth;
             if (history === 'push') {
                 this._studyDepth = depth + 1;
-                window.history.pushState({ study: true, studyDepth: this._studyDepth, studyPrevLabel: this.study.prevLabel }, '', url);
+                this.navPushState({ study: true, studyDepth: this._studyDepth, studyPrevLabel: this.study.prevLabel }, url);
             } else if (history === 'replace') {
-                window.history.replaceState({ study: true, studyDepth: depth, studyPrevLabel: this.study.prevLabel }, '', url);
+                this.navReplaceState({ study: true, studyDepth: depth, studyPrevLabel: this.study.prevLabel }, url);
             }
 
             this.$nextTick(() => {
@@ -434,7 +434,7 @@ window.BibleModules = window.BibleModules || {};
                 return;
             }
             this.studyHide();
-            this.updateURL(false);
+            this.updateURL();
         },
 
         // One step back: previous study location, or out to the reader.
@@ -723,7 +723,7 @@ window.BibleModules = window.BibleModules || {};
                 this.study.active = slug;
                 const prefs = this.studyPrefs();
                 this.studySavePrefs({ ...prefs, last: slug });
-                if (this.study.open) window.history.replaceState({ ...(window.history.state || {}), study: true }, '', this.studyURL(slug));
+                if (this.study.open) this.navReplaceState({ ...(window.history.state || {}), study: true }, this.studyURL(slug));
             }
             this.studyLoadPane(slug);
             if (scroll) this.studyScrollToSource(slug, true);
@@ -898,13 +898,12 @@ window.BibleModules = window.BibleModules || {};
             this.studyClosePeek();
             if (ref) this.openStudy(ref, { history: 'push' });
         },
-        // Leave the study view for the reader; Back returns to this study location.
+        // Leave the study view for the reader; the return chip and Back both come back
+        // to this study location (navigate() closes the view).
         studyPeekRead() {
             const ref = this.study.peek?.ref;
             this.studyClosePeek();
-            if (!ref) return;
-            this.studyHide();
-            this.loadReference(ref);
+            if (ref) this.navigate(ref, { kind: 'jump' });
         },
 
         // ---------- reader hint: which sources say something on the selection ----------
