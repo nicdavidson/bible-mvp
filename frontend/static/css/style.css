@@ -2171,6 +2171,13 @@ textarea:focus:not(:focus-visible) {
     transition: all 0.15s;
 }
 
+.setting-tour-btn {
+    min-height: 44px;
+    flex-shrink: 0;
+    font-size: 0.875rem;
+    color: var(--color-text);
+}
+
 .btn-reset-colors:hover {
     background: var(--color-border);
     color: var(--color-text);

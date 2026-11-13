@@ -169,7 +169,7 @@
             <button @click="enterImmersiveMode()" class="btn-icon header-immersive" title="Immersive reading (F)" x-show="currentReference">
                 <span class="immersive-enter-icon">⛶</span>
             </button>
-            <button @click="openSearch()" class="btn-icon" title="Search (/)">
+            <button @click="openSearch()" class="btn-icon header-search" title="Search (/)">
                 🔍
             </button>
         </div>
@@ -1250,6 +1250,17 @@
                             </template>
                         </div>
                         <button @click="resetGenreColors()" class="btn-reset-colors">Reset to Defaults</button>
+                    </div>
+
+                    <div class="settings-section">
+                        <h4>Help</h4>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <div class="setting-label">Walkthrough</div>
+                                <div class="setting-description">A short tour of the main controls</div>
+                            </div>
+                            <button type="button" class="btn-reset-colors setting-tour-btn" @click="showSettings = false; tourStart()">Show the walkthrough</button>
+                        </div>
                     </div>
                 </div>
 

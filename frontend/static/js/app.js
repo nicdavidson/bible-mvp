@@ -40,6 +40,11 @@ let _relevantNotesCache = [];
 // Monotonic toast id — Date.now() collides for same-ms toasts (B11)
 let _toastSeq = 0;
 
+// This deploy's asset version ('?v=<commit>' from the script tag) for files loaded on
+// demand: the walkthrough, modules/tour.js, which sets TOUR_DONE_KEY when finished or skipped.
+const ASSET_V = (() => { try { return new URL(document.currentScript.src).search; } catch (e) { return ''; } })();
+const TOUR_DONE_KEY = 'tourDone';
+
 // Chapter counts for each book
 const BOOK_CHAPTERS = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
@@ -608,6 +613,40 @@ function bibleApp() {
 
             // Load reading plan progress from localStorage
             this.loadPlanProgress();
+
+            this.tourArm();
+        },
+
+        // ---------- the walkthrough (modules/tour.js, imported only when it runs) ----------
+        tourStart(opts = {}) {
+            return import(`/static/js/modules/tour.js${ASSET_V}`)
+                .then(m => m.startTour(this, opts))
+                .catch(err => console.warn('Walkthrough unavailable:', err));
+        },
+
+        // Once per device: on a plain load (Home or a chapter; not ?study=, /word/, ?search=,
+        // a plan), the first time a chapter is on screen with nothing open over it. Storage
+        // must work, or the tour would come back on every load. Returning users: one getItem.
+        tourArm() {
+            try {
+                if (localStorage.getItem(TOUR_DONE_KEY)) return;
+                localStorage.setItem('tourProbe', '1');
+                localStorage.removeItem('tourProbe');
+            } catch (e) { return; }
+            const path = window.location.pathname;
+            const plain = !window.location.search
+                && (path === '/' || /^\/[^/]+\/\d+(?:\/\d+(?:-\d+)?)?$/.test(path));
+            if (!plain || this.ws?.open || this.study?.open || this.showSearch || this.combinedPlanReading) return;
+            let started = false;
+            const tryStart = () => this.$nextTick(() => {
+                if (started || !this.verses.length || this.loading || this.combinedPlanReading) return;
+                if (this.anyModalOpen() || this.picker.open || this.selectedWord || document.querySelector('dialog[open]')) return;
+                started = true;
+                this.tourStart({ auto: true });
+            });
+            this.$watch('verses', tryStart);
+            this.$watch('loading', tryStart);
+            tryStart();
         },
 
         // Setup IntersectionObserver for scroll-based active verse tracking

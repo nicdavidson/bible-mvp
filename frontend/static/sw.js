@@ -10,15 +10,16 @@ const SW_VERSION = '__SW_VERSION__';
 const STATIC_CACHE = `biblemvp-static-${SW_VERSION}`;  // app shell: one per deploy
 const CONTENT_CACHE = 'biblemvp-content';               // API data: survives deploys
 
-// Exactly the URLs index.html requests (versioned ones carry ?v=)
+// Exactly the URLs index.html requests (versioned ones carry ?v=), plus the walkthrough
+// (modules/tour.js imports itself and css/tour.css on demand) so it works offline
 const V = `?v=${SW_VERSION}`;
 const SHELL = [
     '/', '/config.js', '/static/manifest.json', '/static/icons/icon.svg',
     '/static/vendor/alpine-3.17.4.min.js', '/static/vendor/supabase-2.117.2.min.js',
     ...[
-        '/static/css/style.css', '/static/css/study.css', '/static/css/nav.css', '/static/css/wordstudy.css', '/static/css/search.css', '/static/js/app.js', '/static/js/offline-storage.js',
+        '/static/css/style.css', '/static/css/study.css', '/static/css/nav.css', '/static/css/wordstudy.css', '/static/css/search.css', '/static/css/tour.css', '/static/js/app.js', '/static/js/offline-storage.js',
         '/static/js/supabase-client.js',
-        ...['tts', 'menus', 'share', 'feedback', 'tags', 'selection', 'offline', 'plans', 'study_extras', 'study', 'study_panes', 'hymns', 'wordstudy', 'search', 'nav', 'wordlink']
+        ...['tts', 'menus', 'share', 'feedback', 'tags', 'selection', 'offline', 'plans', 'study_extras', 'study', 'study_panes', 'hymns', 'wordstudy', 'search', 'nav', 'wordlink', 'tour']
             .map(m => `/static/js/modules/${m}.js`),
     ].map(u => u + V),
 ];
