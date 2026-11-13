@@ -23,6 +23,7 @@ Usage:
 """
 import json
 import os
+import time
 import urllib.request
 from pathlib import Path
 
@@ -106,6 +107,38 @@ def cached_fetch_json(key: str, url: str, timeout: int = 30) -> dict | list | No
     except json.JSONDecodeError as e:
         print(f"    JSON parse error for {key}: {e}")
         return None
+
+
+_last_fetch = 0.0
+
+
+def cached_fetch_bytes(key: str, url: str, timeout: int = 120, min_interval: float = 2.0) -> bytes | None:
+    """Fetch a binary file (e.g. a SWORD module zip) from cache or URL.
+
+    Network fetches are spaced at least `min_interval` seconds apart to be polite to
+    upstream servers. Returns None on failure.
+    """
+    global _last_fetch
+    p = _cache_path(key)
+    if p.exists() and p.stat().st_size > 0:
+        return p.read_bytes()
+    wait = _last_fetch + min_interval - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "BibleMVP/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            data = response.read()
+    except Exception as e:
+        print(f"    Error fetching {url}: {e}")
+        return None
+    finally:
+        _last_fetch = time.time()
+    _ensure_dir(p)
+    tmp = p.with_suffix(p.suffix + ".part")
+    tmp.write_bytes(data)
+    tmp.replace(p)
+    return data
 
 
 def cached_fetch_html(key: str, url: str, timeout: int = 30) -> str | None:
