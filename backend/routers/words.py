@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from .. import alignment_store
+from ..word_study import edition_sql
 from ..database import get_db_connection, get_writable_db_connection, DATABASE_PATH
 from ..core import (OT_BOOKS, NT_BOOKS, CANONICAL_BOOKS, limiter,
                     parse_reference, get_cross_references, get_speaker_verses)
@@ -319,7 +320,7 @@ def get_passage_interlinear(
         # Query alignment data with variant info.
         # For Greek NT, filter to only show words present in the translation's source edition.
         # Words with no editions data (Hebrew OT, or legacy data) are always included.
-        cursor = conn.execute("""
+        cursor = conn.execute(f"""
             SELECT a.verse, a.word_position as position, a.hebrew_text as original_text,
                    a.book || '.' || a.chapter || '.' || a.verse || '.' || a.word_position as word_id,
                    CASE WHEN a.strong_number LIKE 'H0%%' THEN 'H' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
@@ -341,7 +342,7 @@ def get_passage_interlinear(
                 WHEN a.strong_number LIKE 'G0%%' THEN 'G' || CAST(CAST(SUBSTR(a.strong_number, 2) AS INTEGER) AS TEXT)
                 ELSE a.strong_number END
             WHERE a.book = ? AND a.chapter = ?
-              AND (a.editions IS NULL OR ? IS NULL OR a.editions LIKE '%%' || ? || '%%')
+              AND (a.editions IS NULL OR ? IS NULL OR {edition_sql("a.editions")})
             ORDER BY a.verse, a.word_position
         """, (book, chapter, edition_key, edition_key))
 

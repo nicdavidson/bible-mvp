@@ -62,9 +62,12 @@ class SourceToken:
         return self.strong
 
     def in_edition(self, edition: str | None) -> bool:
+        """Exact edition name. TAGNT lists editions that have the word in a different
+        order with the displacement ('TR«3': in the TR, 3 words earlier; 'Byz»1': one
+        later); the word is in that edition, so it counts."""
         if edition is None or self.editions is None:
             return True
-        return edition in self.editions.split("+")
+        return edition in {e.split("«")[0].split("»")[0] for e in self.editions.split("+")}
 
 
 def _base_strong(code: str) -> str:

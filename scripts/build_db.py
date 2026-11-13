@@ -101,7 +101,7 @@ IMPORT_STEPS = [
     {
         "name": "alignments",
         "description": "Word alignments for BSB, KJV, WEB + lemma_renderings index",
-        "version": "1.1",  # 1.1: every word tappable, reranker, KJV calibration
+        "version": "1.2",  # 1.2: TR«n / Byz»n displaced words are candidates; 1.1: tappable words, reranker
         "script": "build_alignments.py",
         "args": ["all"],
         "requires_data": "clear-bible",
