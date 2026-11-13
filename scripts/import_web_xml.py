@@ -136,10 +136,14 @@ def parse_usfx(xml_content: str, conn: sqlite3.Connection) -> int:
         for (chapter, verse), pieces in verses.items():
             text = re.sub(r'\s+', ' ', ''.join(pieces)).strip()
             if text:
+                # Upsert, not INSERT OR REPLACE: REPLACE deletes without firing
+                # the verses_ad trigger, which leaves verses_fts corrupt.
                 cursor.execute("""
-                    INSERT OR REPLACE INTO verses
+                    INSERT INTO verses
                     (translation_id, book, book_order, chapter, verse, text)
                     VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(translation_id, book, chapter, verse)
+                    DO UPDATE SET text = excluded.text, book_order = excluded.book_order
                 """, ("WEB", book_name, book_order, chapter, verse, text))
                 book_verses += 1
 
@@ -164,6 +168,9 @@ def main():
         print(f"Downloaded {len(xml_content):,} bytes\n")
 
         total = parse_usfx(xml_content, conn)
+        # Belt and braces: re-derive the external-content FTS index from verses.
+        conn.execute("INSERT INTO verses_fts(verses_fts) VALUES('rebuild')")
+        conn.commit()
 
         print(f"\n{'=' * 50}")
         print(f"WEB Import Complete: {total} verses")
