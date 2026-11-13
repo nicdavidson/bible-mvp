@@ -105,7 +105,8 @@ def test_typed_reference_in_sloppy_form(server, browser, size):
     pg.wait_for_selector("#passage-picker[open]")
     pg.fill("#passage-picker .picker-input", "rom 8:28")
     # The typed text is read back canonically before going
-    assert pg.inner_text("#passage-picker .picker-go") == "Go to Romans 8:28"
+    pg.wait_for_selector("#passage-picker .picker-go", state="visible")
+    assert pg.inner_text("#passage-picker .picker-go").strip() == "Go to Romans 8:28"
     pg.press("#passage-picker .picker-input", "Enter")
     _wait_ref(pg, "Romans 8:28")
     # Canonical everywhere: URL, title, state, history entry, Recent

@@ -161,7 +161,8 @@ def test_offline_chapter_and_book_agree(client):
     assert len(a) == len(b) > 300
     assert [(x["verse"], x["position"], x["word"]) for x in a] == \
         [(x["verse"], x["position"], x["word"]) for x in b]
-    assert list(a[0]) == ["verse", "position", "word", "original_word_position", "original_text",
+    assert list(a[0]) == ["verse", "position", "word", "original_word_position", "confidence",
+                          "method", "original_text",
                           "transliteration", "gloss", "strong_number", "grammar", "definition",
                           "extended_definition", "language"]
 

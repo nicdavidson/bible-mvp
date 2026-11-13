@@ -49,7 +49,14 @@ def test_thresholds_match_the_alignment_doc():
 @pytest.mark.skipif(not DB.exists(), reason="no data/bible.db")
 def test_js_list_matches_aligner_over_the_vocabulary():
     con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
-    vocab = {_key(r[0]) for r in con.execute("SELECT DISTINCT english_word FROM english_word_alignments")}
+    # Alignments are packed per verse now; the vocabulary is every tappable word of an aligned verse.
+    from backend import alignment_store
+    vocab = set()
+    for (text,) in con.execute(f"""
+            SELECT v.text FROM {alignment_store.TABLE} p
+            JOIN verses v ON v.translation_id = p.translation_id AND v.book = p.book
+                 AND v.chapter = p.chapter AND v.verse = p.verse"""):
+        vocab.update(_key(w) for w in alignment_store.tappable_words(text))
     expected = {w for w in vocab if is_function(normalize(w))}
     js = _js_function_words()
     assert expected - js == set(), "function words missing from wordlink.js"
