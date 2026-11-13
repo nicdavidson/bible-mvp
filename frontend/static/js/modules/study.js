@@ -22,6 +22,8 @@ window.BibleModules = window.BibleModules || {};
     // first (Scofield) never opens as an empty pane.
     const DEFAULT_ORDER = [
         'scofield-notes-1917', 'john-gill', 'jamieson-fausset-brown', 'tyndale-study-notes',
+        'gaebelein-annotated-bible', 'ironside-expositions', 'darby-synopsis',
+        'brooks-summarized-bible', 'mackintosh-notes-on-the-pentateuch', 'larkin-on-revelation',
         'treasury-of-david',
     ];
     const chapterCache = new Map();         // "Book|ch|slug" -> entries (whole chapter)

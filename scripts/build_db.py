@@ -124,7 +124,7 @@ IMPORT_STEPS = [
         "script": "import_cross_refs.py",
         "requires_data": "cross_references.txt",
     },
-    # The commentary library: five sources (scripts/commentary_registry.py,
+    # The commentary library (scripts/commentary_registry.py,
     # docs/COMMENTARY_LIBRARY_2026-11.md). Eight others were removed on 2026-11-13 at the
     # owner's decision; the commentary_search step drops their rows from an older DB.
     {
@@ -149,14 +149,36 @@ IMPORT_STEPS = [
             ("commentary_tyndale", "tyndale", "Tyndale Open Study Notes (CC BY-SA)"),
         ]
     ],
+    # Dispensational sources, first wave (2026-11-13): first published before 1931.
+    # SermonIndex SWORD modules repaired at import (scripts/commentary_repair.py) and
+    # Project Gutenberg texts; docs/COMMENTARY_LIBRARY_2026-11.md has the evidence.
+    *[
+        {
+            "name": step,
+            "description": f"{desc} commentary",
+            "version": "1.0",
+            "script": "import_commentary.py",
+            "args": [key],
+        }
+        for step, key, desc in [
+            ("commentary_gaebelein", "gaebelein", "Gaebelein, Annotated Bible (SermonIndex)"),
+            ("commentary_ironside", "ironside", "Ironside, pre-1931 volumes (SermonIndex)"),
+            ("commentary_darby", "darby", "Darby, Synopsis NT (SermonIndex)"),
+            ("commentary_brooks", "brooks", "Brooks, Summarized Bible (SermonIndex)"),
+            ("commentary_mackintosh", "mackintosh", "Mackintosh, Notes on the Pentateuch (Gutenberg)"),
+            ("commentary_larkin", "larkin", "Larkin, Book of Revelation (SermonIndex)"),
+        ]
+    ],
     {
         # Commentary search text derived from content through a view instead of a stored
         # copy (backend/commentary_search.py); converts an older DB, no-op on a new one.
         # 1.1: also drops sources no longer in the registry and refreshes the kept sources'
         # commentary_sources rows (sort_order, size_bytes), then rechecks the FTS index.
+        # 1.2: rerun after the 2026-11-13 dispensational sources (Treasury of David's
+        # sort_order moved to the end of the new order).
         "name": "commentary_search",
         "description": "Commentary FTS over a view; drop sources not in the registry",
-        "version": "1.1",
+        "version": "1.2",
         "script": "migrate_commentary_search.py",
     },
     {
