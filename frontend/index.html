@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/static/css/style.css?v=__SW_VERSION__">
     <link rel="stylesheet" href="/static/css/study.css?v=__SW_VERSION__">
     <link rel="stylesheet" href="/static/css/nav.css?v=__SW_VERSION__">
+    <link rel="stylesheet" href="/static/css/wordstudy.css?v=__SW_VERSION__">
     <script src="/static/vendor/supabase-2.117.2.min.js"></script>
     <script src="/config.js"></script>
     <script src="/static/js/supabase-client.js?v=__SW_VERSION__"></script>
@@ -686,11 +687,11 @@
             </div>
         </section>
 
-        <!-- Word Details Panel (shows on word click) -->
-        <aside class="panel panel-word" x-show="selectedWord" x-transition>
+        <!-- Word panel: a quick look at a tapped word, and the way into its study (modules/wordstudy.js) -->
+        <aside class="panel panel-word" x-show="selectedWord" x-transition aria-labelledby="word-panel-title">
             <div class="panel-header">
-                <h2>Word Details</h2>
-                <button @click="selectedWord = null" class="btn-close">×</button>
+                <h2 id="word-panel-title">Word</h2>
+                <button @click="selectedWord = null" class="btn-close" aria-label="Close">×</button>
             </div>
             <div class="panel-body" x-show="selectedWord">
                 <!-- A weak link (BibleWordLink): say we aren't sure, offer the closest match -->
@@ -702,32 +703,42 @@
                         <button type="button" class="word-reveal" @click="revealWordLink()">Show the closest match</button>
                     </div>
                 </template>
-                <!-- Show full word details when we have original language data -->
+                <!-- The source word: what it is, one lexicon gloss, how often, and the next step -->
                 <template x-if="(selectedWord?.original || selectedWord?.strong_number) && !(selectedWord?.unsure && !selectedWord?.revealed)">
-                    <div>
+                    <div class="qw">
                         <p class="word-unsure-note" x-show="selectedWord?.unsure">Closest match. Not certain: the link between these words is weak.</p>
-                        <div class="word-header">
-                            <span class="word-original" :class="selectedWord?.language" x-text="selectedWord?.original || selectedWord?.text"></span>
-                            <span class="word-transliteration" x-text="selectedWord?.transliteration || '—'"></span>
+                        <div class="qw-head">
+                            <span class="qw-original ws-orig" :class="selectedWord?.language"
+                                  :lang="selectedWord?.language === 'hebrew' ? 'he' : 'grc'" :dir="selectedWord?.language === 'hebrew' ? 'rtl' : 'ltr'"
+                                  x-text="selectedWord?.original || selectedWord?.text"></span>
+                            <span class="qw-translit" x-text="selectedWord?.quick?.transliteration || selectedWord?.transliteration || ''"></span>
                         </div>
-                        <div class="word-strongs" x-show="selectedWord?.strong_number">
-                            <span class="strong-badge" :class="selectedWord?.language" x-text="selectedWord?.strong_number"></span>
-                            <span class="word-lang-label" x-text="selectedWord?.language === 'hebrew' ? 'Hebrew' : selectedWord?.language === 'greek' ? 'Greek' : ''"></span>
-                        </div>
+                        <p class="qw-kind">
+                            <span x-text="(selectedWord?.language === 'hebrew' ? 'Hebrew' : 'Greek') + (selectedWord?.quick?.pos ? ' ' + selectedWord.quick.pos : '')"></span><template x-if="selectedWord?.strong_number"><span>, Strong's <span x-text="selectedWord?.strong_number"></span></span></template><template x-if="selectedWord?.text && !selectedWord?.interlinear && selectedWord?.original"><span>, behind “<span x-text="selectedWord?.text"></span>”</span></template>
+                        </p>
+                        <p class="qw-gloss" x-show="selectedWord?.quick?.gloss">
+                            “<span x-text="selectedWord?.quick?.gloss"></span>”
+                            <span class="qw-src" x-text="selectedWord?.quick?.glossSource"></span>
+                        </p>
+                        <p class="qw-gloss" x-show="!selectedWord?.quick?.gloss && selectedWord?.quick?.status !== 'loading' && selectedWord?.definition">
+                            <span x-text="(selectedWord?.definition || '').trim()"></span>
+                            <span class="qw-src">Strong's</span>
+                        </p>
+                        <p class="qw-note" x-show="selectedWord?.quick?.homographNote" x-text="selectedWord?.quick?.homographNote"></p>
+                        <p class="qw-count" x-show="selectedWord?.quick?.total"
+                           x-text="(selectedWord?.quick?.total === 1 ? 'Once' : (selectedWord?.quick?.total || 0).toLocaleString() + ' times') + ' in the ' + selectedWord?.quick?.testament"></p>
                         <div class="word-editions" x-show="selectedWord?.editions">
-                            <span class="editions-label">Editions:</span>
+                            <span class="editions-label">In these editions:</span>
                             <span class="editions-list" x-text="selectedWord?.editions?.replace(/\+/g, ', ')"></span>
                         </div>
-                        <div class="word-pronunciation" x-show="selectedWord?.pronunciation">
-                            <em x-text="selectedWord?.pronunciation"></em>
-                        </div>
-                        <div class="word-definition">
-                            <strong>Definition:</strong>
-                            <p x-text="selectedWord?.definition || 'No definition available'"></p>
-                        </div>
+                        <button type="button" class="qw-study" x-show="selectedWord?.strong_number && selectedWord?.quick?.status !== 'offline'" @click="studySelectedWord()">
+                            <span x-text="selectedWord?.unsure ? 'Study the closest match' : 'Study this word'"></span>
+                            <span class="qw-study-sub">Lexicons, translations, where it occurs, verses</span>
+                        </button>
+                        <p class="qw-offline" x-show="selectedWord?.quick?.status === 'offline'">The full word study needs a connection. This is the definition saved on this device.</p>
                     </div>
                 </template>
-                <!-- Show helpful message when clicking English words -->
+                <!-- An English word with no source word -->
                 <template x-if="!selectedWord?.original && !selectedWord?.strong_number">
                     <div class="word-hint">
                         <div class="word-hint-title">
@@ -736,63 +747,6 @@
                         <p x-text="selectedWord?.definition"></p>
                     </div>
                 </template>
-                <div class="word-extended" x-show="selectedWord?.extended_definition && !(selectedWord?.unsure && !selectedWord?.revealed)">
-                    <strong>KJV Usage:</strong>
-                    <p x-text="selectedWord?.extended_definition"></p>
-                </div>
-                <div class="word-derivation" x-show="selectedWord?.derivation">
-                    <strong>Derivation:</strong>
-                    <p x-text="selectedWord?.derivation"></p>
-                </div>
-                <!-- Translation variants (how the word is rendered in English) -->
-                <div class="word-glosses" x-show="selectedWord?.glosses?.length > 0">
-                    <strong>Translated as:</strong>
-                    <div class="gloss-chips">
-                        <template x-for="(g, gIdx) in (selectedWord?.glosses || []).slice(0, 8)" :key="'gl-' + gIdx">
-                            <span class="gloss-chip">
-                                <span class="gloss-text" x-text="g.gloss"></span>
-                                <span class="gloss-count" x-text="'(' + g.count + ')'"></span>
-                            </span>
-                        </template>
-                    </div>
-                </div>
-                <!-- Book frequency chart -->
-                <div class="word-frequency" x-show="selectedWord?.book_frequency?.length > 0">
-                    <strong>Frequency by book:</strong>
-                    <div class="freq-chart">
-                        <template x-for="(bf, bfIdx) in (selectedWord?.book_frequency || []).slice(0, 10)" :key="'bf-' + bfIdx">
-                            <div class="freq-row">
-                                <span class="freq-book" x-text="bf.book"></span>
-                                <div class="freq-bar-bg">
-                                    <div class="freq-bar" :style="'width: ' + Math.round((bf.count / (selectedWord?.book_frequency?.[0]?.count || 1)) * 100) + '%'"></div>
-                                </div>
-                                <span class="freq-count" x-text="bf.count"></span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-                <div class="word-occurrences" x-show="selectedWord?.count > 0">
-                    <h4>Appears <span x-text="selectedWord?.count"></span> times<span x-show="selectedWord?.count > (selectedWord?.occurrences || []).length" x-text="' (showing first ' + (selectedWord?.occurrences || []).length + ')'"></span>:</h4>
-                    <ul class="occurrence-list">
-                        <template x-for="(occ, occIdx) in (showAllOccurrences ? (selectedWord?.occurrences || []) : (selectedWord?.occurrences || []).slice(0, 10))" :key="'occ-' + occIdx">
-                            <li>
-                                <a
-                                    href="#"
-                                    @click.prevent="navigate(occ.book + ' ' + occ.chapter + ':' + occ.verse, { kind: 'jump' })"
-                                    x-text="occ.book + ' ' + occ.chapter + ':' + occ.verse"
-                                ></a>
-                            </li>
-                        </template>
-                        <li x-show="selectedWord?.count > 10 && !showAllOccurrences" class="more-occurrences">
-                            <a href="#" @click.prevent="showAllOccurrences = true" class="show-more-link">
-                                ...and <span x-text="selectedWord?.count - 10"></span> more
-                            </a>
-                        </li>
-                        <li x-show="selectedWord?.count > 10 && showAllOccurrences" class="more-occurrences">
-                            <a href="#" @click.prevent="showAllOccurrences = false" class="show-more-link">Show less</a>
-                        </li>
-                    </ul>
-                </div>
             </div>
         </aside>
     </main>
@@ -921,10 +875,14 @@
                 <div x-show="searchWordInfo" class="strongs-word-card">
                     <div class="strongs-header">
                         <span class="strongs-number" x-text="searchWordInfo?.strong_number"></span>
-                        <span class="strongs-original" x-text="searchWordInfo?.original"></span>
+                        <span class="strongs-original ws-orig" :class="searchWordInfo?.strong_number?.[0] === 'H' ? 'hebrew' : 'greek'" x-text="searchWordInfo?.original"></span>
                         <span class="strongs-transliteration" x-text="'(' + (searchWordInfo?.transliteration || '') + ')'"></span>
                     </div>
                     <div class="strongs-definition" x-text="searchWordInfo?.definition"></div>
+                    <button type="button" class="qw-study strongs-study" @click="showSearch = false; openWordStudy(searchWordInfo.strong_number)">
+                        <span>Study <span x-text="searchWordInfo?.original || searchWordInfo?.strong_number"></span></span>
+                        <span class="qw-study-sub">Lexicons, translations, where it occurs, verses</span>
+                    </button>
                 </div>
 
                 <!-- Results grouped by type -->
@@ -2207,6 +2165,374 @@
         </div>
     </div>
 
+    <!-- Word study: one Hebrew/Greek word from the data (modules/wordstudy.js, css/wordstudy.css) -->
+    <dialog id="word-study" class="word-study" aria-labelledby="ws-title" @cancel.prevent="wsBack()">
+        <div class="ws-shell" x-show="ws.open">
+            <header class="ws-bar">
+                <button type="button" class="study-icon-btn" x-show="!ws.list" @click="wsClose()" aria-label="Close the word study">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+                <button type="button" class="study-icon-btn" x-show="ws.list" @click="wsBack()" :aria-label="'Back to the study of ' + (wsLemma().transliteration || ws.strong)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <div class="ws-bar-title">
+                    <span class="ws-bar-word ws-orig" :class="wsLang()" :lang="wsLangAttr()" x-text="wsTitle()"></span>
+                    <span class="ws-bar-sub" x-text="ws.list ? 'Verses' : 'Word study'"></span>
+                </div>
+            </header>
+
+            <!-- The study -->
+            <div class="ws-scroll" x-show="!ws.list" tabindex="-1">
+                <div class="ws-page">
+                    <div class="ws-state" x-show="ws.loading && !ws.data"><div class="loading-spinner"></div></div>
+                    <div class="ws-state" x-show="ws.error">
+                        <p class="ws-state-title" x-text="ws.error"></p>
+                        <button type="button" class="study-text-btn" @click="wsRetry()">Try again</button>
+                    </div>
+
+                    <!-- Offline and not saved: what this device has, and what it needs -->
+                    <section class="ws-offline" x-show="ws.offline">
+                        <h1 class="ws-word ws-orig" id="ws-title-off" :class="wsLang()" :lang="wsLangAttr()" :dir="wsLang() === 'hebrew' ? 'rtl' : 'ltr'" x-text="ws.offlineEntry?.original || ws.strong"></h1>
+                        <p class="ws-translit" x-text="ws.offlineEntry?.transliteration || ''"></p>
+                        <p class="ws-offline-msg">You're offline, and this word study isn't saved on this device. Studies you have opened before stay available offline.</p>
+                        <template x-if="ws.offlineEntry">
+                            <div class="ws-lex">
+                                <h3 class="ws-lex-name">Strong's</h3>
+                                <p x-text="(ws.offlineEntry.definition || '').trim()"></p>
+                                <p class="ws-lex-extra" x-show="ws.offlineEntry.extended_definition">KJV: <span x-text="ws.offlineEntry.extended_definition"></span></p>
+                            </div>
+                        </template>
+                        <button type="button" class="study-primary-btn" @click="wsRetry()">Try again</button>
+                    </section>
+
+                    <template x-if="ws.data">
+                        <div>
+                            <!-- The word -->
+                            <section class="ws-hero" aria-labelledby="ws-title">
+                                <p class="ws-from" x-show="ws.from?.unsure">
+                                    The closest match for “<span x-text="ws.from?.text"></span>”<span x-show="ws.from?.ref"> in <span x-text="ws.from?.ref"></span></span>. The link between these words is weak, so this may not be the word behind it.
+                                </p>
+                                <h1 class="ws-word ws-orig" id="ws-title" tabindex="-1" :class="wsLang()" :lang="wsLangAttr()" :dir="wsLang() === 'hebrew' ? 'rtl' : 'ltr'" x-text="wsLemma().original"></h1>
+                                <p class="ws-translit" x-text="wsLemma().transliteration"></p>
+                                <p class="ws-glance" x-show="wsGlance()">“<span x-text="wsGlance()?.gloss"></span>”<span class="qw-src" x-text="wsGlance()?.source"></span></p>
+                                <p class="ws-kind" x-text="wsKindLine()"></p>
+                                <p class="ws-from-plain" x-show="ws.from && !ws.from.unsure && ws.from.ref && !ws.from.interlinear">From “<span x-text="ws.from?.text"></span>” in <span x-text="ws.from?.ref"></span></p>
+
+                                <div class="ws-homographs" x-show="wsHomographs().length" role="group" aria-labelledby="ws-hg-label">
+                                    <p id="ws-hg-label">Strong's <span x-text="ws.strong"></span> covers <span x-text="wsHomographs().length"></span> different words. Counts below are for the one you pick.</p>
+                                    <template x-for="h in wsHomographs()" :key="h.ext">
+                                        <button type="button" class="ws-hg" :aria-pressed="h.selected ? 'true' : 'false'" @click="wsPickHomograph(h)">
+                                            <span class="ws-hg-name" x-text="wsHomographLabel(h).name"></span>
+                                            <span class="ws-hg-gloss" x-text="'“' + wsHomographLabel(h).gloss + '”'"></span>
+                                            <span class="ws-hg-count" x-text="h.occurrences === 1 ? 'once' : h.occurrences + ' times'"></span>
+                                        </button>
+                                    </template>
+                                </div>
+
+                                <div class="ws-count" x-show="wsOcc().total">
+                                    <p x-text="wsCountLine()"></p>
+                                    <button type="button" class="ws-link-btn" @click="wsOpenList({ kind: 'all' })">
+                                        <span x-text="wsOcc().verses === 1 ? 'Show the verse' : 'Show all ' + (wsOcc().verses || 0).toLocaleString() + ' verses'"></span>
+                                    </button>
+                                </div>
+                                <nav class="ws-toc" aria-label="On this page">
+                                    <button type="button" @click="wsScrollTo('ws-sec-lex')">Lexicons</button>
+                                    <button type="button" x-show="wsTranslations().length" @click="wsScrollTo('ws-sec-tr')">Translations</button>
+                                    <button type="button" x-show="wsOcc().total" @click="wsScrollTo('ws-sec-where')">Where</button>
+                                    <button type="button" x-show="wsSamples().length" @click="wsScrollTo('ws-sec-samples')">Verses</button>
+                                    <button type="button" x-show="wsCollocates().length || wsRelated().length" @click="wsScrollTo(wsCollocates().length ? 'ws-sec-with' : 'ws-sec-related')">Related</button>
+                                </nav>
+                            </section>
+
+                            <!-- Lexicons: quoted, each credited, fullest first -->
+                            <section class="ws-sec" id="ws-sec-lex" aria-labelledby="ws-h-lex">
+                                <h2 id="ws-h-lex">What the lexicons say</h2>
+                                <template x-for="(l, li) in wsLexicons()" :key="'lex-' + l.source">
+                                    <article class="ws-lex">
+                                        <h3 class="ws-lex-name" x-text="l.name"></h3>
+                                        <template x-for="(e, ei) in l.entries" :key="'lexe-' + l.source + ei">
+                                            <div class="ws-lex-entry" :class="{ 'is-other': l.source === 'bdb' && e.homograph && wsOcc().homograph && e.homograph !== wsOcc().homograph }">
+                                                <p class="ws-lex-head">
+                                                    <span class="ws-orig" :class="wsLang()" :lang="wsLangAttr()" :dir="wsLang() === 'hebrew' ? 'rtl' : 'ltr'" x-text="e.headword"></span>
+                                                    <span class="ws-lex-hg" x-show="e.meta?.homograph" x-text="'(' + e.meta?.homograph + ')'"></span>
+                                                    <span class="ws-lex-gloss" x-show="e.gloss" x-text="e.gloss"></span>
+                                                </p>
+                                                <template x-if="l.source !== 'strongs'">
+                                                    <div>
+                                                        <div class="ws-lex-def" :class="{ 'is-clamped': wsLexLong(l, e) && !ws.lexMore[wsLexKey(l, ei)] }" x-text="wsPlainSense(e.definition)"></div>
+                                                        <button type="button" class="ws-link-btn ws-lex-more" x-show="wsLexLong(l, e)" :aria-expanded="ws.lexMore[wsLexKey(l, ei)] ? 'true' : 'false'"
+                                                                @click="ws.lexMore[wsLexKey(l, ei)] = !ws.lexMore[wsLexKey(l, ei)]"
+                                                                x-text="ws.lexMore[wsLexKey(l, ei)] ? 'Show less' : 'Read the whole entry'"></button>
+                                                        <details class="ws-lex-notes" x-show="e.notes"><summary>Abbott-Smith's note on synonyms</summary><p x-text="e.notes"></p></details>
+                                                        <p class="ws-lex-extra" x-show="e.meta?.etymology" x-text="e.meta?.etymology"></p>
+                                                        <p class="ws-lex-note" x-show="wsLexNote(e)" x-text="wsLexNote(e)"></p>
+                                                    </div>
+                                                </template>
+                                                <template x-if="l.source === 'strongs'">
+                                                    <div>
+                                                        <p class="ws-lex-def" x-text="(e.definition || '').trim()"></p>
+                                                        <p class="ws-lex-extra" x-show="e.kjv_usage"><span class="ws-lex-label">KJV renders it</span> <span x-text="e.kjv_usage"></span></p>
+                                                        <p class="ws-lex-extra" x-show="e.derivation"><span class="ws-lex-label">Derivation</span>
+                                                            <template x-for="(seg, si) in wsLinkify(e.derivation)" :key="'d' + si">
+                                                                <span><template x-if="seg.strong"><button type="button" class="ws-inline-link" @click="wsGoWord(seg.strong)" x-text="seg.t"></button></template><template x-if="!seg.strong"><span x-text="seg.t"></span></template></span>
+                                                            </template>
+                                                        </p>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <p class="ws-credit" x-text="wsCredit(l.source)"></p>
+                                    </article>
+                                </template>
+                            </section>
+
+                            <!-- Renderings: one meter list per translation -->
+                            <section class="ws-sec" id="ws-sec-tr" aria-labelledby="ws-h-tr" x-show="wsTranslations().length">
+                                <h2 id="ws-h-tr">How your translations render it</h2>
+                                <p class="ws-sec-sub">Counted from the word-by-word links between each translation and the <span x-text="wsLang() === 'hebrew' ? 'Hebrew' : 'Greek'"></span>, where the link is reasonably sure. Tap a rendering for its verses.</p>
+                                <p class="ws-sec-sub" x-show="wsLemma().function_word">Small words like this one often have no English word of their own, so many of its <span x-text="(wsOcc().total || 0).toLocaleString()"></span> places have no rendering here.</p>
+                                <template x-for="t in wsTranslations()" :key="'tr-' + t.tr">
+                                    <div class="ws-tr" :class="{ 'is-few': t.total <= 2 }">
+                                        <h3 class="ws-tr-name"><span x-text="t.tr"></span> <span class="ws-tr-total" x-text="t.total.toLocaleString() + ' linked'"></span></h3>
+                                        <ul class="ws-meter">
+                                            <template x-for="r in t.rows" :key="t.tr + r.rendering">
+                                                <li>
+                                                    <button type="button" class="ws-meter-row" @click="wsOpenList({ kind: 'rendering', tr: t.tr, value: r.rendering })"
+                                                            :aria-label="t.tr + ' renders it ' + r.rendering + ' ' + r.count + ' times. Show these verses.'">
+                                                        <span class="ws-meter-label" x-text="r.rendering"></span>
+                                                        <span class="ws-meter-track" aria-hidden="true"><span class="ws-meter-bar" :style="'width:' + r.width + '%'"></span></span>
+                                                        <span class="ws-meter-n" x-text="r.count.toLocaleString()"></span>
+                                                    </button>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                        <button type="button" class="ws-link-btn" x-show="t.hidden" @click="ws.moreRenderings[t.tr] = true"
+                                                x-text="t.hidden === 1 ? 'One more rendering' : t.hidden + ' more renderings'"></button>
+                                        <p class="ws-tr-other" x-show="t.other?.occurrences" x-text="'Rendered ' + (t.other.renderings === 1 ? 'another way' : t.other.renderings + ' other ways') + ' in ' + t.other.occurrences + (t.other.occurrences === 1 ? ' place' : ' places') + ', too few to list'"></p>
+                                    </div>
+                                </template>
+                                <p class="ws-sec-sub" x-show="wsHasPhrases()">Some rows are phrases the links group together, such as a verb and its helper words.</p>
+                                <p class="ws-credit" x-text="wsCredit('alignments')"></p>
+                            </section>
+
+                            <!-- Where it occurs: books by part of the Bible, one hue, same scale -->
+                            <section class="ws-sec" id="ws-sec-where" aria-labelledby="ws-h-where" x-show="wsOcc().total">
+                                <h2 id="ws-h-where">Where it occurs</h2>
+                                <p class="ws-sec-sub" x-show="wsBooksWithCount().length > 2">Times in each book of the <span x-text="wsTestament()"></span>, in Bible order. Every bar uses the same scale. Tap a bar for that book's verses.</p>
+                                <p class="ws-few" x-show="wsBooksWithCount().length <= 2">Only in
+                                    <template x-for="(b, bi) in wsBooksWithCount()" :key="'few-' + b.book">
+                                        <span><button type="button" class="ws-inline-link" @click="wsOpenList({ kind: 'book', value: b.book })" x-text="b.book + (b.count > 1 ? ' (' + b.count + ' times)' : '')"></button><span x-show="bi === 0 && wsBooksWithCount().length === 2"> and </span></span>
+                                    </template>
+                                </p>
+                                <div x-show="wsBooksWithCount().length > 2">
+                                <div class="ws-dist" role="group" :aria-label="'Times in each book. ' + wsChartSummary()">
+                                    <template x-for="sec in wsSections()" :key="'sec-' + sec.name">
+                                        <div class="ws-dist-row">
+                                            <span class="ws-dist-name" x-text="sec.name"></span>
+                                            <span class="ws-dist-cols" :style="'--n:' + sec.books.length">
+                                                <template x-for="b in sec.books" :key="'b-' + b.book">
+                                                    <button type="button" class="ws-col" :class="{ 'is-zero': !b.count }" :aria-pressed="ws.book?.book === b.book ? 'true' : 'false'"
+                                                            :aria-label="b.book + ': ' + (b.count === 1 ? 'once' : b.count + ' times')" :title="b.book + ': ' + b.count"
+                                                            :disabled="!b.count" @click="wsPickBook(b)">
+                                                        <span class="ws-col-bar" :style="'height:' + (b.count ? Math.max(5, b.h) : 0) + '%'"></span>
+                                                    </button>
+                                                </template>
+                                            </span>
+                                            <span class="ws-dist-total" x-text="sec.total"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="ws-dist-readout" aria-live="polite">
+                                    <template x-if="ws.book">
+                                        <p><strong x-text="ws.book.book"></strong>: <span x-text="ws.book.count === 1 ? 'once' : ws.book.count + ' times'"></span>
+                                            <button type="button" class="ws-link-btn" @click="wsOpenList({ kind: 'book', value: ws.book.book })">Show <span x-text="ws.book.count === 1 ? 'it' : 'them'"></span></button></p>
+                                    </template>
+                                    <p x-show="!ws.book" class="ws-dist-top">Most in
+                                        <template x-for="(b, bi) in wsTopBooks(3)" :key="'top-' + b.book">
+                                            <span><button type="button" class="ws-inline-link" @click="wsOpenList({ kind: 'book', value: b.book })" x-text="b.book + ' (' + b.count + ')'"></button><span x-text="bi < Math.min(3, wsTopBooks(3).length) - 1 ? ', ' : ''"></span></span>
+                                        </template>
+                                    </p>
+                                </div>
+                                <details class="ws-more">
+                                    <summary>Every book as a list</summary>
+                                    <ul class="ws-booklist">
+                                        <template x-for="b in wsBooksWithCount()" :key="'bl-' + b.book">
+                                            <li><button type="button" class="ws-row-btn" @click="wsOpenList({ kind: 'book', value: b.book })"><span x-text="b.book"></span><span class="ws-n" x-text="b.count"></span></button></li>
+                                        </template>
+                                    </ul>
+                                </details>
+                                </div>
+                                <template x-if="wsEditions()">
+                                    <p class="ws-sec-sub ws-editions">Counted in the SBL Greek New Testament (the BSB's Greek). The Greek behind the KJV has it
+                                        <button type="button" class="ws-inline-link" @click="wsOpenList({ kind: 'edition', value: 'TR' })" x-text="wsEditions().TR + ' times'"></button>, the Byzantine text (the WEB's)
+                                        <button type="button" class="ws-inline-link" @click="wsOpenList({ kind: 'edition', value: 'Byz' })" x-text="wsEditions().Byz + ' times'"></button>.</p>
+                                </template>
+                                <p class="ws-credit" x-text="wsCredit('stepbible')"></p>
+                            </section>
+
+                            <!-- Sample verses -->
+                            <section class="ws-sec" id="ws-sec-samples" aria-labelledby="ws-h-samples" x-show="wsSamples().length">
+                                <h2 id="ws-h-samples" x-text="ws.data.samples?.all_occurrences ? (wsSamples().length === 1 ? 'The verse' : 'Every verse') : 'Verses to start with'"></h2>
+                                <p class="ws-sec-sub" x-show="!ws.data.samples?.all_occurrences">Chosen by a rule, not by a person: a verse for each common rendering and each part of the Bible where it occurs.</p>
+                                <ol class="ws-verses">
+                                    <template x-for="v in wsSamplesShown()" :key="'s-' + v.ref + v.word_position">
+                                        <li><button type="button" class="ws-verse" @click="wsPeek(v.ref)">
+                                            <span class="ws-verse-ref" x-text="v.ref"></span>
+                                            <span class="ws-verse-text" x-html="v.html"></span>
+                                        </button></li>
+                                    </template>
+                                </ol>
+                                <button type="button" class="ws-link-btn" x-show="!ws.moreSamples && wsSamples().length > 5" @click="ws.moreSamples = true"
+                                        x-text="(wsSamples().length - 5) + ' more verses'"></button>
+                                <p class="ws-credit">Verse text: BSB. <span x-text="wsCredit('alignments')"></span></p>
+                            </section>
+
+                            <!-- Forms -->
+                            <section class="ws-sec" aria-labelledby="ws-h-forms" x-show="(wsOcc().by_form || []).length > 1">
+                                <h2 id="ws-h-forms">Its forms</h2>
+                                <p class="ws-sec-sub">The grammatical forms it takes in the <span x-text="wsLang() === 'hebrew' ? 'Hebrew' : 'Greek'"></span> text.</p>
+                                <ul class="ws-rows">
+                                    <template x-for="f in (wsOcc().by_form || []).slice(0, 12)" :key="'f-' + f.form">
+                                        <li><button type="button" class="ws-row-btn" @click="wsOpenList({ kind: 'form', value: f.form })"><span x-text="f.label || f.form"></span><span class="ws-n" x-text="f.count"></span></button></li>
+                                    </template>
+                                </ul>
+                                <p class="ws-credit" x-text="wsCredit('stepbible')"></p>
+                            </section>
+
+                            <!-- Related by the lexicons' own statements -->
+                            <section class="ws-sec" id="ws-sec-related" aria-labelledby="ws-h-related" x-show="wsRelated().length">
+                                <h2 id="ws-h-related">Related words</h2>
+                                <p class="ws-sec-sub">Only relations a lexicon states. Tap a word to study it.</p>
+                                <ul class="ws-rows">
+                                    <template x-for="r in wsRelated()" :key="'r-' + r.strong_number">
+                                        <li><button type="button" class="ws-word-row" @click="wsGoWord(r.strong_number)">
+                                            <span class="ws-word-row-top">
+                                                <span class="ws-orig" :class="wsLang()" :lang="r.strong_number[0] === 'H' ? 'he' : 'grc'" x-text="r.original"></span>
+                                                <span class="ws-word-row-tr" x-text="r.transliteration"></span>
+                                                <span class="ws-word-row-gloss" x-text="r.gloss"></span>
+                                            </span>
+                                            <span class="ws-word-row-why" x-text="r.links.map(l => wsRelationLabel(l)).join('; ')"></span>
+                                        </button></li>
+                                    </template>
+                                </ul>
+                                <p class="ws-credit">Glosses: <span x-text="wsGlossSources(wsRelated())"></span>.</p>
+                            </section>
+
+                            <!-- Computed from the data: lower, and labelled -->
+                            <section class="ws-sec is-computed" id="ws-sec-with" aria-labelledby="ws-h-with" x-show="wsCollocates().length">
+                                <h2 id="ws-h-with">Words it travels with <span class="ws-computed">Computed</span></h2>
+                                <p class="ws-sec-sub">Words found in the same verses more often than chance would give. A count, not a meaning: some are set phrases, like greetings. Tap one for the verses that have both.</p>
+                                <ul class="ws-rows">
+                                    <template x-for="c in wsCollocates()" :key="'c-' + c.strong_number">
+                                        <li><button type="button" class="ws-word-row" @click="wsOpenList({ kind: 'with', value: c.strong_number })"
+                                                    :aria-label="c.transliteration + ', ' + c.gloss + ': together in ' + c.together + ' verses. Show them.'">
+                                            <span class="ws-word-row-top">
+                                                <span class="ws-orig" :class="wsLang()" :lang="wsLangAttr()" x-text="c.original"></span>
+                                                <span class="ws-word-row-tr" x-text="c.transliteration"></span>
+                                                <span class="ws-word-row-gloss" x-text="c.gloss"></span>
+                                            </span>
+                                            <span class="ws-word-row-why" x-text="'In ' + c.together + ' verses together'"></span>
+                                        </button></li>
+                                    </template>
+                                </ul>
+                                <p class="ws-credit"><span x-text="wsCredit('stepbible')"></span>. Glosses: <span x-text="wsGlossSources(wsCollocates())"></span>.</p>
+                            </section>
+
+                            <section class="ws-sec is-computed" aria-labelledby="ws-h-xref" x-show="wsXrefs().length">
+                                <h2 id="ws-h-xref">Verses with this word that point to each other <span class="ws-computed">Computed</span></h2>
+                                <p class="ws-sec-sub">Cross-references from OpenBible.info where both verses use this word, the most voted first.</p>
+                                <ul class="ws-rows">
+                                    <template x-for="x in wsXrefs()" :key="'x-' + x.a + x.b">
+                                        <li class="ws-xref">
+                                            <button type="button" class="ws-inline-link" @click="wsPeek(x.a)" x-text="x.a"></button>
+                                            <span aria-hidden="true" class="ws-xref-and">and</span>
+                                            <button type="button" class="ws-inline-link" @click="wsPeek(x.b)" x-text="x.b"></button>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <p class="ws-credit" x-text="wsCredit('openbible-xrefs')"></p>
+                            </section>
+
+                            <section class="ws-sec is-computed" aria-labelledby="ws-h-topics" x-show="wsTopics().length">
+                                <h2 id="ws-h-topics">Nave's topics with many of its verses <span class="ws-computed">Computed</span></h2>
+                                <p class="ws-sec-sub">Topics in Nave's Topical Bible whose verse lists often contain this word. Matched by counting, not chosen by Nave, so a few may not fit. Tap one for the verses it shares.</p>
+                                <ul class="ws-topics">
+                                    <template x-for="t in wsTopics()" :key="'t-' + t.topic_id">
+                                        <li><button type="button" class="ws-row-btn" @click="wsOpenList({ kind: 'topic', value: String(t.topic_id) })"
+                                                    :aria-label="wsTopicName(t) + ': ' + t.hits + ' of the topic\'s ' + t.topic_verses + ' verses have this word. Show them.'">
+                                            <span class="ws-topic" x-text="wsTopicName(t)"></span>
+                                            <span class="ws-n" x-text="t.hits + ' of its ' + t.topic_verses + ' verses'"></span></button></li>
+                                    </template>
+                                </ul>
+                                <p class="ws-credit" x-text="wsCredit('naves')"></p>
+                            </section>
+
+                            <footer class="ws-sources" aria-labelledby="ws-h-sources">
+                                <h2 id="ws-h-sources">Sources</h2>
+                                <p>Everything here is quoted or counted from these datasets. Nothing is written by this app.</p>
+                                <ul>
+                                    <template x-for="s in wsSourcesShown()" :key="'src-' + s.key">
+                                        <li><span x-text="s.name"></span>. <span x-text="s.license"></span><span x-show="s.attribution">. Credit: <span x-text="s.attribution"></span></span><span x-show="s.url">. <a :href="s.url" target="_blank" rel="noopener">Source</a></span></li>
+                                    </template>
+                                </ul>
+                            </footer>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- A list of verses behind a count -->
+            <div class="ws-scroll ws-list" x-show="ws.list" tabindex="-1">
+                <template x-if="ws.list">
+                    <div class="ws-page">
+                        <h1 class="ws-list-title" id="ws-list-title" tabindex="-1" x-text="wsListTitle(ws.list)"></h1>
+                        <p class="ws-sec-sub" x-text="wsListCountLine(ws.list)"></p>
+                        <p class="ws-sec-sub" x-show="ws.list.kind === 'with'">Verses where both words occur. Computed from the text; being in one verse doesn't mean the words are about each other.</p>
+                        <p class="ws-sec-sub" x-show="ws.list.kind === 'topic'">Verses listed under this topic in Nave's Topical Bible that also have this word. The topic was matched to the word by counting.</p>
+                        <ol class="ws-verses">
+                            <template x-for="v in ws.list.items" :key="'l-' + v.ref">
+                                <li><button type="button" class="ws-verse" @click="wsPeek(v.ref)">
+                                    <span class="ws-verse-ref" x-text="v.ref"></span>
+                                    <span class="ws-verse-text" x-show="v.html" x-html="v.html"></span>
+                                </button></li>
+                            </template>
+                        </ol>
+                        <div class="ws-state" x-show="ws.list.loading"><div class="loading-spinner"></div></div>
+                        <div class="ws-state" x-show="ws.list.error"><p x-text="ws.list.error"></p>
+                            <button type="button" class="study-text-btn" @click="wsShowList(ws.list, ws.list.items.length > 0)">Try again</button></div>
+                        <button type="button" class="study-text-btn ws-list-more" x-show="ws.list.more && !ws.list.loading" @click="wsShowList(ws.list, true)">Show more</button>
+                        <p class="ws-credit" x-show="ws.list.translation">Verse text: <span x-text="ws.list.translation"></span>. Highlighted where the word-by-word links show the word.</p>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- A verse in its place: read it, or study it -->
+        <dialog id="ws-peek" class="study-sheet" aria-labelledby="ws-peek-title" @close="ws.peek = null" @click.self="wsClosePeek()" @cancel.stop>
+            <template x-if="ws.peek">
+                <div class="study-sheet-inner">
+                    <div class="study-sheet-head">
+                        <h3 id="ws-peek-title" x-text="ws.peek.ref"></h3>
+                        <button type="button" class="study-icon-btn" @click="wsClosePeek()" aria-label="Close">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div x-show="ws.peek.loading" class="study-pane-state"><div class="loading-spinner"></div></div>
+                    <p class="study-peek-error" x-show="ws.peek.error" x-text="ws.peek.error"></p>
+                    <p class="study-verses" x-show="ws.peek.verses.length">
+                        <template x-for="v in ws.peek.verses" :key="'wp-' + v.verse">
+                            <span class="study-verse" :class="{ 'is-context': v.verse < ws.peek.focus[0] || v.verse > ws.peek.focus[1] }"><sup x-text="v.verse"></sup><span x-text="v.text"></span> </span>
+                        </template>
+                    </p>
+                    <div class="study-sheet-actions" x-show="!ws.peek.loading && !ws.peek.error">
+                        <button type="button" class="study-primary-btn" @click="wsPeekRead()">Read it in the chapter</button>
+                        <button type="button" class="study-text-btn" @click="wsPeekStudy()">Study <span x-text="ws.peek.ref"></span></button>
+                    </div>
+                </div>
+            </template>
+        </dialog>
+    </dialog>
+
     <!-- Study view: a verse or range with commentary (modules/study.js, css/study.css) -->
     <dialog id="study-view" class="study-view" aria-labelledby="study-title"
             :class="{ 'is-strip-collapsed': study.stripCollapsed, 'is-writing': studyWriting }">
@@ -2285,7 +2611,7 @@
                     </button>
                 </div>
                 <!-- Pinned at the thumb end: Scripture's own links and the reader's notes (modules/study_panes.js) -->
-                <div class="study-tools" role="group" aria-label="Cross-references and your notes">
+                <div class="study-tools" role="group" aria-label="Cross-references, hymns and your notes">
                     <button type="button" class="study-tool" data-slug="cross-references" :aria-pressed="study.active === 'cross-references' ? 'true' : 'false'"
                             @click="studySelect('cross-references')"
                             :aria-label="'Cross-references' + (studyXrefCount() !== null ? ': ' + studyXrefCount() : '')">
@@ -2294,6 +2620,14 @@
                             <span class="study-tool-count" x-text="studyXrefCount() ?? ''"></span>
                         </span>
                         <span class="study-tool-label">Cross-refs</span>
+                    </button>
+                    <button type="button" class="study-tool" data-slug="hymns" x-show="studyHymnsShown()" :aria-pressed="study.active === 'hymns' ? 'true' : 'false'"
+                            @click="studySelect('hymns')" :aria-label="studyHymnsLabel()">
+                        <span class="study-tool-top">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+                            <span class="study-tool-count" x-text="studyHymnCount() || ''"></span>
+                        </span>
+                        <span class="study-tool-label">Hymns</span>
                     </button>
                     <button type="button" class="study-tool" data-slug="notes" :aria-pressed="study.active === 'notes' ? 'true' : 'false'"
                             @click="studySelect('notes')" :aria-label="'Your notes' + (studyNoteCount() ? ': ' + studyNoteCount() : '')">
@@ -2406,6 +2740,57 @@
                             <button type="button" class="study-text-btn" @click="studyXref.key = null; studyLoadXrefs()">Try again</button>
                         </div>
                         <p class="study-attribution" x-show="studyXref.status === 'ready' && studyXref.items.length" x-text="studyXref.credit"></p>
+                    </div>
+                </section>
+
+                <!-- Hymns built on these verses, then on the rest of the chapter (modules/hymns.js) -->
+                <section class="study-pane study-pane-tool" data-slug="hymns" aria-labelledby="hymns-title"
+                         x-show="!study.loading && !study.error && studyHymnsShown()" :class="{ 'is-active': study.active === 'hymns' }">
+                    <div class="study-pane-scroll" tabindex="0" @scroll.passive="studyPaneScrolled($event)">
+                        <div class="study-pane-head">
+                            <h3 class="study-tool-title" id="hymns-title">Hymns</h3>
+                            <p class="study-tool-sub">
+                                <span x-show="studyHymns.passage.length" x-text="(studyHymns.passage.length === 1 ? 'One hymn' : studyHymns.passage.length + ' hymns') + ' linked to ' + studyRefLabel() + ' by a hymnal, a psalter, or a quotation.'"></span>
+                                <span x-show="!studyHymns.passage.length">None linked to <span x-text="studyRefLabel()"></span> itself, but some to other verses of <span x-text="study.book + ' ' + study.chapter"></span>.</span>
+                                From older public-domain hymnals and psalters, so not a complete list: most hymns and songs written after about 1930 aren't here.
+                            </p>
+                        </div>
+                        <div class="xref-body hymn-body">
+                        <template x-for="grp in [{ key: 'passage', items: studyHymns.passage }, { key: 'chapter', items: studyHymns.chapter }]" :key="'hg-' + grp.key">
+                            <section class="hymn-group" x-show="grp.items.length">
+                                <h4 class="study-entry-range" x-show="grp.key === 'chapter'" x-text="'On other verses of ' + study.book + ' ' + study.chapter"></h4>
+                                <ol class="hymn-list">
+                                    <template x-for="h in grp.items" :key="'h-' + h.id">
+                                        <li>
+                                            <button type="button" class="hymn-item" @click="hymnOpen(h)" :aria-label="hymnHead(h).head + '. Open the hymn'">
+                                                <span class="hymn-title" x-text="hymnHead(h).head"></span>
+                                                <span class="hymn-sub" x-show="hymnHead(h).sub" x-text="hymnHead(h).sub"></span>
+                                                <span class="hymn-first" x-show="hymnFirstLine(h)" x-text="hymnFirstLine(h)"></span>
+                                                <span class="hymn-who" x-show="hymnWho(h)" x-text="hymnWho(h)"></span>
+                                                <span class="hymn-tune" x-show="hymnTune(h)" x-text="hymnTune(h)"></span>
+                                                <template x-if="hymnLinkOf(h)">
+                                                    <span class="hymn-why" :class="{ 'is-computed': hymnWhy(hymnLinkOf(h)).computed }">
+                                                        <span class="ws-computed" x-show="hymnWhy(hymnLinkOf(h)).computed">Computed</span>
+                                                        <span x-text="hymnWhy(hymnLinkOf(h)).text"></span><template x-if="hymnWhy(hymnLinkOf(h)).evidence"><span>: <q class="hymn-evidence" x-text="hymnWhy(hymnLinkOf(h)).evidence"></q></span></template>
+                                                    </span>
+                                                </template>
+                                                <template x-if="hymnComputedLink(h)">
+                                                    <span class="hymn-why is-computed">
+                                                        <span class="ws-computed">Computed</span>
+                                                        <span x-text="hymnWhy(hymnComputedLink(h)).text"></span>: <q class="hymn-evidence" x-text="hymnComputedLink(h).evidence"></q>
+                                                    </span>
+                                                </template>
+                                            </button>
+                                        </li>
+                                    </template>
+                                </ol>
+                            </section>
+                        </template>
+                        </div>
+                        <div class="study-attribution hymn-credits">
+                            <p>A computed quotation is a run of at least six words this hymn shares with one KJV verse, found by matching the texts.</p>
+                            <p>Sources: <template x-for="(s, si) in hymnSourcesShown()" :key="'hs-' + s.key"><span><span x-text="s.name"></span><span x-show="s.attribution" x-text="' (credit: ' + s.attribution + ')'"></span><span x-text="si < hymnSourcesShown().length - 1 ? '; ' : '.'"></span></span></template></p>
+                        </div>
                     </div>
                 </section>
 
@@ -2540,6 +2925,47 @@
                         <button type="button" class="study-primary-btn" @click="studyPeekStudy()">Study <span x-text="study.peek.ref"></span></button>
                         <button type="button" class="study-text-btn" @click="studyPeekRead()">Read the chapter</button>
                     </div>
+                </div>
+            </template>
+        </dialog>
+
+        <!-- One hymn: what is known about it and every passage it is linked to (modules/hymns.js) -->
+        <dialog id="study-hymn" class="study-sheet" aria-labelledby="study-hymn-title" @close="hymnSheet = null" @click.self="hymnClose()">
+            <template x-if="hymnSheet">
+                <div class="study-sheet-inner hymn-sheet">
+                    <div class="study-sheet-head">
+                        <h3 id="study-hymn-title" x-text="hymnHead(hymnSheet.data).head"></h3>
+                        <button type="button" class="study-icon-btn" @click="hymnClose()" aria-label="Close">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <p class="hymn-sub" x-show="hymnHead(hymnSheet.data).sub" x-text="hymnHead(hymnSheet.data).sub"></p>
+                    <p class="hymn-first" x-show="hymnFirstLine(hymnSheet.data)" x-text="hymnFirstLine(hymnSheet.data)"></p>
+                    <dl class="study-info-facts hymn-facts">
+                        <template x-if="hymnWho(hymnSheet.data)"><div><dt>Words</dt><dd x-text="hymnWho(hymnSheet.data)"></dd></div></template>
+                        <template x-if="hymnSheet.data.tune"><div><dt>Tune</dt><dd x-text="hymnDecode(hymnSheet.data.tune).replace(/`/g, '’') + (hymnSheet.data.composer ? ', ' + hymnDecode(hymnSheet.data.composer).replace(/(\d)-(\d)/g, '$1–$2') : '')"></dd></div></template>
+                        <template x-if="hymnSheet.data.meter"><div><dt>Meter</dt><dd x-text="hymnSheet.data.meter"></dd></div></template>
+                        <template x-if="hymnSheet.data.copyright"><div><dt>Copyright</dt><dd x-text="hymnSheet.data.words_public_domain ? 'Words in the public domain' : hymnDecode(hymnSheet.data.copyright)"></dd></div></template>
+                    </dl>
+                    <h4 class="hymn-sheet-h">Scripture it is linked to</h4>
+                    <div x-show="hymnSheet.status === 'loading'" class="study-pane-state"><div class="loading-spinner"></div></div>
+                    <p class="study-peek-error" x-show="hymnSheet.status === 'error'" x-text="hymnSheet.error"></p>
+                    <ul class="hymn-passages">
+                        <template x-for="p in hymnPassages()" :key="'hp-' + p.label">
+                            <li>
+                                <button type="button" class="hymn-passage" @click="hymnStudyPassage(p)" :aria-label="'Study ' + p.label">
+                                    <span class="hymn-passage-ref" x-text="'Study ' + p.label"></span>
+                                    <template x-for="(w, wi) in p.whys" :key="'hw' + wi">
+                                        <span class="hymn-why" :class="{ 'is-computed': w.computed }"><span class="ws-computed" x-show="w.computed">Computed</span> <span x-text="w.text"></span><template x-if="w.evidence"><span>: <q class="hymn-evidence" x-text="w.evidence"></q></span></template></span>
+                                    </template>
+                                </button>
+                            </li>
+                        </template>
+                    </ul>
+                    <template x-if="(hymnSheet.data.other_settings || []).length">
+                        <p class="hymn-also">Also in <span x-text="hymnSheet.data.other_settings.map(o => hymnSourceShort(o.source) + (o.tune ? ' (tune ' + hymnDecode(o.tune) + ')' : '')).join('; ')"></span>.</p>
+                    </template>
+                    <p class="study-attribution">Sources: <template x-for="(s, si) in hymnSheetSources()" :key="'hss-' + s.key"><span><span x-text="s.name"></span><span x-show="s.attribution" x-text="' (credit: ' + s.attribution + ')'"></span><span x-text="si < hymnSheetSources().length - 1 ? '; ' : '.'"></span></span></template></p>
                 </div>
             </template>
         </dialog>
@@ -2716,6 +3142,8 @@
     <script src="/static/js/modules/study_extras.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study_panes.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/hymns.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/wordstudy.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/nav.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/wordlink.js?v=__SW_VERSION__"></script>
     <script src="/static/js/app.js?v=__SW_VERSION__"></script>

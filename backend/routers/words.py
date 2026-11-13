@@ -268,6 +268,7 @@ def get_word_renderings(
             ORDER BY b.book_order, w.chapter, w.verse, w.word_position
         """, (translation, padded))
         groups = {}
+        texts = {}
         unpacked = {}
         for row in cur:
             vkey = (row["book"], row["chapter"], row["verse"])
@@ -279,9 +280,11 @@ def get_word_renderings(
             ws = [(epos, word) for epos, opos, word in unpacked[vkey] if opos == row["pos"]]
             if ws:
                 groups[vkey + (row["pos"],)] = ws
+                texts[vkey] = row["text"]
         want = rendering.strip().lower()
         hits = [{"book": k[0], "chapter": k[1], "verse": k[2], "original_word_position": k[3],
-                 "english_word_positions": [p for p, _ in sorted(ws)]}
+                 "english_word_positions": [p for p, _ in sorted(ws)],
+                 "text": texts[k[:3]]}
                 for k, ws in groups.items() if _group_rendering(ws) == want]
         return {"strong_number": plain, "translation": translation, "rendering": want,
                 "total": len(hits), "offset": offset, "occurrences": hits[offset:offset + 200]}

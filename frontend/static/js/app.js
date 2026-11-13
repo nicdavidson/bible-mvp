@@ -284,7 +284,6 @@ function bibleApp() {
         topicLoading: false,
         notes: [],
         selectedWord: null,
-        showAllOccurrences: false,
         loading: false,
         error: null,
         darkMode: false,
@@ -1978,8 +1977,6 @@ function bibleApp() {
                 definition: this.showInterlinear
                     ? `Click on the ${language} word below to see Strong's definitions and word study details.`
                     : `Enable "Original Language" in the header to see ${language} words with Strong's numbers.`,
-                occurrences: [],
-                count: 0
             };
         },
 
@@ -1988,12 +1985,29 @@ function bibleApp() {
         // says we aren't sure and offers the closest match behind one more tap.
         _showWordLink(word, verseBox, info, align) {
             const unsure = BibleWordLink.strength(word, align.confidence, align.method) === 'unsure';
+            const verse = parseInt((verseBox?.id || '').replace('verse-', ''), 10) || null;
             this.selectedWord = {
-                text: word, ...info, occurrences: [], count: 0,
+                text: word, ...info,
                 unsure, revealed: !unsure, functionWord: BibleWordLink.isFunctionWord(word),
                 _verseId: verseBox?.id || null, _origPos: align.original_word_position,
+                _occ: verse ? { ref: { book: this.currentBook, chapter: this.currentChapter, verse }, pos: align.original_word_position } : null,
             };
-            if (!unsure) this._highlightInterlinearWord(verseBox, align.original_word_position);
+            if (!unsure) {
+                this._highlightInterlinearWord(verseBox, align.original_word_position);
+                if (info.strong_number) this.wsQuick(info.strong_number, this.selectedWord._occ);
+            }
+        },
+
+        // The word panel's next step. A withheld (unsure) link never offers a study until
+        // the reader asks for the closest match, and then the study says it is one.
+        studySelectedWord() {
+            const w = this.selectedWord;
+            if (!w?.strong_number || (w.unsure && !w.revealed)) return;
+            const ref = w._occ ? `${w._occ.ref.book} ${w._occ.ref.chapter}:${w._occ.ref.verse}` : null;
+            this.openWordStudy(w.strong_number, {
+                homograph: w.quick?.homograph || null,
+                from: { text: w.text, ref, unsure: !!w.unsure, interlinear: !!w.interlinear },
+            });
         },
 
         revealWordLink() {
@@ -2001,6 +2015,7 @@ function bibleApp() {
             this.selectedWord.revealed = true;
             const w = this.selectedWord;
             this._highlightInterlinearWord(w._verseId && document.getElementById(w._verseId), w._origPos);
+            if (w.strong_number) this.wsQuick(w.strong_number, w._occ);
         },
 
         // Handle interlinear word click
@@ -2075,42 +2090,29 @@ function bibleApp() {
                     definition: word.definition || 'No definition available',
                     editions: word.editions || null,
                     word_type: word.word_type || null,
-                    occurrences: [],
-                    count: 0
                 };
             }
         },
 
-        // Load word details by Strong's number
+        // An interlinear word: the panel shows it at once (the saved lexicon fills in
+        // offline), then wsQuick() adds the lexicon gloss and the count.
         async loadWordDetails(strongNumber, interlinearWord) {
-            this.showAllOccurrences = false;
-            try {
-                const response = await fetch(`/api/word/${strongNumber}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    this.selectedWord = {
-                        text: data.word.original || strongNumber,
-                        original: data.word.original,
-                        transliteration: data.word.transliteration,
-                        pronunciation: data.word.pronunciation,
-                        strong_number: data.word.strong_number,
-                        parsing: data.word.language === 'hebrew' ? 'Hebrew' : 'Greek',
-                        definition: data.word.definition,
-                        extended_definition: data.word.extended_definition,
-                        derivation: data.word.derivation,
-                        language: data.word.language,
-                        editions: interlinearWord?.editions || null,
-                        word_type: interlinearWord?.word_type || null,
-                        occurrences: data.occurrences,
-                        // API caps occurrences at 500; total is the real count
-                        count: data.total ?? data.count,
-                        glosses: data.glosses || [],
-                        book_frequency: data.book_frequency || []
-                    };
-                }
-            } catch (err) {
-                console.error('Failed to load word details:', err);
-            }
+            const w = interlinearWord || {};
+            const [, book, chapter, verse, pos] = String(w.word_id || '').match(/^(.+)\.(\d+)\.(\d+)\.(\d+)$/) || [];
+            const lex = await window.offlineStorage?.getLexiconEntry(BibleWordStudy.plainStrong(strongNumber)).catch(() => null);
+            this.selectedWord = {
+                text: w.original_text || strongNumber,
+                original: w.lexeme || lex?.original || w.original_text,
+                transliteration: w.transliteration || lex?.transliteration,
+                strong_number: BibleWordStudy.plainStrong(strongNumber) || strongNumber,
+                definition: lex?.definition || w.definition,
+                language: w.language || lex?.language || (String(strongNumber)[0].toUpperCase() === 'H' ? 'hebrew' : 'greek'),
+                editions: w.editions || null,
+                word_type: w.word_type || null,
+                interlinear: true,
+                _occ: book ? { ref: { book, chapter: +chapter, verse: +verse }, pos: +pos } : null,
+            };
+            this.wsQuick(this.selectedWord.strong_number, this.selectedWord._occ);
         },
 
         // Toggle sidebar collapsed state (tablet/desktop)

@@ -119,7 +119,8 @@ window.BibleModules = window.BibleModules || {};
             const loc = locationFromURL();
             const studySource = new URLSearchParams(window.location.search).get('study');
             let ok = false;
-            if (loc && !loc.home) {
+            if (await this.wsInitFromURL()) ok = true;          // /word/G26 (modules/wordstudy.js)
+            else if (loc && !loc.home) {
                 ok = await this.navigate(loc.plan ? { plan: loc.plan } : loc.ref, { source: 'init', state: st });
                 if (ok && loc.ref && studySource !== null) {
                     this.openStudy(loc.ref, { source: studySource, history: 'replace' });
@@ -137,6 +138,12 @@ window.BibleModules = window.BibleModules || {};
 
         navOnPop(e) {
             const st = e.state;
+            const wordWasOpen = this.ws?.open;
+            if (this.wsHandlePop(e)) {                     // a word study entry: wordstudy.js showed it
+                if (st?.nav) this._navIdx = st.idx || 0;
+                if (this.study?.open) this.studyHide();
+                return;
+            }
             const closedStudyHere = this.studyHandlePop(e);
             if (st?.nav) this._navIdx = st.idx || 0;
             if (st?.study) return;                       // a study view entry: study.js showed it
@@ -146,6 +153,12 @@ window.BibleModules = window.BibleModules || {};
             }
             const loc = locationFromURL();
             if (!loc) return;
+            // The word study closed onto the chapter already underneath: nothing to reload
+            if (wordWasOpen && loc.ref) {
+                const r = parseRef(loc.ref);
+                if (r.book === this.currentBook && r.chapter === this.currentChapter) { this.navReturn = st?.ret || null; return; }
+            }
+            if (wordWasOpen && loc.home && !this.currentBook && !this.combinedPlanReading) { this.navReturn = st?.ret || null; return; }
             this.navigate(loc.plan ? { plan: loc.plan } : loc.home ? loc : loc.ref, { source: 'pop', state: st });
         },
 
@@ -227,8 +240,12 @@ window.BibleModules = window.BibleModules || {};
         // Where the reader is now, as a chip target. Null on Home (nothing to return to).
         navHere() {
             const idx = this._navIdx;
+            if (this.ws?.open && this.ws.strong) {
+                const name = this.ws.data?.lemma?.transliteration || this.ws.strong;
+                return { word: this.ws.strong, homograph: this.ws.homograph, label: `the word study of ${name}`, idx };
+            }
             if (this.study?.open && this.study.book) {
-                const what = { 'cross-references': 'cross-references', notes: 'your notes' }[this.study.active] || 'commentary';
+                const what = { 'cross-references': 'cross-references', notes: 'your notes', hymns: 'hymns' }[this.study.active] || 'commentary';
                 return { study: true, ref: this.studyRefLabel().replace('–', '-'), label: `${what} on ${this.studyRefLabel()}`, idx };
             }
             if (this.combinedPlanReading && this.currentPlan) {
@@ -249,7 +266,8 @@ window.BibleModules = window.BibleModules || {};
                 return;
             }
             // History was cut (new tab from a shared link): go there as reading
-            if (ret.study) this.navigate(ret.ref, { kind: 'read' }).then(ok => ok && this.openStudy(ret.ref));
+            if (ret.word) this.openWordStudy(ret.word, { homograph: ret.homograph || null });
+            else if (ret.study) this.navigate(ret.ref, { kind: 'read' }).then(ok => ok && this.openStudy(ret.ref));
             else this.navigate(ret.plan ? { plan: ret.plan } : ret.ref, { kind: 'read' });
         },
 
@@ -369,6 +387,7 @@ window.BibleModules = window.BibleModules || {};
             this.actionMore = false;
             this.closePicker();
             if (this.study?.open) this.studyHide();   // "Read the chapter" from the study view
+            if (this.ws?.open) this.wsHide();         // "Read in context" from a word study
             // After a jump on a phone, fold the sheet so the verse and the chip both show (P1-10)
             if (kind === 'jump' && window.innerWidth <= 600) {
                 this.resourcesPanelExpanded = false;

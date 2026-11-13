@@ -1,8 +1,10 @@
 """Computed word studies: everything for one Hebrew/Greek lemma, from data only.
 
 GET /api/word/{strong}/study    the study page payload (docs/WORD_STUDY_2026-11.md)
+GET /word/{strong}              the app page at a word study's address (index.html)
 GET /api/word/{strong}/verses   its occurrences, filterable by book, form, edition,
-                                or a second lemma (to show collocation evidence)
+                                a second lemma (collocation evidence) or a Nave's topic
+                                (topic evidence); with ?translation= each verse's text
 
 Every section names its dataset in `source`, a key into the `sources` map (name,
 license, credit line). Nothing in the payload is written by a model: lexicon
@@ -15,9 +17,11 @@ import math
 import re
 import threading
 from collections import Counter, OrderedDict, defaultdict
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from .. import alignment_store
 from ..database import DATABASE_PATH, get_db_connection
@@ -271,16 +275,16 @@ def _renderings(conn, plain, function_word):
     return out
 
 
-def _bsb_links(conn, refs):
-    """{(book, chapter, verse): (text, {source position: [english positions]})} for BSB."""
+def _bsb_links(conn, refs, translation="BSB"):
+    """{(book, chapter, verse): (text, {source position: [english positions]})}."""
     out = {}
     for b, c, v in refs:
         r = conn.execute(f"""
             SELECT v.text, p.method, p.links FROM verses v
             LEFT JOIN {alignment_store.TABLE} p ON p.translation_id = v.translation_id
                  AND p.book = v.book AND p.chapter = v.chapter AND p.verse = v.verse
-            WHERE v.translation_id = 'BSB' AND v.book = ? AND v.chapter = ? AND v.verse = ?
-        """, (b, c, v)).fetchone()
+            WHERE v.translation_id = ? AND v.book = ? AND v.chapter = ? AND v.verse = ?
+        """, (translation, b, c, v)).fetchone()
         if not r:
             continue
         links = defaultdict(list)
@@ -461,6 +465,13 @@ def build_study(plain: str, padded: str, homograph_param: Optional[str] = None) 
         conn.close()
 
 
+@router.get("/word/{strong_number}")
+def serve_word_study_page(strong_number: str):
+    """The app at a word study's own address (/word/G26): JS opens the study
+    (and says so when the number is malformed or unknown)."""
+    return FileResponse(Path(__file__).resolve().parents[2] / "frontend" / "index.html")
+
+
 @router.get("/api/word/{strong_number}/study")
 def get_word_study(
     strong_number: str,
@@ -493,13 +504,23 @@ def get_word_verses(
                                  description="Only verses that also contain this lemma"),
     homograph: Optional[str] = Query(default=None, max_length=10,
                                      description="Only this homograph, e.g. H2617B"),
+    topic: Optional[int] = Query(default=None, description="Only verses in this Nave's topic "
+                                 "(the evidence behind a topic)"),
     offset: int = Query(default=0, ge=0),
+    translation: Optional[str] = Query(default=None, description="BSB, KJV or WEB: add each "
+                                       "verse's text and the words linked to the occurrence"),
 ):
-    """Occurrences of a lemma (one row per occurrence), in canonical order, 100 per page."""
+    """Occurrences of a lemma (one row per occurrence), in canonical order, 100 per page.
+
+    With `translation`, each row on the page also carries `text` (the verse in that
+    translation) and `word_positions` (its tappable words linked to this occurrence,
+    by the same rule as renderings; empty when no link is shown)."""
     plain, padded = _parse_strong(strong_number)
     hebrew = plain[0] == "H"
     if edition and edition not in NT_EDITIONS:
         raise HTTPException(status_code=400, detail=f"edition must be one of {NT_EDITIONS}")
+    if translation and translation not in ("BSB", "KJV", "WEB"):
+        raise HTTPException(status_code=400, detail="translation must be BSB, KJV or WEB")
     ed = edition or "SBL"
     conn = get_db_connection()
     try:
@@ -519,6 +540,12 @@ def get_word_verses(
         if book:
             sql += " AND w.book = ?"
             params.append(book)
+        if topic is not None:
+            sql += """ AND EXISTS (SELECT 1 FROM naves_topic_refs r WHERE r.topic_id = ?
+                       AND r.book = w.book AND r.chapter = w.chapter
+                       AND w.verse BETWEEN r.verse_start
+                                       AND COALESCE(r.verse_end, r.verse_start))"""
+            params.append(topic)
         if with_:
             other, other_padded = _parse_strong(with_)
             sql += f""" AND EXISTS (SELECT 1 FROM word_alignments o
@@ -533,12 +560,20 @@ def get_word_verses(
             if form and key != form:
                 continue
             rows.append({**dict(r), "form": key, "form_label": label})
+        page = rows[offset:offset + VERSES_PAGE]
+        if translation:
+            links = _bsb_links(conn, {(r["book"], r["chapter"], r["verse"]) for r in page},
+                               translation)
+            for r in page:
+                text, lk = links.get((r["book"], r["chapter"], r["verse"]), (None, {}))
+                r["text"] = text
+                r["word_positions"] = sorted(lk.get(r["word_position"], []))
         return {"strong_number": plain, "text": PRIMARY_TEXT_LABEL["OT" if hebrew else "NT"]
                 if not edition else f"Greek NT ({edition} tokens in TAGNT)",
                 "filters": {"book": book, "form": form, "edition": edition, "with": with_,
-                            "homograph": homograph},
+                            "homograph": homograph, "topic": topic},
                 "total": len(rows), "verses": len({(r["book"], r["chapter"], r["verse"])
                                                    for r in rows}),
-                "offset": offset, "occurrences": rows[offset:offset + VERSES_PAGE]}
+                "offset": offset, "translation": translation, "occurrences": page}
     finally:
         conn.close()
