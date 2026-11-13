@@ -185,6 +185,7 @@ TOPIC_MIN_HITS = 4          # shared verses
 TOPIC_MIN_SHARE = 0.10      # of the topic's verses
 TOPIC_MIN_BOOKS = 3         # shared verses spread over this many books
 NAME_TOPIC_SHARE = 0.5      # a topic named like a person/place whose verses mostly hold it
+NAME_ONLY_SHARE = 0.9       # ... or whose name the KJV uses as a proper noun this often
 
 
 def name_topics(conn, topic_verses, lemma_verses, names):
@@ -198,16 +199,29 @@ def name_topics(conn, topic_verses, lemma_verses, names):
         if s and s[1:].isdigit():
             proper.add(unpad(s))
     lemmas_named = defaultdict(set)
-    for s, r in conn.execute("SELECT strong_number, rendering FROM lemma_renderings "
-                             "WHERE translation_id = 'KJV'"):
-        if s in proper and " " not in r:
+    as_name, as_any = defaultdict(int), defaultdict(int)
+    for s, r, c in conn.execute("SELECT strong_number, rendering, count FROM lemma_renderings "
+                                "WHERE translation_id = 'KJV'"):
+        if " " in r:
+            continue
+        as_any[r.upper()] += c
+        if s in proper:
             lemmas_named[r.upper()].add(s)
+            as_name[r.upper()] += c
     out = set()
     for tid, name in names.items():
-        ls = lemmas_named.get(name.split(",")[0].split("(")[0].strip().upper())
+        key = name.split(",")[0].split("(")[0].strip().upper()
+        ls = lemmas_named.get(key)
         T = topic_verses.get(tid)
-        if ls and T and sum(any(k in lemma_verses.get(x, ()) for x in ls) for k in T) \
-                >= NAME_TOPIC_SHARE * len(T):
+        if not ls or not T:
+            continue
+        # A word the KJV uses (almost) only as a name is a name entry whatever its verses
+        # hold: Nave's files several Jorams/Jehorams, and whole-chapter references, under
+        # one heading, so the verse share alone lets JORAM back in. SIN stays a topic.
+        only_a_name = as_name[key] >= NAME_ONLY_SHARE * as_any[key]
+        mostly_holds_it = sum(any(k in lemma_verses.get(x, ()) for x in ls) for k in T) \
+            >= NAME_TOPIC_SHARE * len(T)
+        if only_a_name or mostly_holds_it:
             out.add(tid)
     return out
 

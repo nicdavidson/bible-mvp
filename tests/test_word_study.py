@@ -206,7 +206,10 @@ def test_renderings_hide_noise(client):
 @needs_db
 def test_topics_leave_out_names_and_single_stories(client):
     shalom = [t["topic"] for t in client.get("/api/word/H7965/study").json()["topics"]["items"]]
-    assert shalom == ["PEACE"]
+    # SALUTATIONS qualifies since the Nave's parser fix restored its references ("Peace be
+    # to you" is a greeting); the people of the "Is it peace?" story must stay out.
+    assert shalom[0] == "PEACE" and set(shalom) <= {"PEACE", "SALUTATIONS"}
+    assert not {"JORAM", "JEHU", "JEZREEL", "CUSHI", "MICAIAH"} & set(shalom)
     agape = [t["topic"] for t in client.get("/api/word/G26/study").json()["topics"]["items"]]
     assert "LOVE" in agape
 
