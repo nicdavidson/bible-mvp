@@ -296,13 +296,9 @@ window.BibleModules = window.BibleModules || {};
 
         // ---------- lifecycle ----------
         studyInit() {
-            const dlg = document.getElementById('study-view');
-            // init() can run twice (Alpine auto-init + x-init): bind once
-            if (dlg && !dlg.dataset.bound) {
-                dlg.dataset.bound = '1';
-                // Esc / Android back on the open dialog: step back one study location
-                dlg.addEventListener('cancel', (e) => { e.preventDefault(); this.studyBack(); });
-            }
+            // Esc / Android back on the open dialog: step back one study location
+            document.getElementById('study-view')
+                ?.addEventListener('cancel', (e) => { e.preventDefault(); this.studyBack(); });
             // Source metadata for credits outside the study view (search results)
             this.studySourceMeta = readJSON(META_KEY, []);
             fetch('/api/commentary/sources').then(r => r.ok ? r.json() : null).then(d => {
@@ -465,15 +461,9 @@ window.BibleModules = window.BibleModules || {};
             if (opener && document.contains(opener)) opener.focus({ preventScroll: true });
         },
 
-        // Called first by the app's popstate handler. Returns true when handled.
+        // Called first by the app's popstate handler (modules/nav.js). Returns true when
+        // it showed a study entry, or closed the view onto the chapter already underneath.
         studyHandlePop(e) {
-            // The app may have more than one popstate listener; answer each event once
-            if (e && '_studyHandled' in e) return e._studyHandled;
-            const result = this._studyHandlePop(e);
-            if (e) e._studyHandled = result;
-            return result;
-        },
-        _studyHandlePop(e) {
             const params = new URLSearchParams(window.location.search);
             if (params.has('study')) {
                 this._studyDepth = e?.state?.studyDepth || 0;
