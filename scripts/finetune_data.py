@@ -137,6 +137,12 @@ def build(cache: Path, max_queries: int | None = None) -> Path:
         cand = [int(i) for i in order if int(i) not in bad]
         return rng.choice(cand) if cand else None
 
+    # Identical text counts as the same query: 423 BSB verse texts occur more than once
+    # (Ps 136 refrain, Ps 14 = Ps 53, the commandments), so exclude by text as well.
+    banned = {texts[i] for i in test_sources} | test_queries | \
+        {texts[src] for src, _, key in xq if select_of(key) == "select"} | \
+        {q for q, _, key in nq if select_of(key) == "select"}
+
     train, select = [], {"naves": [], "xref": []}
     for (q, rel, key), qv in zip(nq, nq_vecs):
         if select_of(key) == "select":
@@ -144,14 +150,20 @@ def build(cache: Path, max_queries: int | None = None) -> Path:
             continue
         neg = negative(qv, rel, ())
         for p in rng.sample(rel, min(len(rel), MAX_POS_PER_QUERY)):
+            if texts[p] in banned or texts[neg] == texts[p]:
+                continue
             train.append({"anchor": q, "positive": texts[p], "negative": texts[neg],
                           "kind": "naves"})
     for src, rel, key in xq:
         if select_of(key) == "select":
             select["xref"].append({"src": src, "rel": rel})
             continue
+        if texts[src] in banned:
+            continue
         neg = negative(np.asarray(qwen[src]), rel, (src,))
         for p in rel:
+            if texts[p] in banned or texts[neg] == texts[p]:
+                continue
             train.append({"anchor": texts[src], "positive": texts[p],
                           "negative": texts[neg], "kind": "xref"})
     rng.shuffle(train)

@@ -330,7 +330,10 @@ def run(args):
     def record(method, name, split, per_query, extra=None):
         m = mean_metrics(per_query)
         results["rows"].append({"method": method, "set": name, "split": split, **m,
-                                **(extra or {})})
+                                **(extra or {}),
+                                "per_query": {"nDCG@10": [round(r["nDCG@10"], 4)
+                                                          for r in per_query],
+                                              "hit@10": [r["hit@10"] for r in per_query]}})
         print(f"  {method:34} {name:10} {split:5} " +
               " ".join(f"{k}={v:.3f}" for k, v in m.items()), flush=True)
 
@@ -546,6 +549,24 @@ def write_pool(path: Path, sets, corpus):
     print(f"pool: {sum(len(x['candidates']) for x in out)} unjudged candidates -> {path}")
 
 
+def compare(results: dict, a: str, b: str, n_boot: int = 10000, seed: int = 0):
+    """Paired bootstrap of (b - a) per test set: mean difference and 95% interval."""
+    rng = np.random.default_rng(seed)
+    rows = {(r["method"], r["set"]): r for r in results["rows"] if r["split"] == "test"}
+    for name in ("questions", "qpooled", "naves", "subtopics", "xref"):
+        if (a, name) not in rows or (b, name) not in rows:
+            continue
+        for metric in ("nDCG@10", "hit@10"):
+            x = np.array(rows[(a, name)]["per_query"][metric])
+            y = np.array(rows[(b, name)]["per_query"][metric])
+            d = y - x
+            boots = d[rng.integers(0, len(d), size=(n_boot, len(d)))].mean(axis=1)
+            lo, hi = np.percentile(boots, [2.5, 97.5])
+            verdict = "better" if lo > 0 else "worse" if hi < 0 else "no clear difference"
+            print(f"{name:10} {metric:8} {b} - {a}: {d.mean():+.3f} "
+                  f"[95% {lo:+.3f}, {hi:+.3f}] n={len(d)}  {verdict}")
+
+
 def markdown_table(results: dict, split: str = "test") -> str:
     """One row per method, nDCG@10 / hit@10 per query set (test split)."""
     sets = [s for s in ("questions", "qpooled", "naves", "subtopics", "xref")
@@ -581,7 +602,12 @@ def main():
     p.add_argument("--out")
     p.add_argument("--pool", help="write unjudged pooled candidates for the questions set")
     p.add_argument("--table", help="print the markdown table for an existing --out JSON")
+    p.add_argument("--compare", nargs=3, metavar=("JSON", "METHOD_A", "METHOD_B"),
+                   help="paired bootstrap of METHOD_B - METHOD_A on each test set")
     args = p.parse_args()
+    if args.compare:
+        compare(json.loads(Path(args.compare[0]).read_text()), *args.compare[1:])
+        return
     if args.table:
         print(markdown_table(json.loads(Path(args.table).read_text())))
         return
