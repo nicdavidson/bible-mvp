@@ -44,7 +44,15 @@ def _warm():
         logger.exception("meaning search warm-up failed")
 
 
-# Load vectors + model in the background at import so the first search is not the slow one.
+# Import the heavy modules here, in the importing thread: a background thread importing
+# numpy while another thread imports it can expose a partially initialised module.
+try:
+    import numpy  # noqa: F401
+    import onnxruntime  # noqa: F401
+    import tokenizers  # noqa: F401
+except ImportError:
+    pass  # get_index() reports the error and search falls back to keywords
+# Load vectors + model in the background so the first search is not the slow one.
 threading.Thread(target=_warm, daemon=True, name="semantic-warmup").start()
 
 
