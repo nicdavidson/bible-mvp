@@ -242,3 +242,49 @@ def test_build_is_deterministic(tmp_path):
         assert n_rows == len(rows) == 85
     assert digests[0] == digests[1]
     assert blobs[0] == blobs[1]
+
+
+# ---------- caching (a fallback must never be cached; search ETag follows the DB release) ----------
+
+class TestCaching:
+    def test_fallback_is_not_stored(self, client, monkeypatch):
+        monkeypatch.setattr(semantic, "get_index", lambda *a, **k: None)
+        r = _get(client, "/api/search/meaning", q="waiting on the LORD")
+        assert r.json()["fallback"] is True
+        assert r.headers["cache-control"] == "no-store"
+        assert "etag" not in r.headers
+        r = _get(client, "/api/search/similar/Isaiah 40:31")
+        assert r.headers["cache-control"] == "no-store"
+
+    def test_keyword_search_gets_release_etag_and_304(self, client):
+        r = _get(client, "/api/search", q="shepherd")
+        assert r.headers["cache-control"] == "public, max-age=3600"
+        etag = r.headers["etag"]
+        r2 = client.get("/api/search", params={"q": "shepherd"},
+                        headers={"If-None-Match": etag, "X-Forwarded-For": "10.77.0.1"})
+        assert r2.status_code == 304 and r2.headers["etag"] == etag
+        other = _get(client, "/api/search", q="shepherds")
+        assert other.headers["etag"] != etag
+
+    def test_etag_changes_with_db_release(self, monkeypatch):
+        from backend import release
+        a = release.search_etag("/api/search/meaning?q=x")
+        monkeypatch.setattr(release, "db_release", lambda: "otherrelease")
+        assert release.search_etag("/api/search/meaning?q=x") != a
+        monkeypatch.setenv("FLY_IMAGE_REF", "registry.fly.io/bible-mvp:deployment-2")
+        b = release.search_etag("/api/search/meaning?q=x")
+        monkeypatch.setenv("FLY_IMAGE_REF", "registry.fly.io/bible-mvp:deployment-3")
+        assert release.search_etag("/api/search/meaning?q=x") != b
+
+    def test_other_immutable_paths_unchanged(self, client):
+        r = client.get("/api/passage/John 3:16?translation=BSB")
+        assert r.headers["cache-control"] == "public, max-age=86400"
+        assert "etag" not in r.headers
+
+
+@needs_vectors
+def test_meaning_results_cacheable_with_etag(client):
+    r = _get(client, "/api/search/meaning", q="rest for the weary", mode="meaning")
+    assert r.json()["fallback"] is False
+    assert r.headers["cache-control"] == "public, max-age=3600"
+    assert r.headers["etag"].startswith('W/"')

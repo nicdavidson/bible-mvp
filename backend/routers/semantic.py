@@ -16,7 +16,7 @@ import sqlite3
 import threading
 import time
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from .. import semantic
 from ..core import CANONICAL_BOOKS, NT_BOOKS, OT_BOOKS, limiter, parse_reference
@@ -31,6 +31,7 @@ MEANING_POOL = 100
 HYBRID_WEIGHT = 0.5     # RRF weight of meaning vs keyword (tuned on Nave's dev split)
 SIMILAR_WEIGHT = 1.0    # "more like this" RRF weight, tuned on the cross-reference dev split
 AUTO_MAX_TERMS = 2      # mode=auto: <= 2 content words -> hybrid, longer -> meaning only
+NO_STORE = "no-store"   # a fallback must not be cached in place of real results
 NEIGHBOURS = 3          # "more like this" skips verses within +-3 in the same chapter
 _STRONGS = re.compile(r"^[GH]\d+$", re.I)
 _BOOK_ORDER = {b: i + 1 for i, b in enumerate(CANONICAL_BOOKS)}
@@ -148,6 +149,7 @@ def _results(conn, ranked, translation, terms, meaning_rank, keyword_rank, score
 @limiter.limit("30/minute")
 def search_meaning(
     request: Request,
+    response: Response,
     q: str = Query(..., min_length=2, max_length=200, description="Natural-language query"),
     scope: str = Query(default="all", description="all, bible, ot, nt, book:<Book>"),
     mode: str = Query(default="auto", pattern="^(auto|hybrid|meaning)$"),
@@ -182,6 +184,7 @@ def search_meaning(
             ranked = keyword[:limit]
             results = _results(conn, ranked, translation, terms, {}, keyword_rank,
                                {r: 1.0 / (60 + i + 1) for i, r in enumerate(keyword)})
+            response.headers["Cache-Control"] = NO_STORE
             return {**base, "mode": "keyword", "fallback": True,
                     "fallback_reason": "meaning search unavailable", "results": results}
 
@@ -215,6 +218,7 @@ def search_meaning(
 @limiter.limit("30/minute")
 def similar_verses(
     request: Request,
+    response: Response,
     reference: str,
     scope: str = Query(default="all", description="all, bible, ot, nt, book:<Book>"),
     translation: str = Query(default="BSB", max_length=10),
@@ -234,6 +238,7 @@ def similar_verses(
     base = {"reference": f"{book} {chapter}:{verse}", "scope": scope, "translation": translation}
     loaded = semantic.get_index()
     if loaded is None:
+        response.headers["Cache-Control"] = NO_STORE
         return {**base, "results": [], "fallback": True,
                 "fallback_reason": "meaning search unavailable"}
     index, _ = loaded
