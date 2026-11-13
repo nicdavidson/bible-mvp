@@ -251,7 +251,7 @@ canonicalized before anything changes (`BibleRef.parse`). Flow tests are in
 | P1-4 `Jude 5` | Already fixed on the server; the client parser handles it too. |
 | P1-5 cramped mobile header | Fixed: one header row with a tappable running head ("John 3 BSB ▾"); translation lives in the picker; Read aloud and Immersive move to the menu on phones. |
 | P1-6 peek chips / cross-refs lose context | Already fixed for the selection; the cross-refs tab now says whose they are ("Cross-references for John 3:16"). |
-| P1-7 search | Partly: a typed reference gets a "Go to …" row and Enter goes there; results are kept and the return chip offers "Results". **Left:** translation duplicates/labels (search API work is happening on the semantic-search branch). |
+| P1-7 search | Fixed on `v2/searchui` (see below): one result per verse, in the reader's translation. |
 | P1-8 Back from plan | Fixed (plan days are history entries; `/` is Home). Tested. |
 | P1-9 guest notes after sign-in | **Left:** account sync, not navigation; needs a Supabase test account. |
 | P1-10 sheet covers jumped-to verse | Fixed: a jump folds the phone sheet; tested that the target verse is in the top three quarters of the screen. |
@@ -317,3 +317,61 @@ header and sidebar.
 
 Screenshots: `docs/nav/chrome-{before,after}-*.png`, `docs/study-view/panes-{before,after}-*.png`.
 Flow tests: `tests/e2e/test_study_panes.py`, `tests/e2e/test_chrome_layout.py`.
+
+---
+
+## Status after `v2/searchui` (2026-11-13)
+
+**One search screen for every way people look things up** (`modules/search.js`,
+`css/search.css`, `<dialog id="search-view">`). The old modal, its functions in
+`feedback.js`, its state in `app.js` and its CSS are gone. There is no mode switch; what
+is typed decides what leads:
+
+| Typed | What the screen shows | Enter |
+|---|---|---|
+| a reference, any form (`rom 8 28`) | one "Go to Romans 8:28" row, nothing else (plus "Search for these words instead") | goes there |
+| `G26`, `ἀγάπη`, `חסד` | the word's card, then verses with the word | opens the word study |
+| `agape`, `logos` | English hits, and a row for the Greek word | — |
+| `"green pastures"` (quoted) | verses with exactly the phrase | — |
+| a word or two (`forgiveness`) | Nave's topic of that name if any; “ ” verses with the words; then ≈ more verses that may be about the idea | loads the idea list now |
+| a question (3+ words, or what/how/verses…) | ≈ verses that may be about the idea first, then verses with the words | loads the idea list now |
+
+- *Meaning results* load on Enter / the keyboard's Search key, after a 1 s pause, or at once
+  when no verse has the words; never per keystroke (30 a minute). They are cached per
+  query, scope and translation. They are headed "Verses that may be about this idea" with
+  "Found by meaning, not exact words. Read each in its context." and a short explanation
+  that it finds and orders verses, does not answer, and can miss well-known verses. No
+  scores. A question gets a tip to try the words a verse would use.
+- *Each verse once:* the second list leaves out verses in the first, so its heading says
+  "More verses…" when it follows the keyword list.
+- *Nonsense* (none of the words occur in Scripture) gets "Nothing found" and an explicit
+  "Show the closest verses anyway", not a list of guesses.
+- *Fallback* (`fallback: true`): "Verses with some of your words", no ≈, and a note that
+  search by meaning isn't available. *Errors*: a retry. *Rate limit*: says so.
+- *Offline*: keyword search runs over chapters saved in IndexedDB in the reader's
+  translation, and says how many chapters it searched. (Before this, search did not work
+  offline at all: `/api/search` was never cached and nothing searched IndexedDB.)
+- *Translations (P1-7):* `/api/search?translation=` returns one result per verse, the
+  whole verse in the reader's translation. A verse matched only in the KJV or WEB
+  ("thou preparest") still shows the reader's text, with the matching wording under it
+  labelled with its translation, so it is clear why it is there and the verse that opens
+  matches what was read.
+- *Scopes* are chips (All, OT, NT, the current book, Commentary), 40px tall.
+- *Commentary hits* follow the verses, three at a time; *Nave's topics* show only when a
+  topic has exactly the typed name (it opens the reader's Topics sheet).
+- *History:* the open screen is an entry (`?search=`). A result opens as a jump with the
+  verse highlighted; the chip offers "Back to <place>" (skipping the search) and
+  "Results"; browser Back returns to the results with the query, both lists, and the
+  scroll; Back again closes search. Word study, commentary and topics opened from search
+  come back to it with Back too.
+- *Keyboard:* `/` opens; arrows move through every result and Up from the first returns
+  to the field; typing on a result goes back to the field; Escape closes. A polite status
+  line announces what arrived.
+
+**Study view.** The Cross-references pane ends with "≈ Similar verses"
+(`/api/search/similar`), loaded on request, labelled as computed and not chosen by an
+editor, without verses already in the cross-references. At ≤480px the rail's tools keep
+icon and count only (names in `aria-label`): whole commentary chips beside them on John
+3:16 went from 1 to 2 at 360 and 390.
+
+Screenshots: `docs/search/{before,after}-*.png`. Flow tests: `tests/e2e/test_search_flow.py`.

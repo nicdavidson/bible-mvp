@@ -431,6 +431,16 @@ UI can hide meaning controls when `available` is false.
 - Offline: until in-browser embedding ships, hide meaning search when offline (or when
   `/api/semantic/status` says unavailable) rather than showing an error.
 
+### What the frontend does (`v2/searchui`)
+
+Mostly as suggested above; details and the reasons in `docs/UI_OVERHAUL.md` ("Status
+after `v2/searchui`"). Differences: meaning results also load at once when no verse has
+the typed words; when none of the words occur in Scripture at all (no result with
+`match` other than `meaning`, and no keyword hits) the list is withheld behind "Show the
+closest verses anyway", because the nearest verses to a typo are noise; "more like this"
+is a section at the end of the Cross-references pane, loaded on request, not a separate
+list beside them.
+
 ## Deployment notes (not done here; nothing was deployed)
 
 - `requirements.txt` gains numpy, onnxruntime and tokenizers (pinned).
