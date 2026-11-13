@@ -30,7 +30,7 @@ def _make_db(path, with_sources: bool):
         conn.execute("INSERT INTO verses (translation_id, book, book_order, chapter, verse, text)"
                      " VALUES ('BSB', 'Jude', 65, 1, ?, ?)", (v, f"Jude {v}"))
     # Henry-style passage rows stored with start only; Gill-style verse rows
-    rows = [("Matthew Henry", 1, 1, "henry one"), ("Matthew Henry", 22, 22, "henry two")]
+    rows = [("Matthew Henry", 1, None, "henry one"), ("Matthew Henry", 22, None, "henry two")]
     rows += [("John Gill", v, v, f"gill {v}") for v in range(1, 37)]
     for src, s, e, c in rows:
         conn.execute("INSERT INTO commentary_entries (source, book, chapter, reference_start,"
@@ -182,10 +182,12 @@ class TestSourcesEndpoint:
 def test_effective_ranges_rules():
     rows = [{"reference_start": 1, "reference_end": None},
             {"reference_start": 5, "reference_end": 9},
-            {"reference_start": 12, "reference_end": 12}]
-    assert study.effective_ranges(rows, "passage", 20) == [(1, 4), (5, 9), (12, 20)]
-    assert study.effective_ranges(rows, "verse", 20) == [(1, 1), (5, 9), (12, 12)]
-    assert study.effective_ranges(rows, "chapter", 20) == [(1, 20)] * 3
+            {"reference_start": 12, "reference_end": 12},
+            {"reference_start": 14, "reference_end": None}]
+    # A filled end is trusted even when it is a single verse; only a missing end is inferred
+    assert study.effective_ranges(rows, "passage", 20) == [(1, 4), (5, 9), (12, 12), (14, 20)]
+    assert study.effective_ranges(rows, "verse", 20) == [(1, 1), (5, 9), (12, 12), (14, 14)]
+    assert study.effective_ranges(rows, "chapter", 20) == [(1, 20)] * 4
 
 
 def test_real_db_henry_reaches_john_3_16():
@@ -194,3 +196,85 @@ def test_real_db_henry_reaches_john_3_16():
     d = TestClient(app).get("/api/passage/John 3:16/study").json()
     henry = _by_name(d)["Matthew Henry"]
     assert henry["selection_entries"] == 1 and henry["ranges"][0]["start"] == 1
+
+
+# ---------- round two: real library (items 1, 6, 7) ----------
+
+def test_requires_attribution_comes_from_license(tmp_client):
+    client, with_sources = tmp_client
+    srcs = {s["source"]: s for s in client.get("/api/commentary/sources").json()["sources"]}
+    assert srcs["John Gill"]["requires_attribution"] is False          # public domain
+    if with_sources:
+        assert srcs["Okafor Study Notes"]["requires_attribution"] is True    # CC BY 4.0
+        assert srcs["Ferreira Greek Notes"]["requires_attribution"] is True  # CC BY-SA 4.0
+
+
+@pytest.mark.parametrize("lic,expected", [
+    ("Public domain", False), ("Public Domain (US)", False), ("CC0", False), (None, False),
+    ("CC BY 4.0", True), ("CC BY-SA 4.0", True), ("Some custom license", True),
+])
+def test_requires_attribution_rules(lic, expected):
+    assert study.requires_attribution(lic) is expected
+
+
+def _real_client():
+    study._cache.update(key=None, sources=None)
+    return TestClient(app)
+
+
+def _real_has_library(client):
+    return any(s["slug"] == "treasury-of-david" for s in client.get("/api/commentary/sources").json()["sources"])
+
+
+def test_real_overview_and_verse_entries_both_listed_tightest_first():
+    """Treasury of David on Ps 23:1-3: verse entries 1, 2, 3 plus the whole-psalm overview."""
+    client = _real_client()
+    if not _real_has_library(client):
+        pytest.skip("DB without the 13-source commentary library")
+    td = _by_name(client.get("/api/passage/Psalms 23:1-3/study").json())["Treasury of David"]
+    spans = sorted((r["start"], r["end"]) for r in td["ranges"])
+    assert {(1, 1), (2, 2), (3, 3), (1, 6)} <= set(spans)
+    entries = client.get("/api/passage/Psalms 23:1-3/commentary?source=treasury-of-david").json()["entries"]
+    order = [(e["range_start"], e["range_end"]) for e in entries]
+    assert order.index((1, 1)) < order.index((1, 6))       # same start: shortest first
+    tyn = _by_name(client.get("/api/passage/John 3:16/study").json())["Tyndale Study Notes"]
+    assert tyn["requires_attribution"] is True and "CC BY-SA" in tyn["attribution"]
+
+
+class TestOfflineSources:
+    """Offline downloads take a source list (item 7)."""
+
+    def test_chapter_sources_filter(self):
+        client = _real_client()
+        all_ = client.get("/api/offline/chapter?book=John&chapter=3").json()["commentary"]
+        none = client.get("/api/offline/chapter?book=John&chapter=3&sources=").json()["commentary"]
+        gill = client.get("/api/offline/chapter?book=John&chapter=3&sources=john-gill").json()["commentary"]
+        assert none == []
+        assert gill and {e["source"] for e in gill} == {"John Gill"}
+        assert len(all_) > len(gill)
+
+    def test_book_commentary_sources_by_name_or_slug(self):
+        client = _real_client()
+        r = client.get("/api/offline/commentary", params={"book": "Jude", "sources": "Matthew Henry,john-gill"})
+        assert r.status_code == 200
+        assert {e["source"] for e in r.json()["entries"]} == {"Matthew Henry", "John Gill"}
+        unknown = client.get("/api/offline/commentary?book=Jude&sources=nobody").json()["entries"]
+        assert unknown == []
+        old = client.get("/api/offline/commentary?book=Jude").json()["entries"]   # old callers: all
+        assert len({e["source"] for e in old}) >= 2
+
+    def test_book_endpoint_sources(self):
+        client = _real_client()
+        d = client.get("/api/offline/book?book=Jude&sources=john-gill").json()
+        comm = [e for ch in d["chapters"].values() for e in ch.get("commentary", [])]
+        assert comm and {e["source"] for e in comm} == {"John Gill"}
+
+    def test_sources_with_sizes_and_defaults(self):
+        client = _real_client()
+        if not _real_has_library(client):
+            pytest.skip("DB without the 13-source commentary library")
+        srcs = client.get("/api/offline/commentary/sources").json()["sources"]
+        by = {s["slug"]: s for s in srcs}
+        assert by["john-gill"]["bytes"] > 1_000_000
+        assert all(s["bytes"] >= 0 and "default" in s for s in srcs)
+        assert 1 <= sum(s["default"] for s in srcs) <= 3

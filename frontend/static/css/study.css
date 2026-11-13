@@ -398,6 +398,97 @@ dialog.study-view::backdrop { background: var(--color-bg); }
 }
 .study-entry p.lvl-1 .study-mark { color: var(--color-text); }
 
+/* Verse markers inside a passage note (Calvin "16.", Catena "Ver. 16.", "Verse 16."):
+   the number moves into the margin like a verse number in the text */
+.study-entry p.has-vmark { position: relative; }
+.study-vmark {
+    float: left;
+    margin: 0.32em 0.45em 0 0;
+    padding: 0 0.35em;
+    border-radius: 4px;
+    background: var(--color-bg-secondary);
+    font: 700 0.72em/1.5 var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+}
+.study-entry p.study-headword {
+    font-style: italic;
+    font-weight: 600;
+    margin-bottom: 0.3em;
+}
+
+/* Long notes: a jump list of their parts */
+.study-toc {
+    margin: 0 0 1em;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font: 0.86rem/1.4 var(--font-sans);
+}
+.study-toc summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    cursor: pointer;
+    color: var(--study-link);
+    font-weight: 600;
+}
+.study-toc ol { list-style: none; margin: 0; padding: 0 4px 6px; max-height: 40dvh; overflow-y: auto; }
+.study-toc button {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.study-toc button:hover { background: var(--color-surface-hover); }
+.study-toc b { font-variant-numeric: tabular-nums; margin-right: 0.4em; }
+
+/* A source's wider entries (whole-psalm overview, passage note) after its verse notes */
+.study-more {
+    margin-top: 1.4em;
+    border-top: 1px solid var(--color-border);
+}
+.study-more > summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font: 600 0.92rem var(--font-sans);
+    color: var(--study-link);
+    list-style: none;
+}
+.study-more > summary::-webkit-details-marker { display: none; }
+.study-more > summary { padding: 8px 0; }
+.study-more-hint {
+    display: block;
+    font: 400 0.8rem/1.35 var(--font-sans);
+    color: var(--study-meta);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: calc(100vw - 96px);
+}
+.study-more > summary::before { content: "+"; font-size: 1.1em; width: 1em; text-align: center; }
+.study-more[open] > summary::before { content: "\2212"; }
+
+/* Credit a license requires, shown with the text (not only in the info sheet) */
+.study-credit {
+    margin-top: 6px;
+    font: 0.78rem/1.4 var(--font-sans);
+    color: var(--study-meta);
+}
+
 /* The paragraphs about the selected verses, inside a wider passage/chapter note */
 .study-entry p.is-focus {
     background: var(--study-focus-bg);
@@ -470,7 +561,8 @@ dialog.study-sheet[open] { animation: study-sheet-in 0.18s ease-out; }
 .study-sheet-inner > p { margin: 0 0 10px; }
 .study-sheet-hint { color: var(--color-text-secondary); }
 .study-info-who { color: var(--color-text-secondary); }
-.study-info-trad { display: block; }
+.study-info-who { display: flex; flex-wrap: wrap; gap: 0 12px; }
+.study-info-trad { flex-basis: 100%; }
 .study-info-facts {
     display: grid;
     grid-template-columns: max-content 1fr;
@@ -553,6 +645,20 @@ dialog.study-sheet[open] { animation: study-sheet-in 0.18s ease-out; }
     color: var(--color-text);
     font: 600 0.9rem var(--font-sans);
     cursor: pointer;
+}
+
+/* License credit under a search hit from a source that requires it */
+.result-credit { margin-top: 4px; font-size: 0.75rem; color: var(--color-text-secondary); }
+
+/* ---------- Settings: commentary download list ---------- */
+.download-hint { margin: 0 0 6px; font-size: 0.8rem; color: var(--color-text-secondary); }
+.download-option .download-size {
+    margin-left: auto;
+    padding-left: 12px;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 /* ---------- wide screens: text column + two sources side by side ---------- */

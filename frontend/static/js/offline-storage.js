@@ -233,7 +233,8 @@ class OfflineStorage {
         return this._txWrite(
             STORES.COMMENTARY,
             entries.map(entry => ({
-                id: `${entry.source}:${book}:${chapter}:${entry.reference_start}`,
+                // start-end: one source can have an overview and a verse note starting together
+                id: `${entry.source}:${book}:${chapter}:${entry.reference_start}-${entry.reference_end ?? entry.reference_start}`,
                 book,
                 chapter,
                 ...entry

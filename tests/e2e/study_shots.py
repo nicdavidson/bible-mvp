@@ -1,8 +1,7 @@
-"""Screenshots of the study view at phone and desktop sizes, light and dark.
+"""Screenshots of the study view with the real commentary library.
 
 Usage: .venv/bin/python tests/e2e/study_shots.py [base_url] [--quick]
-Writes docs/study-view/*.png. Expects the synthetic sources from
-tests/fixtures/study_seed.py in the DB the server uses (for the many-source shots).
+Writes docs/study-view/real-*.png (phones 360/390/430 and desktop 1280, light and dark).
 """
 import sys
 from pathlib import Path
@@ -27,8 +26,16 @@ def new_page(browser, w, h, theme):
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
     return ctx, page, errors
+
+
+def shot(page, tag, name):
+    page.screenshot(path=str(OUT / f"real-{tag}-{name}.png"))
+
+
+def ready(page, slug):
+    page.wait_for_selector(f'.study-pane[data-slug="{slug}"] .study-pane-body p', timeout=15000)
+    page.wait_for_timeout(600)
 
 
 def run():
@@ -37,61 +44,77 @@ def run():
         for theme in THEMES:
             for w, h in SIZES:
                 tag = f"{w}x{h}-{theme}"
+                phone = w < 900
                 ctx, page, errors = new_page(browser, w, h, theme)
+                tap = page.tap if phone else page.click
+
+                # Reader: select 16-18, open the study view (first-time default order)
                 page.goto(f"{BASE}/John/3")
                 page.wait_for_selector("#verse-16")
-                tap = page.tap if w < 900 else page.click
                 page.locator("#verse-16").scroll_into_view_if_needed()
                 tap("#verse-16 .verse-num")
                 tap("#verse-18 .verse-num")
-                page.wait_for_timeout(700)
-                page.screenshot(path=str(OUT / f"{tag}-01-selection.png"))
+                page.wait_for_timeout(600)
                 tap(".verse-action-bar .action-bar-study")
-                page.wait_for_selector(".study-pane-body p", timeout=10000)
-                page.wait_for_timeout(500)
-                page.screenshot(path=str(OUT / f"{tag}-02-study-open.png"))
-                # Henry: passage-level entry with a context note
-                tap('.study-chip[data-slug="matthew-henry"]')
-                page.wait_for_timeout(900)
-                page.screenshot(path=str(OUT / f"{tag}-03-henry.png"))
-                # Long chapter-level entry with marked paragraphs
-                tap('.study-chip[data-slug="lindqvist-chapter-studies"]')
-                page.wait_for_timeout(1200)
-                page.screenshot(path=str(OUT / f"{tag}-04-chapter-entry-focus.png"))
-                # Source info
-                tap('.study-chip[data-slug="lindqvist-chapter-studies"]')
-                page.wait_for_selector("#study-info[open]")
-                page.wait_for_timeout(300)
-                page.screenshot(path=str(OUT / f"{tag}-05-source-info.png"))
-                page.keyboard.press("Escape")
-                # Empty source info with nearest
-                page.locator('.study-chip[data-slug="pell-s-expositor"]').scroll_into_view_if_needed()
-                tap('.study-chip[data-slug="pell-s-expositor"]')
-                page.wait_for_selector("#study-info[open]")
-                page.wait_for_timeout(300)
-                page.screenshot(path=str(OUT / f"{tag}-06-empty-source.png"))
-                page.keyboard.press("Escape")
-                # Reference peek inside commentary
+                ready(page, page.evaluate("Alpine.$data(document.body).study.active"))
+                shot(page, tag, "01-john3-open")
+
+                # Calvin: passage note 13-18, verse markers find 16-18
+                tap('.study-chip[data-slug="john-calvin"]')
+                ready(page, "john-calvin")
+                shot(page, tag, "02-calvin-markers")
+
+                # Who a source is (Gill: no repeated name)
                 tap('.study-chip[data-slug="john-gill"]')
-                page.wait_for_timeout(800)
-                link = page.locator('.study-pane[data-slug="john-gill"] a.commentary-ref').first
-                link.scroll_into_view_if_needed()
-                link.click()
-                page.wait_for_selector("#study-peek[open] .study-verses span", timeout=8000)
+                ready(page, "john-gill")
+                shot(page, tag, "03-gill")
+                tap('.study-chip[data-slug="john-gill"]')
+                page.wait_for_selector("#study-info[open]")
                 page.wait_for_timeout(300)
-                page.screenshot(path=str(OUT / f"{tag}-07-ref-peek.png"))
+                shot(page, tag, "04-source-info")
                 page.keyboard.press("Escape")
-                # Manage sources
+
+                # Henry: long passage note with its outline
+                tap('.study-chip[data-slug="matthew-henry"]')
+                ready(page, "matthew-henry")
+                toc = page.locator('.study-pane[data-slug="matthew-henry"] .study-toc summary').first
+                if toc.count():
+                    toc.scroll_into_view_if_needed()
+                    toc.click()
+                    page.wait_for_timeout(300)
+                shot(page, tag, "05-henry-outline")
+
+                # Your sources (13)
                 tap(".study-manage-btn")
                 page.wait_for_selector("#study-manage[open]")
                 page.wait_for_timeout(300)
-                page.screenshot(path=str(OUT / f"{tag}-08-manage.png"))
+                shot(page, tag, "06-your-sources")
                 page.keyboard.press("Escape")
-                if w < 900:
-                    pane = page.locator('.study-pane[data-slug="john-gill"] .study-pane-scroll')
-                    pane.evaluate("el => el.scrollBy(0, 400)")
-                    page.wait_for_timeout(400)
-                    page.screenshot(path=str(OUT / f"{tag}-09-strip-collapsed.png"))
+
+                # Treasury of David on Psalm 23:1-3: verse expositions first, overview below
+                page.goto(f"{BASE}/Psalms/23/1-3?study=treasury-of-david")
+                ready(page, "treasury-of-david")
+                page.wait_for_timeout(2900)   # the coordinator's 3.5 s check: verses still shown
+                shot(page, tag, "07-treasury-psalm23")
+                more = page.locator('.study-pane[data-slug="treasury-of-david"] .study-more summary').first
+                more.scroll_into_view_if_needed()
+                more.click()
+                page.wait_for_timeout(300)
+                shot(page, tag, "08-treasury-overview-open")
+
+                # Tyndale: CC BY-SA credit with the text
+                tap('.study-chip[data-slug="tyndale-study-notes"]')
+                ready(page, "tyndale-study-notes")
+                shot(page, tag, "09-tyndale-credit")
+
+                if phone and theme == "light":
+                    page.goto(f"{BASE}/John/3")
+                    page.wait_for_selector("#verse-16")
+                    page.evaluate("Alpine.$data(document.body).openSettings('offline')")
+                    page.wait_for_selector(".download-option .download-size", timeout=20000)
+                    page.locator(".download-section-header", has_text="Commentaries").scroll_into_view_if_needed()
+                    page.wait_for_timeout(300)
+                    shot(page, tag, "10-offline-sources")
                 print(tag, "errors:", errors[:5])
                 ctx.close()
         browser.close()

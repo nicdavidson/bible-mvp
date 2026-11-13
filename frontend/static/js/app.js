@@ -498,8 +498,7 @@ function bibleApp() {
                 KJV: false
             },
             lexicon: false,
-            commentaryMH: false,  // Matthew Henry
-            commentaryJG: false,  // John Gill
+            commentary: {},  // slug -> true, from /api/offline/commentary/sources
             crossRefs: false,
             devotionalSpurgeon: false
         },
@@ -510,6 +509,7 @@ function bibleApp() {
             status: ''
         },
         toasts: [],
+        offlineCommentarySources: [],  // [{source, slug, bytes, default, ...}] for Settings
 
         // Feedback/bug report state
         feedbackCategory: 'bug',  // 'bug', 'accuracy', 'feature'

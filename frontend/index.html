@@ -1317,6 +1317,7 @@
                                         <span class="result-source" x-text="'(' + result.source + ')'"></span>
                                     </div>
                                     <div class="result-snippet" x-html="result.snippet"></div>
+                                    <div class="result-credit" x-show="studyCredit(result.source)" x-text="studyCredit(result.source)"></div>
                                 </div>
                             </template>
                         </div>
@@ -1727,15 +1728,17 @@
 
                     <!-- Commentaries -->
                     <div class="download-section">
-                        <div class="download-section-header">Commentaries</div>
-                        <label class="download-option">
-                            <input type="checkbox" x-model="downloadSelections.commentaryMH">
-                            <span>Matthew Henry Commentary</span>
-                        </label>
-                        <label class="download-option">
-                            <input type="checkbox" x-model="downloadSelections.commentaryJG">
-                            <span>John Gill Commentary</span>
-                        </label>
+                        <div class="download-section-header" x-effect="settingsTab === 'offline' && showSettings && loadOfflineCommentarySources()">Commentaries</div>
+                        <p class="download-hint">Each one downloads for the whole Bible. Commentary you read in the study view is also kept for offline use.</p>
+                        <p class="download-hint" x-show="!offlineCommentarySources.length">Loading the list of commentaries…</p>
+                        <template x-for="src in offlineCommentarySources" :key="'dl-' + src.slug">
+                            <label class="download-option">
+                                <input type="checkbox" :checked="!!downloadSelections.commentary[src.slug]"
+                                       @change="downloadSelections.commentary[src.slug] = $event.target.checked">
+                                <span x-text="src.source"></span>
+                                <span class="download-size" x-show="src.bytes" x-text="formatStorageSize(src.bytes)"></span>
+                            </label>
+                        </template>
                     </div>
 
                     <!-- Devotionals -->
@@ -2667,13 +2670,15 @@
                             <div class="study-pane-head">
                                 <button type="button" class="study-who" @click="studyShowInfo(src.slug)" :aria-label="'About ' + src.source">
                                     <span class="study-who-name" x-text="src.source"></span>
-                                    <span class="study-who-meta">
-                                        <span x-show="src.author && src.author !== src.source" x-text="src.author"></span>
-                                        <span x-show="src.year" x-text="src.year"></span>
-                                        <span x-show="src.tradition" x-text="src.tradition"></span>
+                                    <span class="study-who-meta" x-data="{ get w() { return studyWho(src) } }">
+                                        <span x-show="w.author" x-text="w.author"></span>
+                                        <span x-show="w.life" x-text="w.life"></span>
+                                        <span x-show="w.year" x-text="w.year"></span>
+                                        <span x-show="w.tradition" x-text="w.tradition"></span>
                                     </span>
                                     <svg class="study-who-i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
                                 </button>
+                                <p class="study-credit" x-show="src.requires_attribution && src.attribution" x-text="src.attribution"></p>
                                 <p class="study-note" x-show="studyPanes[src.slug]?.note">
                                     <span x-text="studyPanes[src.slug]?.note"></span>
                                     <button type="button" class="study-note-btn" x-show="studyPanes[src.slug]?.focusCount" @click="studyRevealFocus(src.slug)">
@@ -2689,7 +2694,7 @@
                                 <p x-text="studyPanes[src.slug]?.note"></p>
                                 <button type="button" class="study-text-btn" @click="studyPanes[src.slug] = null; studyLoadPane(src.slug)">Try again</button>
                             </div>
-                            <p class="study-attribution" x-show="src.attribution && studyPanes[src.slug]?.status === 'ready'" x-text="src.attribution"></p>
+                            <p class="study-attribution" x-show="src.attribution && !src.requires_attribution && studyPanes[src.slug]?.status === 'ready'" x-text="src.attribution"></p>
                         </div>
                     </section>
                 </template>
@@ -2715,16 +2720,18 @@
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
                         </button>
                     </div>
-                    <p class="study-info-who">
-                        <span x-text="study.info.author"></span><span x-show="study.info.year" x-text="', ' + study.info.year"></span>
-                        <template x-if="study.info.tradition"><span class="study-info-trad" x-text="study.info.tradition"></span></template>
+                    <p class="study-info-who" x-data="{ get w() { return studyWho(study.info) } }">
+                        <span x-show="w.author" x-text="w.author"></span>
+                        <span x-show="w.life" x-text="w.life"></span>
+                        <span x-show="w.year" x-text="w.year"></span>
+                        <span class="study-info-trad" x-show="w.tradition" x-text="w.tradition"></span>
                     </p>
                     <p x-show="study.info.description" x-text="study.info.description"></p>
                     <dl class="study-info-facts">
                         <dt>How it comments</dt><dd x-text="studyKindLabel(study.info.kind)"></dd>
                         <template x-if="study.info.coverage"><div><dt>Covers</dt><dd x-text="study.info.coverage"></dd></div></template>
                         <template x-if="study.info.license"><div><dt>License</dt><dd x-text="study.info.license"></dd></div></template>
-                        <template x-if="study.info.attribution"><div><dt>Credit</dt><dd x-text="study.info.attribution"></dd></div></template>
+                        <template x-if="study.info.attribution"><div><dt x-text="study.info.requires_attribution ? 'Credit (required)' : 'Credit'"></dt><dd x-text="study.info.attribution"></dd></div></template>
                     </dl>
                     <a x-show="study.info.source_url" :href="study.info.source_url" target="_blank" rel="noopener" class="study-text-btn">Where this text comes from</a>
                     <div class="study-info-here" x-show="!(study.info.selection_entries > 0)">
