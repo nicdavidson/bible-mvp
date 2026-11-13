@@ -4257,6 +4257,58 @@ textarea:focus:not(:focus-visible) {
     text-decoration: underline;
 }
 
+.about-subhead {
+    margin: 1rem 0 0.375rem;
+    font-size: 0.9375rem;
+    color: var(--color-text);
+}
+
+/* Focus moves here on /?about=sources so screen readers start at the section; the heading
+   is not a control (tabindex -1), so no focus ring */
+#about-sources-h:focus {
+    outline: none;
+}
+
+.about-sources,
+.about-contact {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.75rem;
+}
+
+.about-source {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.about-source-name {
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+.about-source-by,
+.about-source-license {
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.about-source-license {
+    font-size: 0.8125rem;
+}
+
+.about-contact li {
+    margin-bottom: 0.375rem;
+}
+
+.about-contact .about-link {
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+}
+
 .about-footer {
     padding-top: 1rem;
     border-top: 1px solid var(--color-border);

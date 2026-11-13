@@ -118,6 +118,7 @@ window.BibleModules = window.BibleModules || {};
             if (st?.nav) this._navIdx = st.idx || 0;
             const loc = locationFromURL();
             const studySource = new URLSearchParams(window.location.search).get('study');
+            const aboutSection = new URLSearchParams(window.location.search).get('about');
             let ok = false;
             if (await this.wsInitFromURL()) ok = true;          // /word/G26 (modules/wordstudy.js)
             else if (loc && !loc.home) {
@@ -136,6 +137,10 @@ window.BibleModules = window.BibleModules || {};
                 if (st?.srch?.meaning) this.srchMeaning();
                 if (st?.srchScroll != null) this._srchRestoreScroll(st.srchScroll);
             }
+
+            // ?about=sources : About opened at Sources and rights (a link for rights holders).
+            // Read before navigating: the home entry replaces the address.
+            if (aboutSection === 'sources') this.openAbout('sources');
 
             window.addEventListener('popstate', (e) => this.navOnPop(e));
             this.$watch('translation', () => this.navReloadHere());

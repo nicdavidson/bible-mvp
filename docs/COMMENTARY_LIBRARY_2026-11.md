@@ -268,9 +268,15 @@ on. Checked means compared on 2026-11-13 by word similarity against archive.org 
 
 ### Takedown
 
-If a rights holder believes something here should not be published, the app's About ›
-Sources and rights page says how to reach us; the claim is reviewed and the text removed if it
-holds (LICENSES.md, top).
+Policy: if a rights holder believes something here should not be published, we review the
+claim promptly and remove the text if it holds. The app says so under About > Sources and
+rights (direct link `/?about=sources`), which lists every commentary source with its author,
+year and `license` line from `/api/commentary/sources`, links to LICENSES.md, and gives a
+contact that needs no sign-in: a prefilled GitHub issue ("Rights enquiry: <work>"; fields for
+work, claimant, basis, contact). The contact is defined once, `RIGHTS_CONTACT` in
+`frontend/static/js/modules/menus.js`; setting its `email` shows a mailto link first. LICENSES.md
+opens with the same paragraph. Removing a source: delete its registry entry and build step; the
+`commentary_search` step drops its rows (see "How to rebuild").
 
 ## Second group: "public domain (no renewal found)" (2026-11-13)
 

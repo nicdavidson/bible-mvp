@@ -1,6 +1,55 @@
 // bibleApp feature module: menus — merged via Object.assign in app.js
 window.BibleModules = window.BibleModules || {};
+
+// About > Sources and rights. How a rights holder reaches us: the ONE place to change it.
+// When the owner has a mailbox, set `email`; the page then shows the email first and the
+// GitHub issue link second. No sign-in is needed for either (the feedback form needs one).
+const RIGHTS_CONTACT = {
+    email: null,
+    issueUrl: 'https://github.com/nicdavidson/bible-mvp/issues/new',
+    licensesUrl: 'https://github.com/nicdavidson/bible-mvp/blob/master/LICENSES.md',
+};
+const RIGHTS_ISSUE_TITLE = 'Rights enquiry: <work>';
+const RIGHTS_ISSUE_BODY = [
+    '**Work** (title and author, and where it appears in the app):',
+    '',
+    '**Claimant** (who holds the rights, and your relation to them):',
+    '',
+    '**Basis of the claim** (for example registration or renewal details, publication date):',
+    '',
+    '**Contact** (how we can reach you; optional, this issue is public):',
+    '',
+].join('\n');
+
+// [{ kind, href, label }] in display order: email first when one is configured.
+function rightsContactLinks(contact = RIGHTS_CONTACT) {
+    const links = [];
+    if (contact.email) {
+        links.push({
+            kind: 'email',
+            href: `mailto:${contact.email}?subject=${encodeURIComponent('Rights enquiry')}`,
+            label: `Email ${contact.email}`,
+        });
+    }
+    if (contact.issueUrl) {
+        const q = new URLSearchParams({ title: RIGHTS_ISSUE_TITLE, body: RIGHTS_ISSUE_BODY });
+        links.push({
+            kind: 'issue',
+            href: `${contact.issueUrl}?${q.toString()}`,
+            label: contact.email ? 'Or open a public issue on GitHub' : 'Open a rights enquiry on GitHub (public issue)',
+        });
+    }
+    return links;
+}
+window.BibleRights = { RIGHTS_CONTACT, rightsContactLinks };
+
 window.BibleModules.menus = {
+        // About > Sources and rights: commentary sources from /api/commentary/sources
+        aboutSources: null,        // null = not loaded yet
+        aboutSourcesError: false,
+        rightsLinks: rightsContactLinks(),
+        rightsLicensesUrl: RIGHTS_CONTACT.licensesUrl,
+
         // ========== Side Menu Navigation ==========
 
         // Navigate to a view from side menu
@@ -28,10 +77,36 @@ window.BibleModules.menus = {
             this.showGuide = true;
         },
 
-        // Open About modal
-        openAbout() {
+        // Open About modal; section 'sources' scrolls to Sources and rights (/?about=sources)
+        openAbout(section = null) {
             this.showSideMenu = false;
             this.showAbout = true;
+            this.loadAboutSources();
+            if (section === 'sources') {
+                this.$nextTick(() => {
+                    const h = document.getElementById('about-sources-h');
+                    if (!h) return;
+                    h.scrollIntoView({ block: 'start' });
+                    h.focus({ preventScroll: true });
+                });
+            }
+        },
+
+        async loadAboutSources() {
+            if (this.aboutSources) return;
+            this.aboutSourcesError = false;
+            try {
+                const r = await fetch('/api/commentary/sources');
+                if (!r.ok) throw new Error(String(r.status));
+                this.aboutSources = (await r.json()).sources || [];
+            } catch {
+                this.aboutSourcesError = true;
+            }
+        },
+
+        // "John Gill (1697-1771), 1746"
+        aboutSourceByline(s) {
+            return [s.author, s.year].filter(Boolean).join(', ');
         },
 
         // Open Feedback modal from About

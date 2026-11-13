@@ -1567,6 +1567,42 @@
                     </p>
                 </div>
 
+                <section class="about-section about-rights" id="about-sources" aria-labelledby="about-sources-h">
+                    <h4 id="about-sources-h" tabindex="-1">Sources and rights</h4>
+                    <p class="about-text">
+                        The commentaries, lexicons, hymn texts and Bible translations here are public-domain
+                        or openly licensed works. Before including one we check its publication date and
+                        copyright status, and we record the basis for it.
+                    </p>
+                    <h5 class="about-subhead">Commentaries</h5>
+                    <p class="about-text-muted" x-show="aboutSources === null && !aboutSourcesError">Loading the list&hellip;</p>
+                    <p class="about-text-muted" x-show="aboutSourcesError">Couldn't load the list. The full record below has it.</p>
+                    <ul class="about-sources" x-show="aboutSources && aboutSources.length">
+                        <template x-for="s in (aboutSources || [])" :key="s.slug">
+                            <li class="about-source">
+                                <span class="about-source-name" x-text="s.source"></span>
+                                <span class="about-source-by" x-text="aboutSourceByline(s)"></span>
+                                <span class="about-source-license" x-text="s.license"></span>
+                            </li>
+                        </template>
+                    </ul>
+                    <p class="about-text">
+                        <a :href="rightsLicensesUrl" target="_blank" rel="noopener" class="about-link">Full record of every source and its licence (LICENSES.md)</a>
+                    </p>
+                    <h5 class="about-subhead" id="about-rights-h">Rights holders</h5>
+                    <p class="about-text">
+                        If you hold rights in something published here and believe it should not be, please
+                        tell us which work it is and what your claim is. We will review it promptly and
+                        remove the text if the claim holds.
+                    </p>
+                    <ul class="about-contact">
+                        <template x-for="c in rightsLinks" :key="c.kind">
+                            <li><a :href="c.href" :data-kind="c.kind" target="_blank" rel="noopener" class="about-link" x-text="c.label"></a></li>
+                        </template>
+                    </ul>
+                    <p class="about-text-muted" x-show="rightsLinks.some(c => c.kind === 'issue')">No account with us is needed. A GitHub issue is public, so include only what you are happy to have seen there.</p>
+                </section>
+
                 <div class="about-section">
                     <h4>Feedback</h4>
                     <p class="about-text">Found a bug, accuracy issue, or have a feature idea?</p>
@@ -1582,6 +1618,7 @@
                     <h4>Links</h4>
                     <div class="about-link-list">
                         <a href="https://github.com/nicdavidson/bible-mvp" target="_blank" rel="noopener" class="about-link">GitHub</a>
+                        <a href="/?about=sources" @click.prevent="openAbout('sources')" class="about-link">Sources and rights</a>
                     </div>
                 </div>
 

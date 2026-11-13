@@ -2,6 +2,16 @@
 
 This document tracks the licensing status of all content included in BibleMVP.
 
+## Rights holders
+
+If you hold rights in something published here and believe it should not be, please tell us
+which work it is and what your claim is. We will review it promptly and remove the text if the
+claim holds. To reach us without an account with this site, open a
+[rights enquiry on GitHub](https://github.com/nicdavidson/bible-mvp/issues/new?title=Rights+enquiry%3A+%3Cwork%3E&body=**Work**+%28title+and+author%2C+and+where+it+appears+in+the+app%29%3A%0A%0A**Claimant**+%28who+holds+the+rights%2C+and+your+relation+to+them%29%3A%0A%0A**Basis+of+the+claim**+%28for+example+registration+or+renewal+details%2C+publication+date%29%3A%0A%0A**Contact**+%28how+we+can+reach+you%3B+optional%2C+this+issue+is+public%29%3A%0A)
+(a public issue: include only what you are happy to have seen there). The same is in the app
+under About > Sources and rights (`/?about=sources`), where the contact is set in one place
+(`RIGHTS_CONTACT` in `frontend/static/js/modules/menus.js`).
+
 ## Code License
 
 The BibleMVP source code is licensed under the **MIT License**.
