@@ -636,7 +636,9 @@ def write_source_row(conn, cfg):
 
 def ensure_schema(conn):
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    from backend import commentary_search
     from backend.database import _migrate_commentary_sources
+    commentary_search.register(conn)   # the FTS triggers derive the indexed text
     _migrate_commentary_sources(conn)
 
 
@@ -675,15 +677,18 @@ def import_commentary(key: str):
     if not rows:
         raise RuntimeError(f"{source}: no entries produced")
 
+    from backend.commentary_search import override_for
     conn.execute("DELETE FROM commentary_entries WHERE source = ?", (source,))
     links = 0
     for book, ch, s, e, text in rows:
         content, searchable, n = render(text, resolver)
         links += n
+        # The search text is derived from content (backend/commentary_search.py); store
+        # it only where the derivation would differ, so FTS indexes the same text.
         conn.execute(
             "INSERT INTO commentary_entries (source, book, chapter, reference_start, "
-            "reference_end, content, searchable_text) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (source, book, ch, s, e, content, searchable),
+            "reference_end, content, search_override) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (source, book, ch, s, e, content, override_for(content, searchable)),
         )
     write_source_row(conn, cfg)
     conn.commit()

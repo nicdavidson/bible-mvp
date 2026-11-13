@@ -267,3 +267,40 @@ re-check the CCEL-derived sources (Henry via CrossWire MHC, Calvin via HelloAO; 
 | Darby's Synopsis | Not imported | Only HTML (e.g. stempublishing.com), not verse-keyed. CrossWire `DTN` holds Darby's translation notes, which is a different work |
 | Burkitt (1700-1703), Abbott Illustrated NT (1878), Lightfoot (1658-1674), McGarvey & Pendleton Fourfold Gospel (c. 1914) | PD, deferred | CrossWire modules marked Public Domain and old enough. Left out to keep size and scope down; add with a registry entry each if wanted |
 
+
+## Search storage (2026-11-13, `v2/wordstudy`)
+
+Each entry used to be stored twice: `content` (HTML with reference anchors) and
+`searchable_text` (the same text without anchors, 207.6 MB of text), which fed the
+external-content FTS5 table `commentary_fts`. Now FTS5 reads the text through a view:
+
+    commentary_search(id, searchable_text, source, book, chapter)
+      searchable_text = COALESCE(search_override, commentary_plain(content))
+
+`commentary_plain` (`backend/commentary_search.py`) unwraps the anchors and reads
+`&lt;`/`&gt;` as spaces and `&amp;` as `&`, the importer's own rule. For 668 of 141,380
+entries the stored text differed from that by whitespace the HTML lost ("the result
+thata great" in `content`, "that a great" in the old searchable text; also Wesley,
+Scofield, Barnes); `search_override` keeps the old text for exactly those, so the index
+and snippets see the same text as before.
+
+What reads it: the FTS triggers (insert, delete, and a new update trigger), `snippet()`
+in `/api/search`, and `scripts/check_commentary.py`. The SQL function must be registered
+on every connection that inserts, updates or deletes commentary or asks FTS5 for text
+(`snippet`, `highlight`, the column): `backend/database.py` does it for both app
+connections; the importer and the checker do it too. **Deploy code and database
+together**: older code against this database gets "no such function" from `snippet()`,
+which `/api/search` turns into empty results.
+
+Proof: 2,591 searches sampled from the corpus (single words in three frequency bands,
+quoted 2-3 word phrases, last-word prefixes, two-word queries; scopes commentary and
+all) return byte-identical responses (results, order, snippets) before and after;
+FTS5's `integrity-check` passes; `check_commentary.py` passes. Median search 27 → 19 ms.
+
+Size (after VACUUM): 742,858,752 → 514,818,048 bytes (−228.0 MB, −30.7%);
+`commentary_entries` 507.3 → 279.3 MB; the FTS index is unchanged (92.7 MB).
+Build: step `commentary_search` (`scripts/migrate_commentary_search.py`, 89 s, 20 MB
+RAM) converts an older database; new imports store `search_override` only where needed.
+
+Found while doing this: those 668 entries display with the missing spaces ("thata",
+"2:25and"); worth fixing in the importers' HTML, separately.

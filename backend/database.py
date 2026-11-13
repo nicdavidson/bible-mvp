@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 from pathlib import Path
+from . import commentary_search
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ def get_db_connection() -> sqlite3.Connection:
     """
     conn = sqlite3.connect(f"file:{DATABASE_PATH}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
+    commentary_search.register(conn)   # commentary_fts snippets read through a view
     conn.execute("PRAGMA mmap_size=268435456")  # 256 MB
     conn.execute("PRAGMA cache_size=-64000")    # 64 MB page cache
     return conn
@@ -31,6 +33,7 @@ def get_writable_db_connection() -> sqlite3.Connection:
     """Writable connection — startup only (schema creation, migrations, indexes)."""
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
+    commentary_search.register(conn)
     return conn
 
 
@@ -364,7 +367,7 @@ CREATE TABLE IF NOT EXISTS commentary_entries (
     reference_start INTEGER NOT NULL DEFAULT 1,
     reference_end INTEGER,
     content TEXT NOT NULL,
-    searchable_text TEXT
+    search_override TEXT   -- only where the indexed text differs from content's (rare)
 );
 
 CREATE INDEX IF NOT EXISTS idx_commentary_lookup
@@ -372,26 +375,10 @@ ON commentary_entries(book, chapter, reference_start, reference_end);
 
 -- Commentary source metadata (one row per commentary_entries.source)
 """ + COMMENTARY_SOURCES_DDL + """
--- Full-text search for commentary
-CREATE VIRTUAL TABLE IF NOT EXISTS commentary_fts USING fts5(
-    searchable_text,
-    source,
-    book,
-    chapter,
-    content='commentary_entries',
-    content_rowid='id'
-);
-
--- Commentary FTS triggers
-CREATE TRIGGER IF NOT EXISTS commentary_ai AFTER INSERT ON commentary_entries BEGIN
-    INSERT INTO commentary_fts(rowid, searchable_text, source, book, chapter)
-    VALUES (new.id, new.searchable_text, new.source, new.book, new.chapter);
-END;
-
-CREATE TRIGGER IF NOT EXISTS commentary_ad AFTER DELETE ON commentary_entries BEGIN
-    INSERT INTO commentary_fts(commentary_fts, rowid, searchable_text, source, book, chapter)
-    VALUES ('delete', old.id, old.searchable_text, old.source, old.book, old.chapter);
-END;
+-- Full-text search for commentary: FTS5 reads the text through a view derived from
+-- content (backend/commentary_search.py); connections must register commentary_plain.
+""" + commentary_search.VIEW_SQL + ";\n" + commentary_search.FTS_SQL + ";\n" + \
+    commentary_search.TRIGGERS_SQL + """
 
 -- Cross-references
 CREATE TABLE IF NOT EXISTS cross_references (

@@ -162,6 +162,14 @@ IMPORT_STEPS = [
         ]
     ],
     {
+        # Commentary search text derived from content through a view instead of a stored
+        # copy (backend/commentary_search.py); converts an older DB, no-op on a new one.
+        "name": "commentary_search",
+        "description": "Commentary FTS over a view (drop the stored searchable_text copy)",
+        "version": "1.0",
+        "script": "migrate_commentary_search.py",
+    },
+    {
         "name": "speakers",
         "description": "Red letter speaker data (6,896 divine speech verses)",
         "version": "1.0",
