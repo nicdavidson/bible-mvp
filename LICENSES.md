@@ -85,6 +85,24 @@ excerpts), Pulpit, Ellicott, Expositor's, Cambridge Bible (no clean verse-keyed 
 
 ---
 
+## Meaning Search (models and libraries)
+
+Meaning search (docs/SEMANTIC_SEARCH_2026-11.md) ranks existing verses; it generates no text.
+The model is a file we run, not content we show, but it ships in the image and may be
+downloaded by browsers, so its license is listed here.
+
+| Component | License | Source | Notes |
+|-----------|---------|--------|-------|
+| gte-small, quantized ONNX export (shipped model) | MIT | [thenlper/gte-small](https://huggingface.co/thenlper/gte-small) (Alibaba DAMO), ONNX by [Xenova/gte-small](https://huggingface.co/Xenova/gte-small) @ `5927d1727bb1` | Copied to `data/models/gte-small@5927d1727bb1/` at build time (not in git). Keep the MIT notice if redistributed. The Xenova repo card has no license field; the weights are a format conversion of the MIT model |
+| Verse vectors (`semantic_vectors` table) | Same as the BSB text (public domain) + model output | this project, `scripts/build_embeddings.py` | Numbers derived from BSB verse text |
+| ONNX Runtime (server inference) | MIT | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) | Python wheel, runtime dependency |
+| Hugging Face tokenizers | Apache-2.0 | [huggingface/tokenizers](https://github.com/huggingface/tokenizers) | Python wheel, runtime dependency |
+| NumPy | BSD-3-Clause | [numpy/numpy](https://github.com/numpy/numpy) | Runtime dependency |
+| transformers.js 3.8.1 (browser proof only, `tests/browser/`) | Apache-2.0 | [huggingface/transformers.js](https://github.com/huggingface/transformers.js) | Not shipped in the app yet; bundles onnxruntime-web (MIT) |
+| Models evaluated but not shipped | MIT (bge-small-en-v1.5, e5-small-v2, potion-*), Apache-2.0 (all-MiniLM-L6-v2, snowflake-arctic-embed-xs, mxbai-embed-xsmall-v1) | Hugging Face, revisions pinned in `backend/semantic.py` | Evaluation only. qwen3-embedding:0.6b (Apache-2.0) was used as a quality ceiling via Ollama and is never on the request path |
+
+---
+
 ## DO NOT USE (Copyrighted)
 
 The following translations and resources are **copyrighted** and must NOT be used without licensing:
