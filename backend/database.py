@@ -98,9 +98,19 @@ CREATE TABLE IF NOT EXISTS commentary_sources (
     attribution TEXT,
     source_url TEXT,
     sort_order INTEGER,
-    description TEXT
+    description TEXT,
+    attribution_short TEXT,       -- one-line credit for licenses that require it, else NULL
+    size_bytes INTEGER,           -- UTF-8 bytes of this source's content, set by the build
+    requires_attribution INTEGER  -- 1 if the license requires a credit line, else 0
 );
 """
+
+# Columns added after the table first shipped; added in place on older databases.
+COMMENTARY_SOURCES_ADDED_COLUMNS = [
+    ("attribution_short", "TEXT"),
+    ("size_bytes", "INTEGER"),
+    ("requires_attribution", "INTEGER"),
+]
 
 
 def _migrate_commentary_sources(conn):
@@ -110,6 +120,10 @@ def _migrate_commentary_sources(conn):
     """
     try:
         conn.executescript(COMMENTARY_SOURCES_DDL)
+        have = {r[1] for r in conn.execute("PRAGMA table_info(commentary_sources)")}
+        for name, sqltype in COMMENTARY_SOURCES_ADDED_COLUMNS:
+            if name not in have:
+                conn.execute(f"ALTER TABLE commentary_sources ADD COLUMN {name} {sqltype}")
         conn.commit()
     except Exception as e:
         logger.error(f"Error creating commentary_sources: {e}")

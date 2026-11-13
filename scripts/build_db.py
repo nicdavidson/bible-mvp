@@ -96,15 +96,15 @@ IMPORT_STEPS = [
     },
     {
         "name": "commentary_mh",
-        "description": "Matthew Henry Complete (HelloAO, 65 books + Song of Solomon from CrossWire MHC)",
-        "version": "2.0",
+        "description": "Matthew Henry Complete (CrossWire MHC, from CCEL)",
+        "version": "3.0",
         "script": "import_commentary.py",
         "args": ["matthew-henry"],
     },
     {
         "name": "commentary_jg",
         "description": "John Gill Exposition (HelloAO, 66 books)",
-        "version": "2.0",
+        "version": "2.1",
         "script": "import_commentary.py",
         "args": ["john-gill"],
     },
@@ -113,7 +113,7 @@ IMPORT_STEPS = [
         {
             "name": step,
             "description": f"{desc} commentary",
-            "version": "1.0",
+            "version": "1.1",
             "script": "import_commentary.py",
             "args": [key],
         }

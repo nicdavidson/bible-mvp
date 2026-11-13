@@ -35,10 +35,10 @@ first publication (before 1931) and the author's death, not from a website's lab
 
 | Commentary (`source`) | Status | Source used | Notes |
 |------------|--------|--------|-------|
-| Matthew Henry (Complete) | Public Domain | HelloAO API; Song of Solomon from CrossWire `MHC` (CCEL text) | Published 1708-1710; Henry d. 1714. Earlier listed here as "Concise, CCEL", which was wrong |
+| Matthew Henry (Complete) | Public Domain | CrossWire `MHC` (CCEL text). Not HelloAO, which cuts long entries at 32,767 bytes | Published 1708-1710; Henry d. 1714. Earlier listed here as "Concise, CCEL", which was wrong |
 | John Gill | Public Domain | HelloAO API | Published 1746-1763; Gill d. 1771 |
 | Jamieson-Fausset-Brown | Public Domain | HelloAO API (matches CCEL) | Published 1871; authors d. 1880, 1897, 1910 |
-| Keil & Delitzsch | Public Domain | HelloAO API; Song of Solomon from CrossWire `KD` (Wikisource text) | English translation T. & T. Clark 1864-1878; authors d. 1888, 1890 |
+| Keil & Delitzsch | Public Domain | HelloAO API; 1 Chronicles, Song of Solomon and the ends of 17 length-capped entries from CrossWire `KD` (Wikisource text) | English translation T. & T. Clark 1864-1878; authors d. 1888, 1890 |
 | John Calvin | Public Domain | HelloAO API (CCEL text) | Calvin Translation Society English, 1843-1855 |
 | Adam Clarke | Public Domain | CrossWire `Clarke` (Wikisource text) | Published 1810-1826; Clarke d. 1832 |
 | Barnes' Notes (NT) | Public Domain | CrossWire `Barnes` | Published 1832-1851; Barnes d. 1870 |
@@ -47,7 +47,7 @@ first publication (before 1931) and the author's death, not from a website's lab
 | Scofield Notes (1917) | Public Domain | CrossWire `Scofield` (Wikisource text) | 1917 edition only; the 1967 New Scofield notes are copyrighted. "Scofield" is used descriptively |
 | Treasury of David | Public Domain | CrossWire `TDavid` (Spurgeon Archive text) | Published 1869-1885; Spurgeon d. 1892. Spurgeon's own exposition only |
 | Catena Aurea | Public Domain | CrossWire `Catena` (github.com/lemtom/catena, CC0) | Newman's English translation, Oxford 1841-1845 |
-| Tyndale Study Notes | **CC BY-SA 4.0**, (C) 2022 Tyndale House Publishers | tyndaleopenresources.com ZIP | Share-alike: credit "Adapted from Tyndale Open Study Notes. The original work by Tyndale House Publishers is available for free at http://www.tyndaleopenresources.com." Changes: XML converted to plain text with reference links; wording unchanged. Any published DB slice containing these rows stays CC BY-SA for these rows |
+| Tyndale Study Notes | **CC BY-SA 4.0**, (C) 2022 Tyndale House Publishers | tyndaleopenresources.com ZIP | Short credit (`commentary_sources.attribution_short`): "Adapted from Tyndale Open Study Notes © 2022 Tyndale House Publishers, CC BY-SA 4.0", linked to the full credit. Share-alike: credit "Adapted from Tyndale Open Study Notes. The original work by Tyndale House Publishers is available for free at http://www.tyndaleopenresources.com." Changes: XML converted to plain text with reference links; wording unchanged. Any published DB slice containing these rows stays CC BY-SA for these rows |
 
 Not imported (see the library doc for reasons): Matthew Henry Concise (abridger and date unverified),
 Geneva Bible notes and Family Bible Notes (provenance unverified), Robertson's Word Pictures (vols 5-6

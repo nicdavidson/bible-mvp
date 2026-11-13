@@ -112,7 +112,7 @@ class SwordModule:
         except KeyError:
             return None
 
-    def _slots(self, testament: str):
+    def _slots(self, testament: str, recover_orphans: bool = False):
         """Yield (key, text_bytes_getter) per slot; key identifies the stored text."""
         drv = self.driver
         if drv in ("RawCom", "RawCom4"):
@@ -142,18 +142,38 @@ class SwordModule:
                     blocks[n] = zlib.decompress(data[off:off + csize])
                 return blocks[n]
 
+            raw = [struct.unpack_from(fmt, vidx, i * size) for i in range(len(vidx) // size)]
+            ends = {}
+            if recover_orphans:
+                # Each stored text runs to the next referenced offset in its block, so bytes the
+                # index never points at are kept with the entry stored just before them.
+                starts: dict[int, list[int]] = {}
+                for bn, off, ln in raw:
+                    if ln:
+                        starts.setdefault(bn, []).append(off)
+                for bn, offs in starts.items():
+                    offs = sorted(set(offs))
+                    blen = len(block(bn))
+                    for a, b in zip(offs, offs[1:] + [blen]):
+                        ends[(bn, a)] = b
             out = []
-            for i in range(len(vidx) // size):
-                bn, off, ln = struct.unpack_from(fmt, vidx, i * size)
-                text = block(bn)[off:off + ln] if ln else b""
-                out.append(((bn, off, ln), text))
+            for bn, off, ln in raw:
+                if not ln:
+                    out.append(((bn, off, ln), b""))
+                    continue
+                end = max(off + ln, ends.get((bn, off), off + ln))
+                out.append(((bn, off, ln), block(bn)[off:end]))
             return out
         raise NotImplementedError(f"{self.name}: driver {drv} not supported")
 
-    def entries(self, v11n: dict[str, list[int]], include_intros: bool = False):
-        """Yield SwordEntry objects in canonical order, linked verses merged into ranges."""
+    def entries(self, v11n: dict[str, list[int]], include_intros: bool = False,
+                recover_orphans: bool = False):
+        """Yield SwordEntry objects in canonical order, linked verses merged into ranges.
+
+        recover_orphans: also return stored text that no verse slot points at, appended to
+        the entry stored just before it (zCom modules only)."""
         for testament, books in (("ot", OSIS_BOOKS[:39]), ("nt", OSIS_BOOKS[39:])):
-            slots = self._slots(testament)
+            slots = self._slots(testament, recover_orphans)
             if not slots:
                 continue
             i = 2  # skip module header + testament heading
@@ -192,6 +212,22 @@ class SwordModule:
                 # Trailing slots are normal in some modules (padding); only warn on shortfall.
                 if i > len(slots):
                     raise RuntimeError(f"{self.name}/{testament}: index shorter than KJV v11n")
+
+
+def module_text_blocks(mod: "SwordModule") -> list[str]:
+    """Every decompressed block of a z-module, referenced by the verse index or not.
+
+    Used to recover text that a module stores but whose verse index never points at."""
+    out = []
+    for testament in ("ot", "nt"):
+        bidx = mod._read(f"{testament}.czs") or mod._read(f"{testament}.bzs")
+        data = mod._read(f"{testament}.czz") or mod._read(f"{testament}.bzz")
+        if bidx is None or data is None:
+            continue
+        for n in range(len(bidx) // 12):
+            off, csize, _usize = struct.unpack_from("<III", bidx, n * 12)
+            out.append(zlib.decompress(data[off:off + csize]).decode(mod.encoding, errors="replace"))
+    return out
 
 
 def read_conf(zip_path: Path) -> dict:

@@ -54,6 +54,20 @@ SHIFT_CHECKS = {
 }
 WORD = re.compile(r"[a-z]+")
 
+# Truncation. Every source ends >97% of entries with . ! ? ) " ' etc. An entry that ends on a
+# lowercase letter or a comma stopped mid-sentence; when it is also near 32K characters it
+# was cut by a length cap (HelloAO cut Henry and K&D at 32,767). Entries we could not
+# complete end with a visible " […]" and are reported, not failed.
+INCOMPLETE_MARK = "[\u2026]"
+CAP_SIGNATURE = 30000
+MID_SENTENCE_FAIL = 0.02   # fail a source if more than 2% of its entries end mid-sentence
+DEBRIS = re.compile(r"(?m)^\s*(?:Next: .{1,60}(?:Chapter \d+|Introduction)|Unabridged|End of Barnes)")
+
+
+def ends_mid_sentence(text):
+    t = (text or "").rstrip()
+    return bool(t) and (t[-1].islower() or t[-1] == ",")
+
 
 def shift_check(conn, src, mode, rx, kjv):
     """Returns Counter of ok / next / prev / unclear (entries without a usable lemma skipped)."""
@@ -110,7 +124,7 @@ def main():
 
     try:
         meta = {r[0]: r for r in conn.execute(
-            "SELECT source, short_name, kind, coverage FROM commentary_sources")}
+            "SELECT source, short_name, kind, coverage, size_bytes FROM commentary_sources")}
     except sqlite3.OperationalError:
         meta = {}
         failures.append("commentary_sources table missing")
@@ -224,6 +238,30 @@ def main():
               f"unclear={r['unclear']:5} shifted={shifted:.1%}")
         if decided >= 50 and shifted > 0.03:
             failures.append(f"{src}: {shifted:.1%} of checked entries look shifted by one verse")
+
+    print("\nTruncation check: entries ending mid-sentence (lowercase letter or comma), those "
+          f"over {CAP_SIGNATURE:,} chars (cap signature), marked incomplete, leftover navigation")
+    for src in sources:
+        mid = capped = marked = debris = n = 0
+        for (t,) in conn.execute("SELECT searchable_text FROM commentary_entries WHERE source = ?",
+                                 (src,)):
+            n += 1
+            if (t or "").rstrip().endswith(INCOMPLETE_MARK):
+                marked += 1
+            elif ends_mid_sentence(t):
+                mid += 1
+                if len(t) >= CAP_SIGNATURE:
+                    capped += 1
+            if DEBRIS.search(t or ""):
+                debris += 1
+        print(f"  {src:26} mid-sentence={mid:4} ({mid / n:.2%})  cap-truncated={capped:3}  "
+              f"marked-incomplete={marked:3}  navigation-debris={debris:3}")
+        if capped:
+            failures.append(f"{src}: {capped} entries cut at a length cap")
+        if mid / n > MID_SENTENCE_FAIL:
+            failures.append(f"{src}: {mid / n:.1%} of entries end mid-sentence")
+        if debris:
+            failures.append(f"{src}: {debris} entries contain page-navigation lines")
 
     print(f"\ncoverage = share of all 31,102 KJV verses with at least one entry; "
           f"scope = share of verses in the books the source covers")

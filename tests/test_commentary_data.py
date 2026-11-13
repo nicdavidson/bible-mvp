@@ -10,7 +10,8 @@ import pytest
 from backend.database import DATABASE_PATH
 
 SOURCE_COLUMNS = ["source", "short_name", "author", "year", "tradition", "kind", "coverage",
-                  "license", "attribution", "source_url", "sort_order", "description"]
+                  "license", "attribution", "source_url", "sort_order", "description",
+                  "attribution_short", "size_bytes", "requires_attribution"]
 ANCHOR = re.compile(r'<a href="#" class="commentary-ref" data-ref="[^"<>]*">|</a>')
 
 
@@ -42,6 +43,17 @@ def test_metadata_values(conn):
         assert isinstance(year, int) and 100 < year < 2100, source
         assert isinstance(order, int), source
         assert lic, source
+
+
+def test_attribution_and_size(conn):
+    for source, req, short, size in conn.execute(
+            "SELECT source, requires_attribution, attribution_short, size_bytes FROM commentary_sources"):
+        assert req in (0, 1), source
+        if req:
+            assert short and len(short) <= 100 and "\n" not in short, source
+        actual = conn.execute("SELECT SUM(LENGTH(CAST(content AS BLOB))) FROM commentary_entries "
+                              "WHERE source = ?", (source,)).fetchone()[0]
+        assert size == actual, source
 
 
 def test_entries_reference_real_verses(conn):
