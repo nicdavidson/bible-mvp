@@ -86,6 +86,8 @@ window.BibleModules = window.BibleModules || {};
             this.$nextTick(() => {
                 const input = document.getElementById('srch-input');
                 input?.focus({ preventScroll: true });
+                // A fresh open keeps the last search, selected: typing replaces it
+                if (entry === 'push') input?.select();
             });
         },
 

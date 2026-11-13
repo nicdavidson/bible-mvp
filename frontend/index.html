@@ -943,7 +943,7 @@
                     </section>
                     </template>
                     <template x-if="name === 'meaning'">
-                    <section class="srch-section srch-meaning" data-list="meaning" aria-labelledby="srch-m-h" x-show="srchMeaningShown() && !srchNothing()" :aria-busy="srch.meaning.status === 'loading' ? 'true' : 'false'">
+                    <section class="srch-section srch-meaning" data-list="meaning" aria-labelledby="srch-m-h" x-show="srchMeaningShown() && !srchNothing() && srch.meaning.status !== 'offline'" :aria-busy="srch.meaning.status === 'loading' ? 'true' : 'false'">
                         <h3 id="srch-m-h" class="srch-h" :class="{ 'sr-only': srchMeaningGuessOnly() && !srch.meaning.reveal }"><span class="srch-mark" aria-hidden="true" x-show="!srch.meaning.fallback">≈</span><span x-text="srchHeading('meaning')"></span>
                             <span class="srch-count" x-show="srchMeaningItems().length" x-text="srchMeaningItems().length"></span></h3>
                         <p class="srch-empty-line" x-show="srchMeaningGuessOnly() && !srch.meaning.reveal">None of your words appear in the Bible's text, so verses close in meaning would only be a guess.
@@ -954,7 +954,6 @@
                         </details>
                         <p class="srch-note" x-show="srch.meaning.fallback">Search by meaning isn't available right now, so these verses share some of your words instead.</p>
                         <p class="srch-loading" x-show="srch.meaning.status === 'loading'"><span class="srch-dots" aria-hidden="true"></span>Looking for verses about this idea…</p>
-                        <p class="srch-note" x-show="srch.meaning.status === 'offline'">Search by meaning needs a connection.</p>
                         <p class="srch-note" x-show="srch.meaning.status === 'error'">Couldn't search by meaning. <button type="button" class="srch-textbtn" @click="srchMeaning()">Try again</button></p>
                         <p class="srch-empty-line" x-show="srch.meaning.status === 'ready' && !srchMeaningGuessOnly() && !srchMeaningItems().length && srch.meaning.items.length">Every verse found by meaning is already listed above.</p>
                         <ol class="srch-hits">
