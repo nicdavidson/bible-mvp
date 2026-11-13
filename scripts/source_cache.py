@@ -24,6 +24,7 @@ Usage:
 import json
 import os
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -62,12 +63,21 @@ def write_cache(key: str, data: str):
     p.write_text(data, encoding="utf-8")
 
 
+class NotFound(Exception):
+    """Upstream answered 404; remembered in the cache so rebuilds stay offline."""
+
+
 def _fetch_url(url: str, timeout: int = 30) -> str | None:
-    """Fetch raw text from URL."""
+    """Fetch raw text from URL. Raises NotFound on HTTP 404."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "BibleMVP/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as response:
             return response.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise NotFound(url) from e
+        print(f"    Error fetching {url}: {e}")
+        return None
     except Exception as e:
         print(f"    Error fetching {url}: {e}")
         return None
@@ -90,8 +100,18 @@ def cached_fetch(key: str, url: str, timeout: int = 30) -> str | None:
     if cached is not None:
         return cached
 
+    missing = _cache_path(key + ".404")
+    if missing.exists():
+        return None
+
     # Fetch from network
-    data = _fetch_url(url, timeout)
+    try:
+        data = _fetch_url(url, timeout)
+    except NotFound:
+        print(f"    Not found upstream (cached as missing): {url}")
+        _ensure_dir(missing)
+        missing.write_text(url + "\n", encoding="utf-8")
+        return None
     if data is not None:
         write_cache(key, data)
     return data
