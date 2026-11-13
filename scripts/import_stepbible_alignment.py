@@ -66,6 +66,11 @@ def create_alignment_table(conn):
     print("Created word_alignments table")
 
 
+REF_RE = re.compile(
+    r'([A-Za-z0-9]+)\.(\d+)\.(\d+)(?:[(\[{]\d+\.\d+[)\]}])?#(\d+)=?(.*)'
+)
+
+
 def parse_reference(ref_str):
     """Parse reference like 'Gen.1.1#01=L' into (book, chapter, verse, word_pos, word_type).
 
@@ -73,8 +78,12 @@ def parse_reference(ref_str):
     For Greek TAGNT: NKO system (N=Ancient/Critical, K=Traditional/TR, O=Other)
     For Hebrew TAHOT: L=Leningrad, Q=Qere, K=Ketiv, R=Restored, X=LXX-based
     """
-    # Pattern: Book.Chapter.Verse#Position=Type
-    match = re.match(r'([A-Za-z0-9]+)\.(\d+)\.(\d+)#(\d+)=?(.*)', ref_str)
+    # Pattern: Book.Chapter.Verse[(alt)]#Position=Type
+    # The main reference is the English (NRSV) versification. An optional
+    # alternative follows in brackets: (Hebrew) in TAHOT, e.g. 'Psa.3.1(3.2)#01=L';
+    # [KJV], (NA) or {other} in TAGNT, e.g. 'Mat.17.15[17.14]#01=NKO'. Before
+    # 2026-11 these rows were silently dropped (all of Psalm 3, Malachi 4, ...).
+    match = REF_RE.match(ref_str)
     if not match:
         return None
 
@@ -158,6 +167,30 @@ def extract_transliteration_from_greek(greek_field):
         return None
     match = re.search(r'\(([^)]+)\)', greek_field)
     return match.group(1) if match else None
+
+
+def renumber_split_verses(rows):
+    """Give unique word positions to English verses built from two Hebrew verses.
+
+    In about ten places (e.g. Num.26.1 = Heb 25.19 + 26.1) and in some Psalm
+    titles, one English verse holds words from two Hebrew verses, and STEPBible
+    numbers each part from #01. Keyed on the English verse those positions
+    collide, and INSERT OR REPLACE silently dropped words. For those verses
+    only, renumber 1..n in file order; every other verse keeps STEPBible's
+    numbering. Rows are tuples whose first four fields are
+    (book, chapter, verse, word_pos).
+    """
+    by_verse = {}
+    for row in rows:
+        by_verse.setdefault(row[:3], []).append(row)
+    out = []
+    for key, verse_rows in by_verse.items():
+        positions = [r[3] for r in verse_rows]
+        if len(set(positions)) == len(positions):
+            out.extend(verse_rows)
+        else:
+            out.extend(r[:3] + (i,) + r[4:] for i, r in enumerate(verse_rows, 1))
+    return out
 
 
 def import_alignment_file(conn, filepath, book_filter=None):
@@ -250,6 +283,8 @@ def import_alignment_file(conn, filepath, book_filter=None):
                 original_text, transliteration, english_gloss,
                 strong_number, grammar, word_type, editions
             ))
+
+    alignments = renumber_split_verses(alignments)
 
     # Insert into database
     if alignments:

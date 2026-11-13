@@ -75,8 +75,8 @@ IMPORT_STEPS = [
     },
     {
         "name": "interlinear",
-        "description": "STEPBible Hebrew/Greek interlinear (426K words)",
-        "version": "1.0",
+        "description": "STEPBible Hebrew/Greek interlinear (448K words)",
+        "version": "1.1",  # 1.1: keep verses with alternative versification (Psa 3, Mal 4...)
         "script": "import_stepbible_alignment.py",
         "requires_data": "alignment",
     },
