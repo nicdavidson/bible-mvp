@@ -85,7 +85,7 @@
     --color-surface: #faf6e9;
     --color-surface-hover: #efe6c8;
     --color-text: #3d3225;
-    --color-text-secondary: #7a6b55;
+    --color-text-secondary: #74654f;  /* 4.5:1 on every parchment surface (was #7a6b55, 4.1-4.8) */
     --color-text-muted: #9c8b72;
     --color-border: #d9c9a3;
     --color-primary: #b8860b;
@@ -1942,11 +1942,15 @@ textarea:focus:not(:focus-visible) {
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
         z-index: var(--z-panel);
         padding-bottom: env(safe-area-inset-bottom, 0px);
-        transform: translateY(calc(100% - 48px));
-        transition: transform 0.3s ease, max-height 0.3s ease;
+        /* Hidden until opened from the reading bar (Notes, Topics) or More > Topics */
+        transform: translateY(100%);
+        visibility: hidden;
+        transition: transform 0.3s ease, max-height 0.3s ease, visibility 0s 0.3s;
         display: flex;
         flex-direction: column;
     }
+
+    .panel-resources.expanded { visibility: visible; transition: transform 0.3s ease, max-height 0.3s ease; }
 
     .panel-resources.expanded {
         transform: translateY(0);
@@ -5263,26 +5267,33 @@ svg.action-bar-icon {
 .action-bar-leave-start { transform: translateY(0); opacity: 1; }
 .action-bar-leave-end { transform: translateY(100%); opacity: 0; }
 
-/* Mobile: action bar labels hidden, icons only, bigger targets */
+/* Phones: one row in the reading bar's slot, short labels under the icons
+   (a first-time reader shouldn't have to guess what an icon does) */
 @media (max-width: 600px) {
     .verse-action-bar {
         position: fixed;
-        bottom: 60px; /* Above collapsed resources panel (48px peek + 12px gap) */
+        bottom: 0;
         left: 0;
         right: 0;
-        padding: 0.625rem 0.5rem;
-        border-radius: 0.75rem 0.75rem 0 0;
+        padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
     }
 
-    .action-bar-text {
-        display: none;
-    }
+    .action-bar-label { display: none; }
+    .action-bar-buttons { justify-content: space-between; gap: 0; }
 
     .action-bar-btn {
-        padding: 0.5rem 0.75rem;
-        min-height: 40px;
+        flex: 1 1 0;
+        min-width: 0;
+        flex-direction: column;
+        gap: 0.125rem;
+        padding: 0.375rem 0.125rem;
+        min-height: 52px;
         justify-content: center;
     }
+    .action-more-wrap { flex: 1 1 0; }
+    .action-more-wrap .action-bar-btn { width: 100%; }
+    .action-bar-text { font-size: 0.6875rem; }
+    .action-bar-dismiss { margin-left: 0; flex: 0 0 40px; }
 
     .action-bar-icon {
         width: 20px;
@@ -6518,11 +6529,12 @@ svg.action-bar-icon {
     .side-menu-overlay,
     .panel-resources,
     .nav-buttons,
+    .reading-bar,
+    .chapter-end,
     .tts-controls-bar,
     .plan-return-bar,
     .plan-reading-bar,
     .source-text-warning,
-    .share-mode-bar,
     .verse-action-bar,
     .highlight-picker,
     .interlinear-row,

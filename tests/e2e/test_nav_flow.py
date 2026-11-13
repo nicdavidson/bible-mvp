@@ -111,13 +111,16 @@ def test_typed_reference_in_sloppy_form(server, browser, size):
     # Canonical everywhere: URL, title, state, history entry, Recent
     assert _path(pg) == "/Romans/8/28"
     assert pg.inner_text(".nav-title-ref") == "Romans 8"
-    assert pg.inner_text(".passage-title-btn") == "Romans 8:28"
+    # On phones the running head is the only title above the text (the passage header is gone)
+    assert not pg.is_visible(".passage-title-btn")
     assert _app(pg, "a.currentBook") == "Romans"
     assert pg.evaluate("history.state.ref") == "Romans 8:28"
     assert pg.evaluate("JSON.parse(localStorage.readingHistory)[0].reference") == "Romans 8:28"
     assert _app(pg, "a.highlightedVerses") == [28]
-    # Next chapter works from a typed reference (P1-3)
-    pg.tap(".nav-buttons .btn-nav >> text=Ch →")
+    # Next chapter works from a typed reference (P1-3); on phones it's in the reading bar,
+    # which the selection's action bar replaces until the selection is cleared
+    pg.tap(".action-bar-dismiss")
+    pg.tap(".reading-bar-step.is-next")
     _wait_ref(pg, "Romans 9")
     # A mistake is explained in the picker, and the reader stays where it is
     pg.tap(".nav-title")
@@ -174,9 +177,11 @@ def test_picker_navigation(server, browser, size):
     assert _path(pg) == "/Psalms/23"
     assert not pg.evaluate("document.getElementById('passage-picker').open")
     assert not _chip(pg)   # reading on: no way-back chip
-    # The passage title opens this book's chapters, current one marked
-    pg.tap(".passage-title-btn")
+    # The current book and chapter are marked in the picker
+    pg.tap(".nav-title")
     pg.wait_for_selector("#passage-picker[open]")
+    assert pg.get_attribute('#passage-picker .picker-book[data-book="Psalms"]', "aria-current") == "true"
+    pg.tap('#passage-picker .picker-book[data-book="Psalms"]')
     assert pg.inner_text("#passage-picker .picker-chapter.is-current") == "23"
     pg.tap('#passage-picker .picker-chapter[aria-label="Psalms 24"]')
     _wait_ref(pg, "Psalms 24")
@@ -264,19 +269,31 @@ def test_home_is_the_picker(server, browser):
 
 # ---------- jumps and the way back ----------
 
+def _topic_jump(pg, tap):
+    """From the selected verse: More > Topics (phone) or the Topics tab (wide), the first
+    topic, then its first single-verse reference: a jump from the reader."""
+    pg.wait_for_function("Alpine.$data(document.body).verseTopics.length > 0")
+    if pg.is_visible(".action-bar-more"):
+        tap(".action-bar-more")
+        tap(".action-more button >> text=Topics")
+    else:
+        pg.click(".panel-resources .tab-btn >> text=Topics")
+    pg.locator(".topic-verse-section .topic-chip").first.click()
+    pg.wait_for_selector(".topic-ref-item")
+    item = pg.locator(".topic-ref-item").filter(has_not_text="-").first
+    target = item.locator(".topic-ref-label").inner_text()
+    item.click()
+    _wait_ref(pg, target)
+    return target
+
+
 def _jump_from_john_3_16(pg, server):
-    """Select John 3:16, open its cross-refs on the phone sheet, follow the first one."""
+    """Select John 3:16 and follow a topical reference from it."""
     pg.goto(f"{server}/John/3")
     pg.wait_for_selector("#verse-16")
     pg.locator("#verse-16").scroll_into_view_if_needed()
     pg.tap("#verse-16 .verse-num")
-    pg.locator(".peek-chip", has_text="Cross-refs").tap()
-    assert "Cross-references for John 3:16" in pg.inner_text(".crossref-for")
-    link = pg.locator(".crossref-list a").first
-    target = link.inner_text()
-    link.tap()
-    _wait_ref(pg, target)
-    return target
+    return _topic_jump(pg, pg.tap)
 
 
 @pytest.mark.parametrize("size", PHONES)
@@ -286,6 +303,10 @@ def test_jump_and_return_with_the_chip(server, browser, size):
     assert _chip(pg) == "Back to John 3:16"
     # The sheet folds after a jump so the verse and the chip both show (P1-10)
     assert not _app(pg, "a.resourcesPanelExpanded")
+    # The chip floats above the action bar, clear of the text controls (it covered Share)
+    chip = pg.locator(".return-chip").bounding_box()
+    bar = pg.locator(".verse-action-bar").bounding_box()
+    assert chip["y"] + chip["height"] <= bar["y"]
     box = pg.locator(f"#verse-{target.split(':')[1]}").bounding_box()
     assert 0 < box["y"] < size[1] * 0.75
     # One tap back, verse still selected and in view
@@ -327,12 +348,14 @@ def test_jump_and_return_with_browser_back(server, phone):
 def test_reading_on_clears_the_chip(server, phone):
     target = _jump_from_john_3_16(phone, server)
     assert _chip(phone)
-    phone.tap(".nav-buttons .btn-nav >> text=Ch →")
+    phone.tap(".action-bar-dismiss")
+    phone.tap(".reading-bar-step.is-next")
     phone.wait_for_function(f"Alpine.$data(document.body).currentReference !== {target!r} && !Alpine.$data(document.body).loading && !Alpine.$data(document.body).navBusy")
     assert not _chip(phone)
     # ...and Back to the jumped-to passage shows it again: Back agrees with the chip
+    # (the selection was cleared before reading on, and the entry follows the selection)
     phone.go_back()
-    _wait_ref(phone, target)
+    _wait_ref(phone, target.split(":")[0])
     assert _chip(phone) == "Back to John 3:16"
 
 
@@ -345,18 +368,13 @@ def test_back_forward_through_reads_and_jumps(server, desktop):
     pg.click(".nav-buttons .btn-nav >> text=Ch →")                      # read
     _wait_ref(pg, "John 4")
     pg.click("#verse-14 .verse-num")
-    pg.wait_for_function("Alpine.$data(document.body).crossRefs.length > 0")
-    first = pg.locator(".study-ref-grid a").first
-    j1 = first.inner_text()
-    first.click()                                                       # jump
-    _wait_ref(pg, j1)
+    j1 = _topic_jump(pg, pg.click)                                      # jump
+    pg.click(".topic-back-btn")
     pg.click(f"#verse-{j1.split(':')[1]} .verse-num")                  # deselect
     pg.click(f"#verse-{j1.split(':')[1]} .verse-num")                  # select again
-    pg.wait_for_function("Alpine.$data(document.body).crossRefs.length > 0")
-    second = pg.locator(".study-ref-grid a").first
-    j2 = second.inner_text()
-    second.click()                                                      # chained jump
-    _wait_ref(pg, j2)
+    pg.wait_for_function(f"Alpine.$data(document.body).highlightedVerses[0] === {int(j1.split(':')[1])}")
+    pg.wait_for_timeout(300)
+    j2 = _topic_jump(pg, pg.click)                                      # chained jump
     assert _chip(pg) == "Back to John 4:14"                             # the first place, not j1
     pg.click(".nav-buttons .btn-nav >> text=Ch →")                      # read on
     pg.wait_for_function(f"Alpine.$data(document.body).currentReference !== {j2!r} && !Alpine.$data(document.body).loading && !Alpine.$data(document.body).navBusy")
@@ -405,9 +423,9 @@ def test_plan_mode_in_and_out(server, phone):
     pg.wait_for_selector(".plan-reading-bar:visible")
     pg.wait_for_function("!Alpine.$data(document.body).loading && Alpine.$data(document.body).verses.length > 0")
     assert pg.evaluate("history.length") == 2 and pg.evaluate("history.state.idx") == 0
-    # The chapter buttons step through days in plan reading (P0-5); verse buttons hide
-    prev, nxt = pg.locator(".nav-buttons .btn-nav:visible").all()
-    assert prev.inner_text() == "← Day" and nxt.inner_text() == "Day →"
+    # The reading bar steps through days in plan reading (P0-5)
+    prev, nxt = pg.locator(".reading-bar-step").all()
+    assert prev.inner_text().strip() == "Day 2" and nxt.inner_text().strip() == "Day 4"
     nxt.tap()
     pg.wait_for_function("location.pathname === '/plan/chronological-year/4' && !Alpine.$data(document.body).loading && !Alpine.$data(document.body).navBusy")
     assert _app(pg, "a.planDay") == 4
@@ -417,12 +435,8 @@ def test_plan_mode_in_and_out(server, phone):
     # A cross-reference from plan reading: the chip leads back to the day
     first_verse = pg.locator(".verse-box").first
     first_verse.locator(".verse-num").tap()
-    pg.wait_for_function("Alpine.$data(document.body).crossRefs.length > 0 && Alpine.$data(document.body).currentBook")
-    pg.locator(".peek-chip", has_text="Cross-refs").tap()
-    link = pg.locator(".crossref-list a").first
-    target = link.inner_text()
-    link.tap()
-    _wait_ref(pg, target)
+    pg.wait_for_function("Alpine.$data(document.body).currentBook")
+    target = _topic_jump(pg, pg.tap)
     assert not _app(pg, "a.combinedPlanReading")
     assert _chip(pg) == "Back to Day 3 reading"
     pg.tap(".return-chip-back")
@@ -552,7 +566,7 @@ def test_offline_navigation_to_a_saved_chapter(server, browser):
     pg.goto(f"{server}/Ruth/1")
     _wait_ref(pg, "Ruth 1")
     pg.wait_for_timeout(800)   # auto-cache lands in IndexedDB
-    pg.tap(".nav-buttons .btn-nav >> text=Ch →")
+    pg.tap(".reading-bar-step.is-next")
     _wait_ref(pg, "Ruth 2")
     ctx.set_offline(True)
     pg.tap(".nav-title")

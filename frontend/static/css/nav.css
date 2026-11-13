@@ -104,7 +104,7 @@ body {
     .header-tts, .header-immersive { display: none !important; }
 }
 @media (min-width: 601px) {
-    .side-menu-tts { display: none !important; }
+    .side-menu-tts, .side-menu-phone { display: none !important; }
 }
 
 /* ---------- the way back ---------- */
@@ -160,6 +160,143 @@ body {
     color: var(--color-text-secondary) !important;
 }
 .return-chip button:hover { background: rgba(127, 127, 127, 0.1); }
+
+/* ---------- end of a chapter: the next one, by name ---------- */
+.chapter-end {
+    display: flex;
+    justify-content: flex-end;
+    margin: 1.5rem 0 0.5rem;
+}
+.chapter-end-next {
+    display: inline-grid;
+    justify-items: end;
+    gap: 0.1rem;
+    min-height: 44px;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+    text-align: right;
+}
+.chapter-end-next:hover { border-color: var(--color-text-secondary); }
+.chapter-end-hint { font: 500 0.78rem var(--font-sans); color: var(--color-text-secondary); }
+.chapter-end-ref { font: 700 1.05rem var(--font-verse); }
+.chapter-end-ref::after { content: " \203A"; }
+
+/* ---------- phones: Scripture first, controls in thumb reach ----------
+   Above the text there is only the app header (which hides while scrolling down).
+   The passage header's controls move: previous/next chapter to the reading bar at
+   the bottom, Original Language to the menu, Share to the selected verses' action
+   bar. The reading bar and the action bar share one slot: never two bars. */
+.reading-bar, .action-more-wrap { display: none; }
+@media (max-width: 600px) {
+    .panel-text > .panel-header { display: none; }
+    /* The text runs to the bottom of the screen, under the bar; the last verse clears it */
+    .main-content { padding-bottom: 0; }
+    .panel-text { max-height: calc(100dvh - var(--header-h, 61px)); }
+    body.reading-immersed .panel-text { max-height: 100dvh; }
+    .panel-text .panel-body { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
+    .reading-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: var(--z-overlay-bar);
+        display: flex;
+        align-items: stretch;
+        gap: 2px;
+        padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+        border-top: 1px solid var(--color-border);
+        background: var(--color-surface);
+    }
+    .reading-bar button {
+        min-height: 48px;
+        border: 0;
+        border-radius: 0.625rem;
+        background: none;
+        color: var(--color-text);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .reading-bar button:active { background: var(--color-surface-hover); }
+    .reading-bar-step {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0 0.5rem;
+        font: 600 0.95rem var(--font-verse);
+    }
+    .reading-bar-step > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .reading-bar-step svg { flex: none; color: var(--color-text-secondary); }
+    .reading-bar-step.is-next { justify-content: flex-end; }
+    .reading-bar-step:disabled { opacity: 0.35; cursor: default; }
+    .reading-bar-tool {
+        flex: none;
+        position: relative;
+        padding: 0 0.625rem;
+        font: 500 0.85rem var(--font-sans);
+        color: var(--color-text-secondary) !important;
+    }
+    .reading-bar-dot {
+        position: absolute;
+        top: 10px;
+        right: 3px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--nav-chip-rule);
+    }
+
+    /* The way back floats just above the bottom bar instead of pushing the text down */
+    .return-chip {
+        position: fixed;
+        left: 0.75rem;
+        right: 0.75rem;
+        bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+        z-index: var(--z-overlay-bar);
+        margin: 0;
+        background: linear-gradient(var(--nav-chip-bg), var(--nav-chip-bg)), var(--color-surface);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    }
+    .return-chip.above-actions { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+
+    /* Copy and Memorize sit behind More on phones */
+    .action-bar-wide { display: none !important; }
+    .action-more-wrap { display: flex; position: relative; }
+}
+.action-more {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    z-index: var(--z-dropdown);
+    display: grid;
+    min-width: 11rem;
+    padding: 0.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+}
+.action-more button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    padding: 0 0.875rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: none;
+    color: var(--color-text);
+    font: 500 0.95rem var(--font-sans);
+    text-align: left;
+    cursor: pointer;
+}
+.action-more button:hover { background: var(--color-surface-hover); }
+.action-more-count { font-size: 0.8rem; font-weight: 700; color: var(--color-text-secondary); }
 
 /* ---------- the picker ---------- */
 dialog.picker-sheet {

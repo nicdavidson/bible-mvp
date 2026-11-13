@@ -8,7 +8,6 @@ import json
 import sys
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8561"
 MODE = sys.argv[2] if len(sys.argv) > 2 else "after"
@@ -16,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 NAV = ROOT / "docs" / "nav"
 STUDY = ROOT / "docs" / "study-view"
 
-# Same function as tests/e2e/test_chrome_layout.py
+# Also used by tests/e2e/test_chrome_layout.py
 MEASURE = """() => {
     const vh = innerHeight;
     const first = document.querySelector('.verses .verse-box');
@@ -135,12 +134,15 @@ def panes_after(b, w, h, theme):
     ctx.close()
 
 
-with sync_playwright() as p:
-    b = p.chromium.launch()
-    results = {}
-    for (w, h) in [(360, 740), (390, 844), (1280, 800)]:
-        for theme in ["light", "dark"]:
-            chrome(b, w, h, theme, results)
-            (panes_after if MODE == "after" else panes_before)(b, w, h, theme)
-    b.close()
-    print(json.dumps(results, indent=1))
+if __name__ == "__main__":
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        results = {}
+        for (w, h) in [(360, 740), (390, 844), (1280, 800)]:
+            for theme in ["light", "dark"]:
+                chrome(b, w, h, theme, results)
+                (panes_after if MODE == "after" else panes_before)(b, w, h, theme)
+        b.close()
+        print(json.dumps(results, indent=1))

@@ -713,7 +713,7 @@ function bibleApp() {
                 '--header-h', header.offsetHeight + 'px');
             setH();
             window.addEventListener('resize', setH, { passive: true });
-            let lastY = pane.scrollTop, ticking = false;
+            let lastY = pane.scrollTop, lastH = pane.clientHeight, ticking = false;
             pane.addEventListener('scroll', () => {
                 if (ticking) return;
                 ticking = true;
@@ -723,6 +723,9 @@ function bibleApp() {
                     const y = pane.scrollTop;
                     const delta = y - lastY;
                     lastY = y;
+                    // The pane growing into the header's place (or shrinking back) moves
+                    // scrollTop at the end of the chapter; that isn't the reader scrolling
+                    if (pane.clientHeight !== lastH) { lastH = pane.clientHeight; return; }
                     if (this.anyModalOpen && this.anyModalOpen()) return;
                     if (Date.now() - (this._navScrolledAt || 0) < 800) return;   // navigation placed the page
                     if (y < 60) document.body.classList.remove('reading-immersed');

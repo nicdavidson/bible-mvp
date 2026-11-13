@@ -55,6 +55,11 @@
                     <span class="side-menu-icon">⛶</span>
                     <span>Immersive Reading</span>
                 </button>
+                <button type="button" @click="showInterlinear = !showInterlinear; showSideMenu = false" class="side-menu-item side-menu-phone"
+                        x-show="combinedPlanReading || otBooks.includes(currentBook) || ntBooks.includes(currentBook)" :aria-pressed="showInterlinear ? 'true' : 'false'">
+                    <span class="side-menu-icon" aria-hidden="true">א</span>
+                    <span x-text="showInterlinear ? 'Hide Hebrew & Greek' : 'Show Hebrew & Greek'"></span>
+                </button>
                 <button @click="openTodaysReading()" class="side-menu-item" x-show="currentPlan">
                     <span class="side-menu-icon">📅</span>
                     <span>Today's Reading</span>
@@ -224,7 +229,8 @@
 
             <!-- The way back after a jump (cross-ref, search hit, topic, note link...). Clears
                  when reading on (next chapter, picker) or on dismiss; Back agrees with it. -->
-            <div class="return-chip" x-show="navReturn" x-cloak role="region" aria-label="Way back">
+            <div class="return-chip" x-show="navReturn" x-cloak role="region" aria-label="Way back"
+                 :class="{ 'above-actions': highlightedVerses.length > 0 }">
                 <button type="button" class="return-chip-back" @click="navGoBack()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
                     <span>Back to <span class="return-chip-place" x-text="navReturn?.label"></span></span>
@@ -397,13 +403,20 @@
                             </div>
                         </div>
                     </template>
+                    <nav class="chapter-end" aria-label="Chapters" x-show="!combinedPlanReading && nextLabel()">
+                        <button type="button" class="chapter-end-next" @click="nextChapter()">
+                            <span class="chapter-end-hint">Next chapter</span>
+                            <span class="chapter-end-ref" x-text="nextLabel()"></span>
+                        </button>
+                    </nav>
                 </div>
             </div>
 
-            <!-- Floating Verse Action Bar -->
+            <!-- Verse action bar: what to do with the selected verses. On phones it takes the
+                 reading bar's place at the bottom (one bar, never two). -->
             <div
                 class="verse-action-bar"
-                x-show="highlightedVerses.length > 0 && !shareMode && !noteEditMode"
+                x-show="highlightedVerses.length > 0"
                 x-transition:enter="action-bar-enter"
                 x-transition:enter-start="action-bar-enter-start"
                 x-transition:enter-end="action-bar-enter-end"
@@ -468,6 +481,25 @@
                 </div>
             </div>
 
+            <!-- Phones: the reading bar, in thumb reach. Previous/next chapter by name, and this
+                 chapter's notes and the topical index (the sheet). Hidden while verses are
+                 selected: the action bar takes its place. -->
+            <nav class="reading-bar" aria-label="Chapter" x-show="verses.length > 0 && highlightedVerses.length === 0 && !resourcesPanelExpanded" x-cloak>
+                <button type="button" class="reading-bar-step" @click="previousChapter()" :disabled="!prevLabel() || (combinedPlanReading && planDay <= 1)"
+                        :aria-label="'Previous: ' + prevLabel()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                    <span x-text="prevLabel() || ''"></span>
+                </button>
+                <button type="button" class="reading-bar-tool" @click="openSheet('notes')" :aria-label="'Notes in this chapter' + (getRelevantNotes().length ? ': ' + getRelevantNotes().length : '')">
+                    <span>Notes</span><span class="reading-bar-dot" x-show="getRelevantNotes().length" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="reading-bar-tool" @click="openSheet('topics')">Topics</button>
+                <button type="button" class="reading-bar-step is-next" @click="nextChapter()" :disabled="!nextLabel() || (combinedPlanReading && planDay >= (currentPlan?.duration_days || 365))"
+                        :aria-label="'Next: ' + nextLabel()">
+                    <span x-text="nextLabel() || ''"></span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+            </nav>
         </section>
 
         <!-- Resources Panel -->
@@ -1429,12 +1461,12 @@
                 <div class="guide-section">
                     <h4>Tips</h4>
                     <ul class="tips-list">
-                        <li>Tap a verse (or the first and last of a passage), then Study to read commentary beside it</li>
+                        <li>Tap a verse (or the first and last of a passage), then Study to read commentary beside it; Refs shows its cross-references with their text, and Note lets you write about it</li>
                         <li>Click any word (in BSB) to see Hebrew/Greek details</li>
-                        <li>Enable "Original Language" in settings to see interlinear text</li>
+                        <li>Turn on "Original Language" (in the menu on a phone) to see the Hebrew and Greek under the text</li>
                         <li>Red letter mode highlights words of God (OT) and Jesus (NT)</li>
                         <li>Use reading plans for structured daily Bible reading</li>
-                        <li>Create notes on verses - tag them for easy organization</li>
+                        <li>Your notes on a chapter are under Notes; tag them for easy organization</li>
                         <li>Sign in to sync notes and progress across devices</li>
                         <li>URLs update as you navigate - share or bookmark any verse</li>
                         <li>Use the book picker to browse by genre-colored categories</li>
