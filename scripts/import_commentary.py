@@ -93,21 +93,26 @@ def clean_calvin(text: str, start: int) -> tuple[str, int | None, bool]:
     lo, hi = start, end or start
     i = 0
     if heading and end:
-        # Sections with a "Book C:V-W" heading print the verse text first (English, and
-        # Latin in the NT), numbered lo..hi. The commentary starts at the first numbered
-        # paragraph after verse `hi` has appeared whose number goes back down.
-        seen_hi = False
+        # Sections with a "Book C:V-W" heading print the verse text first: paragraphs
+        # numbered lo..hi (English, and Latin in most volumes). Skip that leading run. The
+        # commentary starts at the first unnumbered paragraph, or where the numbering
+        # restarts after verse `hi` has appeared.
+        seen_hi = 0
+        limit = 2 * (hi - lo + 1) + 2
         for j, p in enumerate(paras):
             nums = [int(n) for n in _CALVIN_NUM.findall(" " + p[:2000])]
             lead = re.match(r"\s*(\d+)\.\s", p)
-            if seen_hi and lead and int(lead.group(1)) < hi:
+            n = int(lead.group(1)) if lead else None
+            if j >= limit or n is None or not lo <= n <= hi:
                 i = j
                 break
-            if seen_hi and lead and int(lead.group(1)) == hi and len(p) > 600:
+            if seen_hi and (n < hi or seen_hi >= 2 or len(p) > 600):
                 i = j
                 break
-            if any(n >= hi for n in nums[:1] or []) or (len(nums) >= 2 and max(nums) >= hi):
-                seen_hi = True
+            if n == hi or (len(nums) >= 2 and max(nums) >= hi):
+                seen_hi += 1
+        else:
+            i = 0  # nothing but numbered paragraphs: keep everything
     body = "\n\n".join(paras[i:])
     body = re.sub(r"\s?\[\d+\]", "", body)
     return body, end, i > 0
@@ -453,7 +458,8 @@ def import_commentary(key: str):
         have = {r[0] for r in rows}
         need = [b for b in sup["books"] if b not in have]
         if need:
-            extra = list(load_sword(cfg, v11n, stats, books=need, module=sup["module"]))
+            sup_cfg = {**cfg, "fixup": None, **sup}  # supplement options override the source's
+            extra = list(load_sword(sup_cfg, v11n, stats, books=need, module=sup["module"]))
             stats.bump(f"supplement_{sup['module']}_entries", len(extra))
             rows.extend(extra)
     if cfg.get("infer_ranges"):
@@ -473,6 +479,10 @@ def import_commentary(key: str):
             (source, book, ch, s, e, content, searchable),
         )
     write_source_row(conn, cfg)
+    conn.commit()
+    # Merge FTS segments and drop delete markers left by the DELETE/INSERT above; without
+    # this, repeated rebuilds bloated commentary_fts_data to 3x its size (309 MB vs 93 MB).
+    conn.execute("INSERT INTO commentary_fts(commentary_fts) VALUES('optimize')")
     conn.commit()
     books = len({r[0] for r in rows})
     conn.close()

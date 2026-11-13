@@ -118,9 +118,9 @@ IMPORT_STEPS = [
             "args": [key],
         }
         for step, key, desc in [
-            ("commentary_jfb", "jamieson-fausset-brown", "Jamieson-Fausset-Brown (CrossWire)"),
-            ("commentary_kd", "keil-delitzsch", "Keil & Delitzsch OT (CrossWire)"),
-            ("commentary_calvin", "john-calvin", "Calvin (CrossWire)"),
+            ("commentary_jfb", "jamieson-fausset-brown", "Jamieson-Fausset-Brown (HelloAO)"),
+            ("commentary_kd", "keil-delitzsch", "Keil & Delitzsch OT (HelloAO)"),
+            ("commentary_calvin", "john-calvin", "Calvin (HelloAO)"),
             ("commentary_clarke", "adam-clarke", "Adam Clarke (CrossWire)"),
             ("commentary_barnes", "albert-barnes", "Barnes' Notes NT (CrossWire)"),
             ("commentary_wesley", "john-wesley", "Wesley's Notes (CrossWire)"),

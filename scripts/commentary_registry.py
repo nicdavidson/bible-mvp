@@ -86,7 +86,8 @@ COMMENTARIES = {
         "license": PD,
         "attribution": "Keil and Delitzsch, Biblical Commentary on the Old Testament "
                        "(English translation, T. & T. Clark, 1864-1878). Text from the HelloAO "
-                       "Free Use Bible API.",
+                       "Free Use Bible API; Song of Solomon from the CrossWire KD module "
+                       "(Wikisource transcription).",
         "source_url": "https://bible.helloao.org/api/c/keil-delitzsch/books.json",
         "sort_order": 40,
         "description": "A detailed scholarly commentary on the Hebrew text of the Old Testament "
@@ -95,6 +96,8 @@ COMMENTARIES = {
         "loader": "helloao",
         "helloao_id": "keil-delitzsch",
         "infer_ranges": True,
+        # HelloAO lists Song of Solomon with 0 chapters; CrossWire KD's Song block is intact
+        "supplement": {"module": "KD", "books": ["Song of Solomon"], "strip_book_intros": True},
     },
     "john-calvin": {
         "source": "John Calvin",
