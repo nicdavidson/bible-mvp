@@ -61,4 +61,4 @@ def test_build_does_not_import_removed_sources():
     imported = [s["args"][0] for s in steps.values() if s.get("script") == "import_commentary.py"]
     assert sorted(imported) == sorted(["john-gill", "jamieson-fausset-brown", "scofield",
                                        "tyndale", "treasury-of-david", "gaebelein", "ironside",
-                                       "darby", "brooks", "mackintosh", "larkin"])
+                                       "darby", "brooks", "mackintosh", "larkin", "newell"])

@@ -19,6 +19,7 @@ CW_RAWZIP = "https://www.crosswire.org/ftpmirror/pub/sword/packages/rawzip/{modu
 HELLOAO = "https://bible.helloao.org/api/c/{id}"
 
 PD = "Public domain"
+CUT_BEFORE = "<cut before>"   # patches: (book, ch, v, marker, CUT_BEFORE) drops text up to marker
 
 COMMENTARIES = {
     "john-gill": {
@@ -129,6 +130,7 @@ COMMENTARIES = {
 # ---------------------------------------------------------------------------
 
 PD_PRE1931 = "Public domain (US: first published before 1931)"
+PD_NO_RENEWAL = "Public domain (no renewal found)"
 
 # H. A. Ironside: SermonIndex's siiron module mixes volumes of every date (its Isaiah prints
 # "Copyright @ 1952") and later edited versions. Only books whose module text was matched
@@ -143,6 +145,16 @@ IRONSIDE_PRE1931 = [
     "Romans",            # Lectures on Romans, 1928
     "Colossians",        # Lectures on Colossians, January 1929
 ]
+# Second group, 1931-1947 volumes for which no copyright renewal was found in the Catalog
+# of Copyright Entries (NYPL transcription; docs, "No renewal found"). Delete this list
+# (and its book names below) to drop the group again.
+IRONSIDE_1931_47_NOT_RENEWED = [
+    "Hebrews",           # Studies in Hebrews and Titus, 1932 (Titus not imported: the same
+                         # lectures are in the renewed 1947 Timothy, Titus and Philemon)
+    "1 Corinthians",     # Addresses on the First Epistle to the Corinthians, 1938
+    "2 Corinthians",     # Addresses on the Second Epistle to the Corinthians, 1939
+    "Galatians",         # Expository Messages on the Epistle to the Galatians, 1940
+]
 # Not imported, though first published before 1931: Proverbs, Revelation and Philippians
 # (the module has later edited wording), Daniel (the module is the 1996 edited text, and
 # Daniel 9 includes The Great Parenthesis, 1943).
@@ -155,19 +167,20 @@ COMMENTARIES.update({
         "year": 1905,
         "tradition": "Dispensational",
         "kind": "passage",
-        "coverage": "Nehemiah, Esther, Jeremiah, Lamentations, Minor Prophets, Romans, "
-                    "Colossians",
-        "license": PD_PRE1931,
-        "attribution": "H. A. Ironside, Notes and Lectures (Loizeaux, 1905-1929). Text from "
-                       "the SermonIndex SWORD module siiron, books matched to the pre-1931 "
-                       "editions only.",
+        "coverage": f"{len(IRONSIDE_PRE1931) + len(IRONSIDE_1931_47_NOT_RENEWED)} books",
+        "license": PD_PRE1931 if not IRONSIDE_1931_47_NOT_RENEWED else
+                   "Public domain (US: first published before 1931; the 1932-1940 volumes: "
+                   "no renewal found)",
+        "attribution": "H. A. Ironside, Notes, Lectures and Addresses (Loizeaux, 1905-1940). "
+                       "Text from the SermonIndex SWORD module siiron, books matched to the "
+                       "editions named in the library documentation only.",
         "source_url": "https://www.sermonindex.net/commentary/iron/",
         "description": "Plain-spoken expository lectures by the Bible teacher who later "
                        "pastored Moody Church in Chicago; strongly dispensational, with much "
                        "on prophecy and Israel's future.",
         "loader": "sermonindex",
         "module": "siiron",
-        "books": IRONSIDE_PRE1931,
+        "books": IRONSIDE_PRE1931 + IRONSIDE_1931_47_NOT_RENEWED,
         # archive.org scans of those editions (Nehemiah 1925, Esther 1921, Jeremiah 1928,
         # Minor Prophets 1928 printing, Romans 1928, Colossians 1929)
         "caps_from_scans": ["notesonbookofneh0000iron", "notesonbookofest0000unse",
@@ -178,6 +191,31 @@ COMMENTARIES.update({
         # Romans 11:25- is The Great Parenthesis (1943), chapter VIII.
         "drop_sections": [("Hosea", 3, 4), ("Romans", 11, 25)],
         "patches": [("Jeremiah", 30, 1, "NOT WRATH BUT RAPTURE", None)],
+    },
+    # Public domain because no renewal was found (published 1935 and 1938; renewals would
+    # have been due 1962-63 and 1965-66). Hebrews Verse by Verse (1947) was renewed in 1975
+    # (R611479) and is not imported. Delete this entry to drop the group again.
+    "newell": {
+        "source": "Newell Verse by Verse",
+        "short_name": "Newell",
+        "author": "William R. Newell (1868-1956)",
+        "year": 1935,
+        "tradition": "Dispensational",
+        "kind": "verse",
+        "coverage": "Romans, Revelation",
+        "license": PD_NO_RENEWAL,
+        "attribution": "William R. Newell, Romans Verse by Verse (1938) and The Book of the "
+                       "Revelation (1935). Text from the SermonIndex SWORD module sinewell.",
+        "source_url": "https://www.sermonindex.net/commentary/newell/",
+        "description": "Expositions by the Bible teacher of Moody Bible Institute and author of "
+                       "the hymn \"At Calvary\": Romans taken verse by verse with a strong "
+                       "emphasis on grace, and a dispensational reading of Revelation.",
+        "loader": "sermonindex",
+        "module": "sinewell",
+        "books": ["Romans", "Revelation"],
+        "split_verse_markers": ["Romans"],
+        # the module's Romans 1:1 entry opens with a second copy of the 1:24-32 notes
+        "patches": [("Romans", 1, 1, "\n---\n", CUT_BEFORE)],
     },
     "gaebelein": {
         "source": "Gaebelein Annotated Bible",
@@ -308,7 +346,7 @@ SOURCE_COLUMNS = ["source", "short_name", "author", "year", "tradition", "kind",
 # source in this order that has something on the selection, so sparse Scofield first is
 # fine. Keep frontend/static/js/modules/study.js DEFAULT_ORDER (slugs) in step.
 DEFAULT_ORDER = ["scofield", "john-gill", "jamieson-fausset-brown", "tyndale",
-                 "gaebelein", "ironside", "darby", "brooks", "mackintosh", "larkin",
+                 "gaebelein", "ironside", "newell", "darby", "brooks", "mackintosh", "larkin",
                  "treasury-of-david"]
 assert sorted(DEFAULT_ORDER) == sorted(COMMENTARIES)
 for _i, _key in enumerate(DEFAULT_ORDER):

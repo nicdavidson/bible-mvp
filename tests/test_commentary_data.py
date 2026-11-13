@@ -30,7 +30,8 @@ def test_columns(conn):
 
 
 LIBRARY = ["Scofield Notes (1917)", "John Gill", "Jamieson-Fausset-Brown", "Tyndale Study Notes",
-           "Gaebelein Annotated Bible", "Ironside Expositions", "Darby Synopsis", "Brooks Summarized Bible",
+           "Gaebelein Annotated Bible", "Ironside Expositions", "Newell Verse by Verse",
+           "Darby Synopsis", "Brooks Summarized Bible",
            "Mackintosh Notes on the Pentateuch", "Larkin on Revelation", "Treasury of David"]
 
 
@@ -145,6 +146,10 @@ def _notes_on(conn, source, book, chapter, verse):
     ("Larkin on Revelation", "Revelation", 20, 4, "THE MILLENNIUM"),
     ("Ironside Expositions", "Romans", 8, 1, "The Triumph of Grace"),
     ("Ironside Expositions", "Esther", 4, 14, "Sackcloth"),
+    # second group (no renewal found)
+    ("Ironside Expositions", "Galatians", 2, 20, "crucified"),
+    ("Newell Verse by Verse", "Romans", 3, 24, "Verse 24"),
+    ("Newell Verse by Verse", "Revelation", 2, 8, "Smyrna"),
 ])
 def test_known_verse_lands_in_the_right_note(conn, source, book, chapter, verse, needle):
     notes = _notes_on(conn, source, book, chapter, verse)
@@ -211,3 +216,33 @@ def test_ironside_left_out_material_stays_out(conn):
     for book in ("Daniel", "Proverbs", "Revelation", "Philippians", "Isaiah"):
         assert not conn.execute("SELECT 1 FROM commentary_entries WHERE source = "
                                 "'Ironside Expositions' AND book = ?", (book,)).fetchone(), book
+
+
+def test_no_renewal_group_holds(conn):
+    """Second group (no renewal found): Newell's Hebrews Verse by Verse (1947) was renewed in
+    1975 and must not appear; Ironside's renewed volumes stay out (Titus too: the 1932
+    lectures are also in the renewed 1947 Timothy, Titus and Philemon)."""
+    reg = _registry()
+    assert not conn.execute("SELECT COUNT(*) FROM commentary_entries WHERE source = "
+                            "'Newell Verse by Verse' AND book = 'Hebrews'").fetchone()[0]
+    assert {r[0] for r in conn.execute("SELECT DISTINCT book FROM commentary_entries WHERE "
+                                        "source = 'Newell Verse by Verse'")} == {"Romans", "Revelation"}
+    renewed = ["Isaiah", "Psalms", "Ezekiel", "Matthew", "Mark", "Joshua", "1 Thessalonians",
+               "2 Thessalonians", "1 Timothy", "2 Timothy", "Titus", "Philemon"]
+    assert not set(renewed) & set(reg.IRONSIDE_PRE1931 + reg.IRONSIDE_1931_47_NOT_RENEWED)
+    rows = conn.execute("SELECT DISTINCT book FROM commentary_entries WHERE source = "
+                        f"'Ironside Expositions' AND book IN ({','.join('?' * len(renewed))})",
+                        renewed).fetchall()
+    assert not rows
+    lic = dict(conn.execute("SELECT source, license FROM commentary_sources"))
+    assert lic["Newell Verse by Verse"] == "Public domain (no renewal found)"
+
+
+def test_newell_romans_is_keyed_by_verse(conn):
+    """Romans Verse by Verse: each "Verse N:" comment is its own row at that verse."""
+    rows = conn.execute("SELECT reference_start, reference_end, content FROM commentary_entries "
+                        "WHERE source = 'Newell Verse by Verse' AND book = 'Romans' AND chapter = 3 "
+                        "ORDER BY reference_start").fetchall()
+    singles = [(s, t) for s, e, t in rows if s == e]
+    assert len(singles) >= 10
+    assert all(re.match(rf"Verses? {s}\b", t) for s, t in singles)

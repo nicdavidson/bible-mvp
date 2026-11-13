@@ -37,7 +37,7 @@ docs/RESOURCE_LICENSES_2026-10.md.
 
 ## Commentaries
 
-Eleven sources, in this display order. Full license reasoning, sources and per-source notes:
+Twelve sources, in this display order. Full license reasoning, sources and per-source notes:
 [docs/COMMENTARY_LIBRARY_2026-11.md](docs/COMMENTARY_LIBRARY_2026-11.md).
 The same metadata ships in the `commentary_sources` table. US public-domain status is argued from
 first publication (before 1931) and the author's death, not from a website's label.
@@ -49,12 +49,24 @@ first publication (before 1931) and the author's death, not from a website's lab
 | Jamieson-Fausset-Brown | Public Domain | HelloAO API (matches CCEL) | Published 1871; authors d. 1880, 1897, 1910 |
 | Tyndale Study Notes | **CC BY-SA 4.0**, (C) 2022 Tyndale House Publishers | tyndaleopenresources.com ZIP | Short credit (`commentary_sources.attribution_short`): "Adapted from Tyndale Open Study Notes © 2022 Tyndale House Publishers, CC BY-SA 4.0", linked to the full credit. Share-alike: credit "Adapted from Tyndale Open Study Notes. The original work by Tyndale House Publishers is available for free at http://www.tyndaleopenresources.com." Changes: XML converted to plain text with reference links; wording unchanged. Any published DB slice containing these rows stays CC BY-SA for these rows |
 | Gaebelein Annotated Bible | Public Domain (first published before 1931) | SermonIndex SWORD module `siannbible`, repaired against archive.org scans | *The Annotated Bible*, 9 vols, Our Hope, ©1913-1921 (two volumes undated, internal evidence 1919-22). Matthew is Gaebelein's *Gospel of Matthew: An Exposition* (1903; ©1910), which the module ships in place of the Annotated Bible's Matthew |
-| Ironside Expositions | Public Domain (first published before 1931) | SermonIndex SWORD module `siiron`, **allow-listed books only** | Nehemiah (1925 ed.), Esther (1921 ed. of 1905), Jeremiah and Lamentations (1928 ed. of 1906), Minor Prophets (1909/1928), Romans (1928), Colossians (1929), each matched to an archive.org scan of that edition. Later works the module appends (Hosea 3:4-, part of Jeremiah 30, Romans 11:25-) left out. The module's other books (later volumes, edited texts, "Copyright @ 1952") are not imported |
+| Ironside Expositions | Public Domain (first published before 1931) for this book list; see below for the second list | SermonIndex SWORD module `siiron`, **allow-listed books only** | Nehemiah (1925 ed.), Esther (1921 ed. of 1905), Jeremiah and Lamentations (1928 ed. of 1906), Minor Prophets (1909/1928), Romans (1928), Colossians (1929), each matched to an archive.org scan of that edition. Later works the module appends (Hosea 3:4-, part of Jeremiah 30, Romans 11:25-) left out. The module's other books (later volumes, edited texts, "Copyright @ 1952") are not imported |
 | Darby Synopsis | Public Domain (first published 1857-1867; Darby d. 1882) | SermonIndex SWORD module `sidarbysyn` | New Testament only. The Old Testament text was not taken from STEM Publishing or CCEL (both ask for permission) |
 | Brooks Summarized Bible | Public Domain (©1919) | SermonIndex SWORD module `sitsb` | Matches the 1919 Bible Institute of Los Angeles edition (archive.org scans); three short readings follow BIOLA's undated "Second Edition", which carries only the 1919 notice |
 | Mackintosh Notes on the Pentateuch | Public Domain (1858-1880; Mackintosh d. 1896) | Project Gutenberg #37915, #40596, #40610, #76552, #41571, #41584 | PG license: only the text is used, nothing of PG's is stored |
 | Larkin on Revelation | Public Domain (©1919; Larkin d. 1924) | SermonIndex SWORD module `silarkinrev`, repaired against archive.org `bookofrevelation00lark` | Charts not included |
 | Treasury of David | Public Domain | CrossWire `TDavid` (Spurgeon Archive text) | Published 1869-1885; Spurgeon d. 1892. Spurgeon's own exposition only |
+
+**Public domain (no renewal found)**, a different and weaker basis than "first published before
+1931": these works were published 1932-1940 and are public domain in the US only because no
+renewal of their copyright was filed in their 28th year. That rests entirely on the transcribed
+renewal records (NYPL's transcription of the Catalog of Copyright Entries renewals, 1950-1977,
+and the Copyright Office records from 1978), searched by author, claimant and title; the search
+does find these authors' renewed books. Per-title search record: library doc, "Second group".
+
+| Commentary (`source`) | Status | Source used | Notes |
+|------------|--------|--------|-------|
+| Newell Verse by Verse | **Public domain (no renewal found)** | SermonIndex SWORD module `sinewell` | W. R. Newell, *The Book of the Revelation* (1935; renewal would have been due 1962-63) and *Romans Verse by Verse* (1938; due 1965-66). *Hebrews Verse by Verse* (1947) was renewed in 1975 (R611479) and is not included |
+| Ironside Expositions, second book list | **Public domain (no renewal found)** | SermonIndex `siiron`, `IRONSIDE_1931_47_NOT_RENEWED` | Hebrews (*Studies in Hebrews and Titus*, 1932), 1 Corinthians (1938), 2 Corinthians (1939), Galatians (1940). Renewed volumes (Isaiah, Psalms, Ezekiel, Matthew, Mark, Joshua, Thessalonians, Timothy/Titus/Philemon, *The Great Parenthesis*, *The Lamp of Prophecy*) are excluded, and so is Titus |
 
 The SermonIndex modules (https://sermonindex.net/modules/sword/) say "Free to copy and pass on".
 Their "Public Domain" labels were not relied on: the basis above is the first publication of

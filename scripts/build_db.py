@@ -162,13 +162,31 @@ IMPORT_STEPS = [
         }
         for step, key, desc in [
             ("commentary_gaebelein", "gaebelein", "Gaebelein, Annotated Bible (SermonIndex)"),
-            ("commentary_ironside", "ironside", "Ironside, pre-1931 volumes (SermonIndex)"),
             ("commentary_darby", "darby", "Darby, Synopsis NT (SermonIndex)"),
             ("commentary_brooks", "brooks", "Brooks, Summarized Bible (SermonIndex)"),
             ("commentary_mackintosh", "mackintosh", "Mackintosh, Notes on the Pentateuch (Gutenberg)"),
             ("commentary_larkin", "larkin", "Larkin, Book of Revelation (SermonIndex)"),
         ]
     ],
+    {
+        # One source, two book lists in the registry: pre-1931 volumes, and (1.1) the
+        # 1932-1940 volumes with no renewal found.
+        "name": "commentary_ironside",
+        "description": "Ironside, allow-listed volumes (SermonIndex) commentary",
+        "version": "1.1",
+        "script": "import_commentary.py",
+        "args": ["ironside"],
+    },
+    {
+        # Second group (2026-11-13): 1931-1947 works with no copyright renewal found. Kept
+        # as its own step so the group can be dropped again by deleting it and the registry
+        # entry. Ironside's 1931-47 books are a separate list in the registry.
+        "name": "commentary_newell",
+        "description": "Newell, Romans and Revelation (SermonIndex; no renewal found) commentary",
+        "version": "1.0",
+        "script": "import_commentary.py",
+        "args": ["newell"],
+    },
     {
         # Commentary search text derived from content through a view instead of a stored
         # copy (backend/commentary_search.py); converts an older DB, no-op on a new one.

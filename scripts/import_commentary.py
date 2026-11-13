@@ -29,7 +29,7 @@ import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from commentary_registry import COMMENTARIES, CW_RAWZIP, HELLOAO, SOURCE_COLUMNS  # noqa: E402
+from commentary_registry import COMMENTARIES, CUT_BEFORE, CW_RAWZIP, HELLOAO, SOURCE_COLUMNS  # noqa: E402
 from commentary_text import (  # noqa: E402
     RefResolver, markup_to_text, plain_to_text, render, resolve_book,
 )
@@ -366,8 +366,13 @@ def load_sermonindex(cfg, v11n, stats):
         if len(hit) != 1:
             raise RuntimeError(f"{cfg['source']}: patch for {book} {ch}:{v} {old!r} does not apply")
         t = hit[0][3]
-        hit[0][3] = t[:t.index(old)].rstrip(" \n\"“") if new is None else t.replace(old, new, 1)
-        stats.bump("patched_from_scan" if new is not None else "appended_text_cut")
+        if new is None:          # cut the entry at `old`
+            hit[0][3] = t[:t.index(old)].rstrip(" \n\"“")
+        elif new == CUT_BEFORE:  # drop everything up to and including `old`
+            hit[0][3] = t[t.index(old) + len(old):].strip()
+        else:
+            hit[0][3] = t.replace(old, new, 1)
+        stats.bump("patched" if new is not None else "appended_text_cut")
     drop = set(cfg.get("drop_sections", []))
     for it in items:
         if tuple(it[:3]) in drop:
@@ -387,7 +392,46 @@ def load_sermonindex(cfg, v11n, stats):
             if (book, ch) in last or v != 1:
                 raise RuntimeError(f"{cfg['source']}: not one entry per chapter at {book} {ch}:{v}")
             last[(book, ch)] = 1
-    yield from chapter_rows([tuple(it) for it in items], v11n, stats)
+    rows = chapter_rows([tuple(it) for it in items], v11n, stats)
+    split = set(cfg.get("split_verse_markers", []))
+    for row in rows:
+        if row[0] in split:
+            yield from split_at_verse_markers(row, stats)
+        else:
+            yield row
+
+
+_VERSE_MARK = re.compile(r"(?m)^Verses? (\d+)(?:\s*(?:-|–|and|to)\s*(\d+))?\s*[:.]?")
+
+
+def split_at_verse_markers(row, stats):
+    """A verse-by-verse exposition section (Newell's Romans: the section's text, then
+    "Verse 24:", "Verses 3 and 4:" ...) -> one row per marked verse or verses, plus the
+    section's opening as a row over the whole section. A marked part runs until the next
+    marker (unmarked verses in between belong to it); markers outside the row's range stay
+    with the part before them."""
+    book, ch, s, e, text = row
+    marks = [m for m in _VERSE_MARK.finditer(text) if s <= int(m.group(1)) <= e]
+    # keep only markers that climb (a back-reference to an earlier verse is text, not a marker)
+    kept, last = [], 0
+    for m in marks:
+        if int(m.group(1)) > last:
+            kept.append(m)
+            last = int(m.group(1))
+    if not kept:
+        yield row
+        return
+    head = text[:kept[0].start()].strip()
+    if head:
+        yield book, ch, s, e, head
+    for i, m in enumerate(kept):
+        a = int(m.group(1))
+        nxt = int(kept[i + 1].group(1)) if i + 1 < len(kept) else e + 1
+        b = max(int(m.group(2)) if m.group(2) else a, nxt - 1)
+        part = text[m.start():kept[i + 1].start() if i + 1 < len(kept) else len(text)].strip()
+        yield book, ch, a, min(b, e), part
+    stats.bump("sections_split_at_verse_markers")
+    stats.bump("verse_rows_from_markers", len(kept))
 
 
 # Project Gutenberg: C. H. Mackintosh, Notes on the Pentateuch (one ebook per volume).

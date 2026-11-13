@@ -198,7 +198,8 @@ LIBRARY = [("scofield-notes-1917", "Scofield Notes (1917)"), ("john-gill", "John
            ("jamieson-fausset-brown", "Jamieson-Fausset-Brown"),
            ("tyndale-study-notes", "Tyndale Study Notes"),
            ("gaebelein-annotated-bible", "Gaebelein Annotated Bible"),
-           ("ironside-expositions", "Ironside Expositions"), ("darby-synopsis", "Darby Synopsis"),
+           ("ironside-expositions", "Ironside Expositions"),
+           ("newell-verse-by-verse", "Newell Verse by Verse"), ("darby-synopsis", "Darby Synopsis"),
            ("brooks-summarized-bible", "Brooks Summarized Bible"),
            ("mackintosh-notes-on-the-pentateuch", "Mackintosh Notes on the Pentateuch"),
            ("larkin-on-revelation", "Larkin on Revelation"), ("treasury-of-david", "Treasury of David")]

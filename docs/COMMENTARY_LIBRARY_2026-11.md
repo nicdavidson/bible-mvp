@@ -137,18 +137,18 @@ same files from their real URLs.
 | Order | Source (`source`) | Chip | Kind | Text shipped (edition, year) | Downloaded from | Entries | Books | Coverage | Text MB |
 |---:|---|---|---|---|---|---:|---:|---|---:|
 | 50 | Gaebelein Annotated Bible | Gaebelein | passage | A. C. Gaebelein, *The Annotated Bible*, 9 vols, Our Hope, New York, ©1913-1921; **Matthew** is his *The Gospel of Matthew: An Exposition* (vol. 1 1903; 2-vol. edition ©1910) | `https://sermonindex.net/modules/sword/siannbible.zip`; caps repair from archive.org `annotatedbibleho01gaeb`…`09gaeb`, `gospelofmatthewe01gaeb`, `gospelofmatthewe02gaeb` | 1,291 | 66 | 100% | 7.0 |
-| 60 | Ironside Expositions | Ironside | passage | H. A. Ironside: Notes on Nehemiah (2nd ed. 1925), Esther (1921 rev. ed. of 1905), Jeremiah and Lamentations (1928 ed. of 1906), Minor Prophets (1909; 1928 printing), Lectures on Romans (1928), Colossians (Jan. 1929) | `https://sermonindex.net/modules/sword/siiron.zip`, books on `IRONSIDE_PRE1931` only; caps repair from archive.org `notesonbookofneh0000iron`, `notesonbookofest0000unse`, `notesonprophecyl0000hair`, `bwb_T5-CWQ-371`, `lecturesonepistl0000hair_u7v0`, `bwb_S0-BLY-002` | 184 | 18 | 99.6% of those books | 1.8 |
-| 70 | Darby Synopsis | Darby | chapter | J. N. Darby, *Synopsis of the Books of the Bible*, New Testament (first ed. 1857-1867) | `https://sermonindex.net/modules/sword/sidarbysyn.zip` | 260 | 27 | NT 100% | 3.0 |
-| 80 | Brooks Summarized Bible | Brooks | chapter | Keith L. Brooks, *The Summarized Bible*, Bible Institute of Los Angeles, ©1919 | `https://sermonindex.net/modules/sword/sitsb.zip` | 1,189 | 66 | 100% | 1.3 |
-| 90 | Mackintosh Notes on the Pentateuch | Mackintosh | passage | C. H. Mackintosh, *Notes on Genesis … Deuteronomy* (1858-1880); PG transcribes Loizeaux reprints (e.g. Exodus "First edition 1880, 27th printing 1965") of the unchanged text | Project Gutenberg `https://www.gutenberg.org/cache/epub/<n>/pg<n>.txt`, n = 37915 Gen, 40596 Exod, 40610 Lev, 76552 Num, 41571 + 41584 Deut | 210 | 5 | 100% | 5.3 |
-| 100 | Larkin on Revelation | Larkin | passage | Clarence Larkin, *The Book of Revelation*, ©1919 (charts not included) | `https://sermonindex.net/modules/sword/silarkinrev.zip`; caps repair from archive.org `bookofrevelation00lark` | 75 | 1 | 100% | 0.5 |
+| 60 | Ironside Expositions | Ironside | passage | H. A. Ironside: Notes on Nehemiah (2nd ed. 1925), Esther (1921 rev. ed. of 1905), Jeremiah and Lamentations (1928 ed. of 1906), Minor Prophets (1909; 1928 printing), Lectures on Romans (1928), Colossians (Jan. 1929) | `https://sermonindex.net/modules/sword/siiron.zip`, books on `IRONSIDE_PRE1931` only; caps repair from archive.org `notesonbookofneh0000iron`, `notesonbookofest0000unse`, `notesonprophecyl0000hair`, `bwb_T5-CWQ-371`, `lecturesonepistl0000hair_u7v0`, `bwb_S0-BLY-002` | 184 (279 with the second group) | 18 (22) | 99.6% of those books | 1.8 (3.5) |
+| 80 | Darby Synopsis | Darby | chapter | J. N. Darby, *Synopsis of the Books of the Bible*, New Testament (first ed. 1857-1867) | `https://sermonindex.net/modules/sword/sidarbysyn.zip` | 260 | 27 | NT 100% | 3.0 |
+| 90 | Brooks Summarized Bible | Brooks | chapter | Keith L. Brooks, *The Summarized Bible*, Bible Institute of Los Angeles, ©1919 | `https://sermonindex.net/modules/sword/sitsb.zip` | 1,189 | 66 | 100% | 1.3 |
+| 100 | Mackintosh Notes on the Pentateuch | Mackintosh | passage | C. H. Mackintosh, *Notes on Genesis … Deuteronomy* (1858-1880); PG transcribes Loizeaux reprints (e.g. Exodus "First edition 1880, 27th printing 1965") of the unchanged text | Project Gutenberg `https://www.gutenberg.org/cache/epub/<n>/pg<n>.txt`, n = 37915 Gen, 40596 Exod, 40610 Lev, 76552 Num, 41571 + 41584 Deut | 210 | 5 | 100% | 5.3 |
+| 110 | Larkin on Revelation | Larkin | passage | Clarence Larkin, *The Book of Revelation*, ©1919 (charts not included) | `https://sermonindex.net/modules/sword/silarkinrev.zip`; caps repair from archive.org `bookofrevelation00lark` | 75 | 1 | 100% | 0.5 |
 
-The library now holds 73,993 entries. Every one of the 31,102 verses has at least one entry
+With the second group (below) the library holds 74,659 entries. Every one of the 31,102 verses has at least one entry
 (the 119 verses left uncovered by the trim are all covered again: Brooks and Gaebelein cover
-every chapter). Treasury of David moved to `sort_order` 110.
+every chapter). Treasury of David moved to `sort_order` 120.
 
 **Order.** Verse-level whole-Bible sources first (Scofield, Gill, JFB, Tyndale), then the
-chapter-level ones (Gaebelein, Ironside, Darby, Brooks, Mackintosh, Larkin), Treasury of David
+chapter-level ones (Gaebelein, Ironside, Newell, Darby, Brooks, Mackintosh, Larkin), Treasury of David
 last, as the owner proposed. Brooks is whole-Bible but a short digest, so it sits after the
 expositions; Ironside sits high although it covers 18 books because the view skips a source
 with nothing on the selection.
@@ -272,6 +272,83 @@ If a rights holder believes something here should not be published, the app's Ab
 Sources and rights page says how to reach us; the claim is reviewed and the text removed if it
 holds (LICENSES.md, top).
 
+## Second group: "public domain (no renewal found)" (2026-11-13)
+
+Imported after the first wave, as its own registry entry and build step (Newell,
+`commentary_newell`) and its own book list (`IRONSIDE_1931_47_NOT_RENEWED` inside the one
+Ironside source), so the whole group can be dropped again by deleting the `newell` registry
+entry and build step and that one list, then running the `commentary_ironside` and
+`commentary_search` steps. **These works were first published 1932-1940, after the 1930
+cut-off.** They are public domain in the US only if their copyright was not renewed in its
+28th year (works published 1928-1963 needed a renewal; unrenewed ones fell into the public
+domain). Their `license` reads **"Public domain (no renewal found)"**, and that basis rests
+entirely on the transcribed renewal records below: a renewal the transcription missed would
+mean the work is still in copyright (until 95 years after publication: 2030-2035).
+
+| Source | Text shipped | Downloaded from | Entries | Books | Text MB |
+|---|---|---|---:|---:|---:|
+| Newell Verse by Verse (`newell`, order 70) | William R. Newell, *Romans Verse by Verse* (Grace Publications / Moody, 1938) and *The Book of the Revelation* (1935) | `https://sermonindex.net/modules/sword/sinewell.zip` | 387 | 2 | 3.4 |
+| Ironside Expositions, second list | H. A. Ironside, *Studies in Hebrews and Titus* (1932; Hebrews only), *Addresses on the First Epistle to the Corinthians* (1938), *Addresses on the Second Epistle to the Corinthians* (1939), *Expository Messages on the Epistle to the Galatians* (1940) | `siiron.zip` as above | 95 of Ironside's 279 | 4 of 22 | 1.7 |
+
+Newell's Romans is keyed by verse: each section (as SermonIndex stores it) is split at Newell's
+"Verse 24:" / "Verses 3 and 4:" markers into one row per marked verse or verses (310 rows), and
+the section's opening (his translation of the passage and headings) is a row over the whole
+section. Ten of Newell's sections were cut by SermonIndex at ~70 KB ("This entry is longer than a
+Bible module can hold"); they end with " […]" (Romans 1:1-7, 3:21-31, 4:18-25, 5:1-11, 5:12-21,
+6:1-11, 7:7-25, 8:1-11, 8:31-39, 11:11-24 and Revelation 1 are the affected sections; the rest
+of those sections is not in the module). The module's Romans 1:1 entry opened with a second copy
+of the 1:24-27 notes; it is dropped. The module has no Hebrews (Newell's *Hebrews Verse by Verse*,
+1947, renewed 1975, is excluded; a test fails if a Newell Hebrews row appears).
+
+### Renewal search (what was searched, what was found)
+
+Data: NYPL's transcription of the Catalog of Copyright Entries renewal volumes 1950-1977 plus
+the Copyright Office renewal records 1978-2001 (github.com/NYPL/cce-renewals, `data/*.tsv`,
+445,386 rows; copy in the research scratch directory). Every field of every row was searched
+case-insensitively for "ironside", "koppin" (Ironside's daughter, Lillian Ironside Koppin, who
+renewed his books from 1975) and "newell" (claimant Philip/Phillip R. Newell), and for each title
+below; publisher names (Loizeaux, Moody, Our Hope, Bible Institute Colportage) were also swept.
+**The search finds the known renewals**, so a miss means something:
+
+- found: Newell, *Hebrews verse by verse* (©13Aug47, A15063; renewed 11Aug75, R611479, Phillip R.
+  Newell) and *Famous messages* (1951; RE26853);
+- found: Ironside, *The lamp of prophecy* (1940; R428751, 1968), *The great parenthesis* (1943;
+  R499630, 1971), *What's the answer* (1944), *Divine priorities* (1945), *Addresses of the First
+  and Second Epistles of Thessalonians* (1947; R609276), *Timothy, Titus and Philemon* (1947;
+  R609277), *Expository notes on the Gospel of Mark* (1948), *… Matthew* (1948), *The daily
+  sacrifice* (1948), *Expository notes on Ezekiel* (1949), *Addresses on the Book of Joshua*
+  (1950; RE4643), *Studies on book one of the Psalms* (1952), *Expository notes on the prophet
+  Isaiah* (1952; RE67098), *Doctor Ironside's Bible* (1955).
+
+| Work | Published | Renewal due (27th-28th year) | Searched | Result |
+|---|---|---|---|---|
+| Newell, *The Book of the Revelation* | 1935 | 1962-1963 | "newell", "book of the revelation", "revelation" + verse/lectures | no renewal found |
+| Newell, *Romans Verse by Verse* | 1938 | 1965-1966 | "newell", "romans verse by verse", "verse by verse" | no renewal found |
+| Ironside, *Studies in Hebrews and Titus* (Hebrews) | 1932 | 1959-1960 | "ironside", "koppin", "hebrews and titus", "epistle to the hebrews" | no renewal found |
+| Ironside, *Addresses on the First Epistle to the Corinthians* | 1938 | 1965-1966 | "ironside", "koppin", "first epistle to the corinthians" | no renewal found |
+| Ironside, *Addresses on the Second Epistle to the Corinthians* | 1939 | 1966-1967 | as above, "second epistle…" | no renewal found |
+| Ironside, *Expository Messages on the Epistle to the Galatians* | 1940 | 1967-1968 | "ironside", "koppin", "epistle to the galatians" | no renewal found |
+| Ironside, *Addresses on the Epistles of John and Jude* | 1931 | 1958-1959 | "epistles of john" | no renewal found, **but not imported**: the module's text could not be confirmed as the 1931 volume (1 John 5 ends with *Full Assurance*, 1937) |
+| Ironside, *In the Heavenlies* (Ephesians) | 1937 | 1964-1965 | "in the heavenlies" | no renewal found, **not imported**: the module is a modern e-text with added wording ("this sermon was delivered in 1936") |
+| Ironside, *Addresses on the Gospel of John* | 1942 | 1969-1970 | "gospel of john" | no renewal found, **not imported**: partly edited text |
+| Ironside, *Lectures on the Book of Acts* | 1943 | 1970-1971 | "book of acts", "acts of the apostles" | no renewal found, **not imported**: heavily edited ("During World War II"; 21 of 48 sampled phrases in no edition) |
+| Ironside, *Expository Notes on James and Peter* | 1947 | 1974-1975 | "epistle of james", "epistles of peter" | no renewal found, **not imported**: not confirmed against the 1947 text; 2 Peter 3 ends with an essay from *Miscellaneous Papers* |
+| Ironside, Titus (in *Hebrews and Titus*, 1932) | 1932 | 1959-1960 | | **not imported**: the same lectures are reprinted in *Timothy, Titus and Philemon* (1947), renewed 1975 (R609277); which printing the module copied can't be told |
+
+Still excluded because renewed: Ironside's Isaiah, Psalms, Ezekiel, Matthew, Mark, Joshua,
+Thessalonians, Timothy/Titus/Philemon, *The Great Parenthesis*, *The Lamp of Prophecy*; Newell's
+Hebrews.
+
+**Is the module text that volume?** Ironside's four books were checked by sampling 9-word phrases
+from every chapter and running them through archive.org's full-text search, which covers the
+borrow-only scans of the original editions (their text cannot be downloaded): Galatians 13 of
+14 phrases found in the 1940 book, 2 Corinthians 27/31 (1939), 1 Corinthians 33/39 (1938),
+Hebrews 27/36 (1932; 5 phrases found nowhere, so light editing is possible). A word-for-word
+control (Esther) scored 14/17 the same way. This is weaker evidence than the full-text
+comparisons of the first wave. Newell's text was **not** compared with the 1935/1938 editions
+(none is downloadable); it is unverified whether SermonIndex's text is the first edition or a
+later Moody printing (new matter in a later printing, if any, would have its own date).
+
 ## Notes for the study view (UI)
 
 - Read `commentary_sources` for chips (`short_name`), ordering (`sort_order`), `kind`, `coverage`,
@@ -281,8 +358,8 @@ holds (LICENSES.md, top).
   written by the build; tested to match). Under CC BY-SA 4.0 s.3(a)(2) the short line may stand
   in for the full credit if the full one (`attribution`, which also names the license and states
   the changes) is a tap away, e.g. on the info sheet.
-- Default order (`sort_order` 10..110, set by the owner): Scofield, Gill, JFB, Tyndale,
-  Gaebelein, Ironside, Darby, Brooks, Mackintosh, Larkin, Treasury of David. The same order is `DEFAULT_ORDER` in `scripts/commentary_registry.py` (keys) and
+- Default order (`sort_order` 10..120, set by the owner): Scofield, Gill, JFB, Tyndale,
+  Gaebelein, Ironside, Newell, Darby, Brooks, Mackintosh, Larkin, Treasury of David. The same order is `DEFAULT_ORDER` in `scripts/commentary_registry.py` (keys) and
   `frontend/static/js/modules/study.js` (slugs); keep them in step.
 - Which source the view opens on: the one asked for (deep link `?study=`, or the reader's last
   choice) if it has something on the selection, else the first source in the order that does.

@@ -46,6 +46,7 @@ SHIFT_CHECKS = {
     "Treasury of David": ("marker", r"\s*Verses?\s+(\d+)"),
     "Tyndale Study Notes": ("marker", r"\s*\d+:(\d+)"),
     "Scofield Notes (1917)": ("lemma1", r"\s*([A-Za-z][^\n]{2,40})\n"),
+    "Newell Verse by Verse": ("marker", r"\s*Verses?\s+(\d+)"),
 }
 WORD = re.compile(r"[a-z]+")
 
