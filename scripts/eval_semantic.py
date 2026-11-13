@@ -40,7 +40,15 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 from import_naves import NAVES_BOOK_MAP  # noqa: E402
 
 from backend.search_text import content_terms, fts_or_query, fts_today_query, unit_texts  # noqa: E402
-from backend.semantic import CANDIDATES, Encoder, fetch_model, pack_binary, quantize_int8, rrf  # noqa: E402
+from backend.semantic import (  # noqa: E402
+    CANDIDATES,
+    Encoder,
+    fetch_model,
+    get_spec,
+    pack_binary,
+    quantize_int8,
+    rrf,
+)
 
 DB_PATH = Path(os.environ.get("DATABASE_PATH", PROJECT_ROOT / "data" / "bible.db"))
 QUESTIONS = PROJECT_ROOT / "tests" / "fixtures" / "semantic_questions.json"
@@ -118,15 +126,24 @@ def concept_topics(conn, corpus):
 
 def build_sets(conn, corpus, max_subtopics=400, max_xref=300):
     pos = corpus["pos"]
-    sets = {"questions": [], "naves": [], "subtopics": [], "xref": []}
-    for q in json.loads(QUESTIONS.read_text())["questions"]:
-        rel = set()
-        for r in q["refs"]:
+    sets = {"questions": [], "qpooled": [], "naves": [], "subtopics": [], "xref": []}
+
+    def idx(refs):
+        out = set()
+        for r in refs:
             b, cv = r.rsplit(" ", 1)
             c, v = cv.split(":")
-            rel.add((b, int(c), int(v)))
-        sets["questions"].append({"q": q["q"], "rel": {pos[r] for r in rel if r in pos},
-                                  "split": "test"})
+            if (b, int(c), int(v)) in pos:
+                out.add(pos[(b, int(c), int(v))])
+        return out
+
+    for q in json.loads(QUESTIONS.read_text())["questions"]:
+        orig = idx(q["refs"])
+        # questions: the labels written up front; qpooled: plus pooled judgements
+        sets["questions"].append({"q": q["q"], "rel": orig, "orig": orig, "split": "test",
+                                  "pool": True})
+        sets["qpooled"].append({"q": q["q"], "rel": orig | idx(q.get("pooled_refs", [])),
+                                "orig": orig, "split": "test"})
     subs = []
     for tid, topic, entry in concept_topics(conn, corpus):
         rel = {pos[r] for r in parse_naves_refs(entry) if r in pos}
@@ -202,7 +219,7 @@ def embed_corpus(key, variant, corpus, cache: Path, threads: int):
     if key == "qwen3":
         vecs = ollama_embed(texts, query=False)
     else:
-        spec = CANDIDATES[key]
+        spec = get_spec(key)
         enc = Encoder(spec, fetch_model(spec), threads=threads)
         vecs = enc.embed(texts, batch_size=64)
     print(f"  embedded {len(texts)} {variant} units with {key} in {time.time() - t0:.0f}s",
@@ -219,7 +236,7 @@ def embed_queries(key, queries, threads):
     if key == "qwen3":
         return ollama_embed(queries, query=True)
     if key not in _ENCODERS:
-        spec = CANDIDATES[key]
+        spec = get_spec(key)
         _ENCODERS[key] = Encoder(spec, fetch_model(spec), threads=threads)
     return _ENCODERS[key].embed(queries, is_query=True)
 
@@ -262,6 +279,15 @@ def metrics(ranked, rel):
     out["MRR"] = 0.0 if first is None else 1 / (first + 1)
     out["hit@10"] = 1.0 if first is not None and first < 10 else 0.0
     return out
+
+
+POOL: dict = {}  # question -> set of corpus indices seen in any method's top 10 (--pool)
+
+
+def scored(ranked, it):
+    if it.get("pool"):
+        POOL.setdefault(it["q"], set()).update(ranked[:10])
+    return metrics(ranked, it["rel"])
 
 
 def mean_metrics(rows):
@@ -326,11 +352,11 @@ def run(args):
                     ex = excluded_for(it, corpus)
                     ranked = [i for i in ranked if i not in ex]
                     fts_cache[(method, it["q"])] = ranked
-                    pq.append(metrics(ranked, it["rel"]))
+                    pq.append(scored(ranked, it))
                 record(method, name, split, pq)
 
     # Questions have no dev split: they borrow the settings tuned on Nave's sub-topics dev.
-    order = sorted(want_sets, key=lambda s: s == "questions")
+    order = sorted(want_sets, key=lambda s: s in ("questions", "qpooled"))
     for key in models:
         variants = ("verse",) if args.verse_only else ("verse", "window")
         docs = {v: embed_corpus(key, v, corpus, cache, args.threads) for v in variants}
@@ -351,18 +377,18 @@ def run(args):
             kw = lambda it: fts_cache[("fts_or", it["q"])]  # noqa: E731
             best = {"alpha": 1.0, "hybrid": 1.0, "boost": 1.0}
             if dev and not args.no_tune and not args.verse_only:
-                score_a = {a: np.mean([metrics(ranked_for(it, j, a), it["rel"])["nDCG@10"]
+                score_a = {a: np.mean([scored(ranked_for(it, j, a), it)["nDCG@10"]
                                        for j, it in dev]) for a in (1.0, 0.7, 0.5, 0.3, 0.0)}
                 best["alpha"] = max(score_a, key=score_a.get)
             if dev and not args.no_tune:
                 for kind in ("hybrid", "boost"):
-                    score_w = {w: np.mean([metrics(fuse(kind, ranked_for(it, j, best["alpha"]),
-                                                        kw(it), w), it["rel"])["nDCG@10"]
+                    score_w = {w: np.mean([scored(fuse(kind, ranked_for(it, j, best["alpha"]),
+                                                        kw(it), w), it)["nDCG@10"]
                                            for j, it in dev]) for w in (0.25, 0.5, 1.0, 2.0)}
                     best[kind] = max(score_w, key=score_w.get)
                 tuned[name] = dict(best)
                 print(f"  tuned on {name} dev: {best}", flush=True)
-            elif name == "questions":
+            elif name in ("questions", "qpooled"):
                 best = tuned.get("subtopics", best)
             for split in ("dev", "test"):
                 items = [(j, it) for j, it in enumerate(all_items) if it["split"] == split]
@@ -371,19 +397,19 @@ def run(args):
                 for label, alpha in (("verse", 1.0), ("mix", best["alpha"])):
                     if label == "mix" and alpha == 1.0:
                         continue
-                    pq = [metrics(ranked_for(it, j, alpha), it["rel"]) for j, it in items]
+                    pq = [scored(ranked_for(it, j, alpha), it) for j, it in items]
                     record(f"vec:{key}:{label}", name, split, pq, {"alpha": alpha})
                 for kind in ("hybrid", "boost"):
-                    pq = [metrics(fuse(kind, ranked_for(it, j, best["alpha"]), kw(it), best[kind]),
-                                  it["rel"]) for j, it in items]
+                    pq = [scored(fuse(kind, ranked_for(it, j, best["alpha"]), kw(it), best[kind]),
+                                 it) for j, it in items]
                     record(f"{kind}:{key}", name, split, pq,
                            {"alpha": best["alpha"], "w": best[kind]})
                 # auto: rule fixed before looking at test results (no tuning of the cut):
                 # <= 2 content words -> hybrid (keyword-like query), else meaning only.
-                pq = [metrics(fuse("hybrid", ranked_for(it, j, best["alpha"]), kw(it),
+                pq = [scored(fuse("hybrid", ranked_for(it, j, best["alpha"]), kw(it),
                                    best["hybrid"])
                               if len(content_terms(it["q"])) <= AUTO_MAX_TERMS
-                              else ranked_for(it, j, best["alpha"]), it["rel"])
+                              else ranked_for(it, j, best["alpha"]), it)
                       for j, it in items]
                 record(f"auto:{key}", name, split, pq, {"alpha": best["alpha"],
                                                          "w": best["hybrid"]})
@@ -392,6 +418,8 @@ def run(args):
         if args.quant and key != "qwen3":
             quant_report(key, docs, sets, want_sets, corpus, args, record)
 
+    if args.pool:
+        write_pool(Path(args.pool), sets, corpus)
     if args.out:
         Path(args.out).write_text(json.dumps(results, indent=1))
         print(f"wrote {args.out}")
@@ -428,7 +456,7 @@ def notes_report(key, conn, docs, sets, order, corpus, cache, args, record, tune
         if key == "qwen3":
             nv = ollama_embed(texts, query=False)
         else:
-            spec = CANDIDATES[key]
+            spec = get_spec(key)
             nv = Encoder(spec, fetch_model(spec), threads=args.threads).embed(texts, batch_size=64)
         print(f"  embedded {len(texts)} Tyndale notes with {key} in {time.time() - t0:.0f}s")
         np.save(path, nv.astype(np.float32))
@@ -452,7 +480,7 @@ def notes_report(key, conn, docs, sets, order, corpus, cache, args, record, tune
 
         dev = [(j, it) for j, it in enumerate(items) if it["split"] == "dev"]
         if dev:
-            sc = {g: np.mean([metrics(ranked(j, it, g), it["rel"])["nDCG@10"] for j, it in dev])
+            sc = {g: np.mean([scored(ranked(j, it, g), it)["nDCG@10"] for j, it in dev])
                   for g in (0.0, 0.25, 0.5, 1.0)}
             gamma = max(sc, key=sc.get)
             tuned.setdefault("notes", {})[name] = gamma
@@ -460,7 +488,7 @@ def notes_report(key, conn, docs, sets, order, corpus, cache, args, record, tune
             gamma = tuned.get("notes", {}).get("subtopics", 0.5)
         test = [(j, it) for j, it in enumerate(items) if it["split"] == "test"]
         record(f"vec+notes:{key}", name, "test",
-               [metrics(ranked(j, it, gamma), it["rel"]) for j, it in test], {"gamma": gamma})
+               [scored(ranked(j, it, gamma), it) for j, it in test], {"gamma": gamma})
 
 
 def quant_report(key, docs, sets, want_sets, corpus, args, record):
@@ -506,9 +534,22 @@ def show_examples(conn, corpus, sets, key, docs, args):
             print(f"   {mark} {b} {c}:{v}  {corpus['texts'][i][:90]}")
 
 
+def write_pool(path: Path, sets, corpus):
+    """Unjudged pooled candidates per question: union of every method's top 10, minus the
+    verses already listed, in canonical order (no method attribution, for blind judging)."""
+    out = []
+    for it in sets["questions"]:
+        cand = sorted(POOL.get(it["q"], set()) - it["orig"])
+        out.append({"q": it["q"], "candidates": [
+            {"ref": "%s %d:%d" % corpus["refs"][i], "text": corpus["texts"][i]} for i in cand]})
+    path.write_text(json.dumps(out, indent=1, ensure_ascii=False))
+    print(f"pool: {sum(len(x['candidates']) for x in out)} unjudged candidates -> {path}")
+
+
 def markdown_table(results: dict, split: str = "test") -> str:
     """One row per method, nDCG@10 / hit@10 per query set (test split)."""
-    sets = [s for s in ("questions", "naves", "subtopics", "xref") if s in results["sets"]]
+    sets = [s for s in ("questions", "qpooled", "naves", "subtopics", "xref")
+            if s in results["sets"]]
     rows: dict = {}
     for r in results["rows"]:
         if r["split"] == split:
@@ -525,7 +566,7 @@ def markdown_table(results: dict, split: str = "test") -> str:
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     p.add_argument("--models", default="bge-small", help="comma list, 'all', or include qwen3")
-    p.add_argument("--sets", default="questions,naves,subtopics,xref")
+    p.add_argument("--sets", default="questions,qpooled,naves,subtopics,xref")
     p.add_argument("--cache", default=str(PROJECT_ROOT / "data" / "sources" / "semantic-eval"))
     p.add_argument("--threads", type=int, default=3)
     p.add_argument("--quant", action="store_true", help="also score int8/binary storage")
@@ -538,6 +579,7 @@ def main():
     p.add_argument("--hybrid-weight", type=float, default=1.0)
     p.add_argument("--examples", action="store_true", help="print top 5 per question")
     p.add_argument("--out")
+    p.add_argument("--pool", help="write unjudged pooled candidates for the questions set")
     p.add_argument("--table", help="print the markdown table for an existing --out JSON")
     args = p.parse_args()
     if args.table:
