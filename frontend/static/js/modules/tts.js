@@ -189,6 +189,7 @@ window.BibleModules.tts = {
             // Refresh offline stats when opening settings
             if (tab === 'offline') {
                 this.updateOfflineStats();
+                this.loadOfflineCommentarySources();
             }
         },
 };

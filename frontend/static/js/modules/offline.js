@@ -148,8 +148,7 @@ window.BibleModules.offline = {
             const t = this.downloadSelections.translations;
             return t.BSB || t.WEB || t.KJV ||
                    this.downloadSelections.lexicon ||
-                   this.downloadSelections.commentaryMH ||
-                   this.downloadSelections.commentaryJG ||
+                   this.selectedOfflineCommentary().length > 0 ||
                    this.downloadSelections.crossRefs ||
                    this.downloadSelections.devotionalSpurgeon;
         },
@@ -171,8 +170,8 @@ window.BibleModules.offline = {
             if (t.WEB) tasks.push({ type: 'translation', name: 'WEB' });
             if (t.KJV) tasks.push({ type: 'translation', name: 'KJV' });
             if (this.downloadSelections.lexicon) tasks.push({ type: 'lexicon' });
-            if (this.downloadSelections.commentaryMH) tasks.push({ type: 'commentary', source: 'Matthew Henry' });
-            if (this.downloadSelections.commentaryJG) tasks.push({ type: 'commentary', source: 'John Gill' });
+            const commentary = this.selectedOfflineCommentary();
+            if (commentary.length) tasks.push({ type: 'commentary', sources: commentary });
             if (this.downloadSelections.crossRefs) tasks.push({ type: 'crossRefs' });
             if (this.downloadSelections.devotionalSpurgeon) tasks.push({ type: 'devotional', source: 'Spurgeon' });
 
@@ -188,7 +187,7 @@ window.BibleModules.offline = {
                         this.downloadProgress.status = 'Fetching Hebrew & Greek definitions';
                         await this.downloadLexicon();
                     } else if (task.type === 'commentary') {
-                        await this.downloadAllCommentary(basePercent, tasks.length, task.source);
+                        await this.downloadAllCommentary(basePercent, tasks.length, task.sources);
                     } else if (task.type === 'crossRefs') {
                         await this.downloadAllCrossRefs(basePercent, tasks.length);
                     } else if (task.type === 'devotional') {
@@ -206,8 +205,7 @@ window.BibleModules.offline = {
                 // Reset selections
                 this.downloadSelections.translations = { BSB: false, WEB: false, KJV: false };
                 this.downloadSelections.lexicon = false;
-                this.downloadSelections.commentaryMH = false;
-                this.downloadSelections.commentaryJG = false;
+                this.downloadSelections.commentary = {};
                 this.downloadSelections.crossRefs = false;
                 this.downloadSelections.devotionalSpurgeon = false;
 
@@ -255,7 +253,8 @@ window.BibleModules.offline = {
 
                     try {
                         const response = await this._fetchRetry(
-                            `/api/offline/chapter?book=${encodeURIComponent(book)}&chapter=${ch}&translation=${translation}`
+                            // sources= (empty): no commentary, which is downloaded per source below
+                            `/api/offline/chapter?book=${encodeURIComponent(book)}&chapter=${ch}&translation=${translation}&sources=`
                         );
                         if (response.ok) {
                             const data = await response.json();
@@ -286,9 +285,32 @@ window.BibleModules.offline = {
             }
         },
 
-        // Download all commentary (optionally filtered by source)
-        async downloadAllCommentary(basePercent, totalTasks, source = null) {
-            this.downloadProgress.label = `Downloading ${source || 'commentary'}...`;
+        // Commentary sources for the Settings list, with download sizes (cached per session)
+        async loadOfflineCommentarySources() {
+            if (this.offlineCommentarySources.length || this._loadingOfflineSources) return;
+            this._loadingOfflineSources = true;
+            try {
+                const r = await fetch('/api/offline/commentary/sources');
+                if (!r.ok) return;
+                const { sources } = await r.json();
+                this.offlineCommentarySources = sources;
+                // A small default set, unless the reader already chose
+                if (!Object.keys(this.downloadSelections.commentary).length) {
+                    for (const s of sources) if (s.default) this.downloadSelections.commentary[s.slug] = true;
+                }
+            } catch { /* offline: the list stays empty */ } finally {
+                this._loadingOfflineSources = false;
+            }
+        },
+
+        selectedOfflineCommentary() {
+            return Object.entries(this.downloadSelections.commentary || {}).filter(([, on]) => on).map(([slug]) => slug);
+        },
+
+        // Download commentary for the chosen sources (slugs), one request per book
+        async downloadAllCommentary(basePercent, totalTasks, sources = []) {
+            const names = sources.map(sl => this.offlineCommentarySources.find(s => s.slug === sl)?.short_name || sl);
+            this.downloadProgress.label = `Downloading ${names.join(', ') || 'commentary'}...`;
             const books = Object.keys(BOOK_CHAPTERS);
             let booksDownloaded = 0;
 
@@ -296,14 +318,14 @@ window.BibleModules.offline = {
                 this.downloadProgress.status = book;
 
                 try {
-                    const response = await this._fetchRetry(`/api/offline/commentary?book=${encodeURIComponent(book)}`);
+                    const response = await this._fetchRetry(`/api/offline/commentary?book=${encodeURIComponent(book)}&sources=${encodeURIComponent(sources.join(','))}`);
                     if (response.ok) {
                         const data = await response.json();
                         if (window.offlineStorage && data.entries?.length > 0) {
-                            // Filter by source if specified
-                            const entries = source
-                                ? data.entries.filter(e => e.source === source)
-                                : data.entries;
+                            // The server filtered to the chosen sources. Current data has real
+                            // end verses: store them as the effective range (no inference offline).
+                            const entries = data.entries.map(e => e.reference_end != null
+                                ? { ...e, range_start: e.reference_start, range_end: e.reference_end } : e);
                             // Group entries by chapter for efficient saving
                             const byChapter = {};
                             for (const entry of entries) {

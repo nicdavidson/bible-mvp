@@ -13,6 +13,35 @@ from ..core import (OT_BOOKS, NT_BOOKS, CANONICAL_BOOKS, limiter,
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Small default for "download commentary for offline": brief, broad, modern + classic
+DEFAULT_OFFLINE_SOURCES = ("tyndale-study-notes", "jamieson-fausset-brown")
+
+SOURCES_HELP = ("Comma-separated commentary sources (name or slug). Omitted: every source "
+                "(old behaviour). Empty: no commentary.")
+
+
+def _resolve_sources(conn, sources: Optional[str]) -> Optional[list]:
+    """None = all sources; [] = none; else the matching canonical source names."""
+    if sources is None:
+        return None
+    from .study import load_sources  # local import: study imports nothing from here
+    wanted = {w.strip() for w in sources.split(",") if w.strip()}
+    if not wanted:
+        return []
+    known = load_sources(conn)
+    return [m["source"] for m in known if m["source"] in wanted or m["slug"] in wanted]
+
+
+def _source_clause(names: Optional[list]) -> tuple[str, tuple]:
+    if names is None:
+        return "", ()
+    if not names:
+        return " AND 0", ()
+    return f" AND source IN ({','.join('?' * len(names))})", tuple(names)
+
+
+_sizes_cache: dict = {"key": None, "rows": None}
+
 # ========== OFFLINE DATA EXPORT ENDPOINTS ==========
 
 @router.get("/api/offline/chapter")
@@ -21,7 +50,8 @@ def get_chapter_offline_data(
     request: Request,
     book: str,
     chapter: int,
-    translation: str = Query(default="BSB")
+    translation: str = Query(default="BSB"),
+    sources: Optional[str] = Query(default=None, max_length=1000, description=SOURCES_HELP),
 ):
     """
     Get all data needed for offline access to a chapter.
@@ -75,13 +105,14 @@ def get_chapter_offline_data(
         """, (book, chapter))
         cross_refs = [dict(c) for c in cursor.fetchall()]
 
-        # Get commentary
-        cursor = conn.execute("""
+        # Get commentary (only the requested sources: all of them is ~190 KB a chapter)
+        clause, params = _source_clause(_resolve_sources(conn, sources))
+        cursor = conn.execute(f"""
             SELECT source, reference_start, reference_end, content
             FROM commentary_entries
-            WHERE book = ? AND chapter = ?
-            ORDER BY reference_start
-        """, (book, chapter))
+            WHERE book = ? AND chapter = ?{clause}
+            ORDER BY reference_start, reference_end
+        """, (book, chapter, *params))
         commentary = [dict(c) for c in cursor.fetchall()]
 
         return {
@@ -125,7 +156,8 @@ def get_book_offline_data(
     include_alignments: bool = Query(default=True),
     include_interlinear: bool = Query(default=True),
     include_crossrefs: bool = Query(default=True),
-    include_commentary: bool = Query(default=True)
+    include_commentary: bool = Query(default=True),
+    sources: Optional[str] = Query(default=None, max_length=1000, description=SOURCES_HELP),
 ):
     """
     Get all data for an entire book for offline use.
@@ -200,11 +232,12 @@ def get_book_offline_data(
 
         commentary_by_ch = {}
         if include_commentary:
-            cursor = conn.execute("""
+            clause, params = _source_clause(_resolve_sources(conn, sources))
+            cursor = conn.execute(f"""
                 SELECT chapter, source, reference_start, reference_end, content
                 FROM commentary_entries
-                WHERE book = ?
-            """, (book,))
+                WHERE book = ?{clause}
+            """, (book, *params))
             commentary_by_ch = _group_by_chapter(cursor, "chapter")
 
         for chapter in chapters:
@@ -226,18 +259,60 @@ def get_book_offline_data(
 
 @router.get("/api/offline/commentary")
 @limiter.limit("30/minute")
-def get_commentary_offline_data(request: Request, book: str):
-    """Get all commentary entries for a book for offline use."""
+def get_commentary_offline_data(
+    request: Request,
+    book: str,
+    sources: Optional[str] = Query(default=None, max_length=1000, description=SOURCES_HELP),
+):
+    """Commentary entries for a book for offline use, optionally for chosen sources only."""
     conn = get_db_connection()
     try:
-        cursor = conn.execute("""
+        clause, params = _source_clause(_resolve_sources(conn, sources))
+        cursor = conn.execute(f"""
             SELECT book, chapter, source, reference_start, reference_end, content
             FROM commentary_entries
-            WHERE book = ?
-            ORDER BY chapter, reference_start
-        """, (book,))
+            WHERE book = ?{clause}
+            ORDER BY chapter, reference_start, reference_end
+        """, (book, *params))
         entries = [dict(row) for row in cursor.fetchall()]
         return {"book": book, "entries": entries}
+    finally:
+        conn.close()
+
+
+@router.get("/api/offline/commentary/sources")
+@limiter.limit("30/minute")
+def get_commentary_offline_sources(request: Request):
+    """Each source with its full-download size, for the Settings offline list.
+
+    `bytes` is the uncompressed text size of every entry (JSON adds a little;
+    gzip on the wire is roughly a third). Computed once per DB file and cached:
+    the first call reads every entry (a few seconds on a cold disk).
+    """
+    from .study import load_sources
+    conn = get_db_connection()
+    try:
+        try:
+            st = DATABASE_PATH.stat()
+            key = (st.st_mtime_ns, st.st_size)
+        except OSError:
+            key = None
+        if key is None or _sizes_cache["key"] != key:
+            sizes = {r["source"]: (r["bytes"], r["books"]) for r in conn.execute(
+                "SELECT source, SUM(LENGTH(content)) AS bytes, COUNT(DISTINCT book) AS books "
+                "FROM commentary_entries GROUP BY source")}
+            _sizes_cache.update(key=key, rows=sizes)
+        sizes = _sizes_cache["rows"]
+        out = []
+        for m in load_sources(conn):
+            b, books = sizes.get(m["source"], (0, 0))
+            out.append({
+                "source": m["source"], "slug": m["slug"], "short_name": m["short_name"],
+                "kind": m["kind"], "coverage": m["coverage"], "entries": m["entry_count"],
+                "books": books, "bytes": b or 0,
+                "default": m["slug"] in DEFAULT_OFFLINE_SOURCES,
+            })
+        return {"sources": out}
     finally:
         conn.close()
 

@@ -49,6 +49,18 @@ def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "source"
 
 
+def requires_attribution(license_text) -> bool:
+    """True when the license obliges us to credit the source wherever its text is shown.
+
+    Public domain and CC0 do not; CC BY / BY-SA / anything else unrecognised does
+    (fail safe: an unknown license keeps its credit visible).
+    """
+    if not license_text:
+        return False
+    lic = str(license_text).strip().lower()
+    return not (lic.startswith("public domain") or lic in ("pd", "cc0", "cc0 1.0") or lic.startswith("cc0"))
+
+
 def _table_exists(conn, name: str) -> bool:
     row = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
     return row is not None
@@ -104,6 +116,7 @@ def load_sources(conn) -> list[dict]:
             "sort_order": meta.get("sort_order") if isinstance(meta.get("sort_order"), int) else 1000,
             "description": meta.get("description"),
             "entry_count": n,
+            "requires_attribution": requires_attribution(meta.get("license")),
         })
     sources.sort(key=lambda s: (s["sort_order"], s["source"].lower()))
     with _cache_lock:
@@ -114,8 +127,8 @@ def load_sources(conn) -> list[dict]:
 def effective_ranges(rows: list[dict], kind: str, last_verse: int) -> list[tuple[int, int]]:
     """Effective (start, end) for one source's entries in one chapter, in row order.
 
-    rows must be sorted by reference_start. A passage entry stored with only a start
-    verse runs until the next entry of the same source begins (or the chapter ends).
+    rows must be sorted by reference_start. A passage entry stored with no end verse
+    runs until the next entry of the same source begins (or the chapter ends).
     """
     starts = [r["reference_start"] or 1 for r in rows]
     out = []
@@ -126,7 +139,8 @@ def effective_ranges(rows: list[dict], kind: str, last_verse: int) -> list[tuple
             out.append((1, max(last_verse, start)))
         elif end is not None and end > start:
             out.append((start, end))
-        elif kind == "passage":
+        elif kind == "passage" and end is None:
+            # Old imports stored passage rows with a start verse only
             nxt = next((s for s in starts[i + 1:] if s > start), None)
             out.append((start, nxt - 1 if nxt else max(last_verse, start)))
         else:
@@ -248,7 +262,8 @@ def get_commentary(reference: str, source: str | None = Query(default=None, max_
             for item, (s, e) in zip(items, effective_ranges(items, kind, last)):
                 if s <= ve and e >= vs:
                     entries.append({**item, "range_start": s, "range_end": e})
-        entries.sort(key=lambda x: (x["range_start"], x["source"]))
+        # Several rows of one source can overlap (overview + verse notes): start, then shortest
+        entries.sort(key=lambda x: (x["range_start"], x["range_end"] - x["range_start"], x["source"]))
         return {"reference": reference, "entries": entries}
     finally:
         conn.close()
