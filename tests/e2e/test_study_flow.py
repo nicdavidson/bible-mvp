@@ -9,6 +9,8 @@ Skips when Playwright or its browser is not installed.
 """
 import pytest
 
+from tests.e2e.conftest import skip_tour
+
 pytest.importorskip("playwright.sync_api")
 
 
@@ -105,6 +107,7 @@ def test_deep_link_opens_same_view_and_escape_closes(server, page):
 def test_offline_study_from_cache(server, browser):
     """A chapter studied once online opens offline from IndexedDB."""
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
+    skip_tour(ctx)
     pg = ctx.new_page()
     pg.goto(f"{server}/John/3/16?study=john-gill")
     pg.wait_for_selector("#study-view[open] .study-pane-body p")
@@ -234,6 +237,7 @@ def test_verses_shown_on_open(server, page, path, slug):
 def test_old_format_offline_chapter_still_opens(server, browser):
     """Item 7: commentary saved by the previous app version (old keys, start-only Henry rows)."""
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
+    skip_tour(ctx)
     pg = ctx.new_page()
     pg.goto(f"{server}/John/3")
     pg.wait_for_selector("#verse-16")

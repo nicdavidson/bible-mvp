@@ -62,10 +62,22 @@ def browser():
         b.close()
 
 
-def new_page(browser, width=390, height=844, touch=True):
-    """A fresh context (empty storage) at the given size. Returns (context, page, errors)."""
+# The first-run walkthrough (modules/tour.js) starts on a fresh device's first plain load
+# and covers the page. Flows that aren't about it start as a device that has seen it.
+SEEN_TOUR = "try { localStorage.setItem('tourDone', '1') } catch (e) {}"
+
+
+def skip_tour(ctx):
+    ctx.add_init_script(SEEN_TOUR)
+
+
+def new_page(browser, width=390, height=844, touch=True, tour=False):
+    """A fresh context (empty storage, except that the walkthrough counts as seen unless
+    tour=True) at the given size. Returns (context, page, errors)."""
     ctx = browser.new_context(viewport={"width": width, "height": height}, has_touch=touch,
                               is_mobile=touch, service_workers="block")
+    if not tour:
+        skip_tour(ctx)
     pg = ctx.new_page()
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))
