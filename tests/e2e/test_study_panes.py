@@ -188,7 +188,8 @@ def test_saved_source_order_and_hidden_sources_still_respected(server, phone):
     slugs = [c.get_attribute("data-slug") for c in phone.locator(".study-chip:not(.is-empty)").all()]
     assert slugs[0] == "john-gill" and "matthew-henry" not in slugs
     panes = [p.get_attribute("data-slug") for p in phone.locator(".study-track > .study-pane").all()]
-    assert panes[0] == "john-gill" and panes[-2:] == ["cross-references", "notes"]
+    # The tools follow the sources (Hymns only shows where there are hymns: modules/hymns.js)
+    assert panes[0] == "john-gill" and panes[-3:] == ["cross-references", "hymns", "notes"]
     # The tools aren't sources: not in Your sources, never remembered as the last source
     phone.tap('.study-tool[data-slug="cross-references"]')
     phone.wait_for_function("Alpine.$data(document.body).study.active === 'cross-references'")

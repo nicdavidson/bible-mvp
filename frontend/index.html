@@ -2610,7 +2610,7 @@
                     </button>
                 </div>
                 <!-- Pinned at the thumb end: Scripture's own links and the reader's notes (modules/study_panes.js) -->
-                <div class="study-tools" role="group" aria-label="Cross-references and your notes">
+                <div class="study-tools" role="group" aria-label="Cross-references, hymns and your notes">
                     <button type="button" class="study-tool" data-slug="cross-references" :aria-pressed="study.active === 'cross-references' ? 'true' : 'false'"
                             @click="studySelect('cross-references')"
                             :aria-label="'Cross-references' + (studyXrefCount() !== null ? ': ' + studyXrefCount() : '')">
@@ -2619,6 +2619,14 @@
                             <span class="study-tool-count" x-text="studyXrefCount() ?? ''"></span>
                         </span>
                         <span class="study-tool-label">Cross-refs</span>
+                    </button>
+                    <button type="button" class="study-tool" data-slug="hymns" x-show="studyHymnsShown()" :aria-pressed="study.active === 'hymns' ? 'true' : 'false'"
+                            @click="studySelect('hymns')" :aria-label="studyHymnsLabel()">
+                        <span class="study-tool-top">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>
+                            <span class="study-tool-count" x-text="studyHymnCount() || ''"></span>
+                        </span>
+                        <span class="study-tool-label">Hymns</span>
                     </button>
                     <button type="button" class="study-tool" data-slug="notes" :aria-pressed="study.active === 'notes' ? 'true' : 'false'"
                             @click="studySelect('notes')" :aria-label="'Your notes' + (studyNoteCount() ? ': ' + studyNoteCount() : '')">
@@ -2731,6 +2739,57 @@
                             <button type="button" class="study-text-btn" @click="studyXref.key = null; studyLoadXrefs()">Try again</button>
                         </div>
                         <p class="study-attribution" x-show="studyXref.status === 'ready' && studyXref.items.length" x-text="studyXref.credit"></p>
+                    </div>
+                </section>
+
+                <!-- Hymns built on these verses, then on the rest of the chapter (modules/hymns.js) -->
+                <section class="study-pane study-pane-tool" data-slug="hymns" aria-labelledby="hymns-title"
+                         x-show="!study.loading && !study.error && studyHymnsShown()" :class="{ 'is-active': study.active === 'hymns' }">
+                    <div class="study-pane-scroll" tabindex="0" @scroll.passive="studyPaneScrolled($event)">
+                        <div class="study-pane-head">
+                            <h3 class="study-tool-title" id="hymns-title">Hymns</h3>
+                            <p class="study-tool-sub">
+                                <span x-show="studyHymns.passage.length" x-text="(studyHymns.passage.length === 1 ? 'One hymn' : studyHymns.passage.length + ' hymns') + ' linked to ' + studyRefLabel() + ' by a hymnal, a psalter, or a quotation.'"></span>
+                                <span x-show="!studyHymns.passage.length">None linked to <span x-text="studyRefLabel()"></span> itself, but some to other verses of <span x-text="study.book + ' ' + study.chapter"></span>.</span>
+                                From older public-domain hymnals and psalters, so not a complete list: most hymns and songs written after about 1930 aren't here.
+                            </p>
+                        </div>
+                        <div class="xref-body hymn-body">
+                        <template x-for="grp in [{ key: 'passage', items: studyHymns.passage }, { key: 'chapter', items: studyHymns.chapter }]" :key="'hg-' + grp.key">
+                            <section class="hymn-group" x-show="grp.items.length">
+                                <h4 class="study-entry-range" x-show="grp.key === 'chapter'" x-text="'On other verses of ' + study.book + ' ' + study.chapter"></h4>
+                                <ol class="hymn-list">
+                                    <template x-for="h in grp.items" :key="'h-' + h.id">
+                                        <li>
+                                            <button type="button" class="hymn-item" @click="hymnOpen(h)" :aria-label="hymnHead(h).head + '. Open the hymn'">
+                                                <span class="hymn-title" x-text="hymnHead(h).head"></span>
+                                                <span class="hymn-sub" x-show="hymnHead(h).sub" x-text="hymnHead(h).sub"></span>
+                                                <span class="hymn-first" x-show="hymnFirstLine(h)" x-text="hymnFirstLine(h)"></span>
+                                                <span class="hymn-who" x-show="hymnWho(h)" x-text="hymnWho(h)"></span>
+                                                <span class="hymn-tune" x-show="hymnTune(h)" x-text="hymnTune(h)"></span>
+                                                <template x-if="hymnLinkOf(h)">
+                                                    <span class="hymn-why" :class="{ 'is-computed': hymnWhy(hymnLinkOf(h)).computed }">
+                                                        <span class="ws-computed" x-show="hymnWhy(hymnLinkOf(h)).computed">Computed</span>
+                                                        <span x-text="hymnWhy(hymnLinkOf(h)).text"></span><template x-if="hymnWhy(hymnLinkOf(h)).evidence"><span>: <q class="hymn-evidence" x-text="hymnWhy(hymnLinkOf(h)).evidence"></q></span></template>
+                                                    </span>
+                                                </template>
+                                                <template x-if="hymnComputedLink(h)">
+                                                    <span class="hymn-why is-computed">
+                                                        <span class="ws-computed">Computed</span>
+                                                        <span x-text="hymnWhy(hymnComputedLink(h)).text"></span>: <q class="hymn-evidence" x-text="hymnComputedLink(h).evidence"></q>
+                                                    </span>
+                                                </template>
+                                            </button>
+                                        </li>
+                                    </template>
+                                </ol>
+                            </section>
+                        </template>
+                        </div>
+                        <div class="study-attribution hymn-credits">
+                            <p>A computed quotation is a run of at least six words this hymn shares with one KJV verse, found by matching the texts.</p>
+                            <p>Sources: <template x-for="(s, si) in hymnSourcesShown()" :key="'hs-' + s.key"><span><span x-text="s.name"></span><span x-show="s.attribution" x-text="' (credit: ' + s.attribution + ')'"></span><span x-text="si < hymnSourcesShown().length - 1 ? '; ' : '.'"></span></span></template></p>
+                        </div>
                     </div>
                 </section>
 
@@ -2865,6 +2924,47 @@
                         <button type="button" class="study-primary-btn" @click="studyPeekStudy()">Study <span x-text="study.peek.ref"></span></button>
                         <button type="button" class="study-text-btn" @click="studyPeekRead()">Read the chapter</button>
                     </div>
+                </div>
+            </template>
+        </dialog>
+
+        <!-- One hymn: what is known about it and every passage it is linked to (modules/hymns.js) -->
+        <dialog id="study-hymn" class="study-sheet" aria-labelledby="study-hymn-title" @close="hymnSheet = null" @click.self="hymnClose()">
+            <template x-if="hymnSheet">
+                <div class="study-sheet-inner hymn-sheet">
+                    <div class="study-sheet-head">
+                        <h3 id="study-hymn-title" x-text="hymnHead(hymnSheet.data).head"></h3>
+                        <button type="button" class="study-icon-btn" @click="hymnClose()" aria-label="Close">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <p class="hymn-sub" x-show="hymnHead(hymnSheet.data).sub" x-text="hymnHead(hymnSheet.data).sub"></p>
+                    <p class="hymn-first" x-show="hymnFirstLine(hymnSheet.data)" x-text="hymnFirstLine(hymnSheet.data)"></p>
+                    <dl class="study-info-facts hymn-facts">
+                        <template x-if="hymnWho(hymnSheet.data)"><div><dt>Words</dt><dd x-text="hymnWho(hymnSheet.data)"></dd></div></template>
+                        <template x-if="hymnSheet.data.tune"><div><dt>Tune</dt><dd x-text="hymnDecode(hymnSheet.data.tune).replace(/`/g, '’') + (hymnSheet.data.composer ? ', ' + hymnDecode(hymnSheet.data.composer).replace(/(\d)-(\d)/g, '$1–$2') : '')"></dd></div></template>
+                        <template x-if="hymnSheet.data.meter"><div><dt>Meter</dt><dd x-text="hymnSheet.data.meter"></dd></div></template>
+                        <template x-if="hymnSheet.data.copyright"><div><dt>Copyright</dt><dd x-text="hymnSheet.data.words_public_domain ? 'Words in the public domain' : hymnDecode(hymnSheet.data.copyright)"></dd></div></template>
+                    </dl>
+                    <h4 class="hymn-sheet-h">Scripture it is linked to</h4>
+                    <div x-show="hymnSheet.status === 'loading'" class="study-pane-state"><div class="loading-spinner"></div></div>
+                    <p class="study-peek-error" x-show="hymnSheet.status === 'error'" x-text="hymnSheet.error"></p>
+                    <ul class="hymn-passages">
+                        <template x-for="p in hymnPassages()" :key="'hp-' + p.label">
+                            <li>
+                                <button type="button" class="hymn-passage" @click="hymnStudyPassage(p)" :aria-label="'Study ' + p.label">
+                                    <span class="hymn-passage-ref" x-text="'Study ' + p.label"></span>
+                                    <template x-for="(w, wi) in p.whys" :key="'hw' + wi">
+                                        <span class="hymn-why" :class="{ 'is-computed': w.computed }"><span class="ws-computed" x-show="w.computed">Computed</span> <span x-text="w.text"></span><template x-if="w.evidence"><span>: <q class="hymn-evidence" x-text="w.evidence"></q></span></template></span>
+                                    </template>
+                                </button>
+                            </li>
+                        </template>
+                    </ul>
+                    <template x-if="(hymnSheet.data.other_settings || []).length">
+                        <p class="hymn-also">Also in <span x-text="hymnSheet.data.other_settings.map(o => hymnSourceShort(o.source) + (o.tune ? ' (tune ' + hymnDecode(o.tune) + ')' : '')).join('; ')"></span>.</p>
+                    </template>
+                    <p class="study-attribution">Sources: <template x-for="(s, si) in hymnSheetSources()" :key="'hss-' + s.key"><span><span x-text="s.name"></span><span x-show="s.attribution" x-text="' (credit: ' + s.attribution + ')'"></span><span x-text="si < hymnSheetSources().length - 1 ? '; ' : '.'"></span></span></template></p>
                 </div>
             </template>
         </dialog>
@@ -3041,6 +3141,7 @@
     <script src="/static/js/modules/study_extras.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study_panes.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/hymns.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/wordstudy.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/nav.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/wordlink.js?v=__SW_VERSION__"></script>

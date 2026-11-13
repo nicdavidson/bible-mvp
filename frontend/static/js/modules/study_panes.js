@@ -1,4 +1,4 @@
-// bibleApp feature module: study_panes — the study view's two non-commentary panes.
+// bibleApp feature module: study_panes — the study view's non-commentary panes.
 // Merged via Object.assign in app.js. Markup: the last two .study-pane sections and the
 // .study-tools buttons in <dialog id="study-view"> (index.html); styles in css/study.css.
 //
@@ -10,6 +10,8 @@
 //                     in place, plus notes on overlapping verses, labelled with their verses.
 //                     Stored through noteCreate()/noteUpdateContent() (modules/feedback.js):
 //                     same format, same keys (book, chapter, startVerse, endVerse).
+//   hymns             Hymns linked to the selection, then to the rest of its chapter
+//                     (modules/hymns.js). Only on the track when there are some.
 //
 // The panes sit after the commentary sources on the track (swipe past the last source)
 // and their buttons are pinned at the end of the rail, so they never push commentary
@@ -19,6 +21,7 @@ window.BibleModules = window.BibleModules || {};
 (() => {
     const XREF = 'cross-references';
     const NOTES = 'notes';
+    const HYMNS = 'hymns';
     const FIRST_SINGLE = 6;     // first screen, one verse
     const FIRST_PER_VERSE = 3;  // first screen, per verse of a range
 
@@ -34,10 +37,10 @@ window.BibleModules = window.BibleModules || {};
         studyNote: { editing: null, text: '', saving: false },   // editing: null | 'new' | note id
         studyWriting: false,
 
-        studyToolSlugs() { return [XREF, NOTES]; },
-        studyIsTool(slug) { return slug === XREF || slug === NOTES; },
+        studyToolSlugs() { return [XREF, ...(this.studyHymnsShown() ? [HYMNS] : []), NOTES]; },
+        studyIsTool(slug) { return slug === XREF || slug === NOTES || slug === HYMNS; },
         // Every pane on the track, in swipe order
-        studyPaneOrder() { return [...this.studyTrack().map(s => s.slug), XREF, NOTES]; },
+        studyPaneOrder() { return [...this.studyTrack().map(s => s.slug), ...this.studyToolSlugs()]; },
         studyStepPane(dir) {
             const order = this.studyPaneOrder();
             const i = order.indexOf(this.study.active);
@@ -50,6 +53,7 @@ window.BibleModules = window.BibleModules || {};
             Object.assign(this.studyNote, { editing: null, text: '', saving: false });
             this.studyXref.showAll = false;
             this.studyLoadXrefs();
+            this.studyLoadHymns();
         },
 
         // ---------- cross-references ----------
