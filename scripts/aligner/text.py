@@ -3,48 +3,35 @@
 POSITIONS CONTRACT. `english_word_alignments.english_word_position` is the
 1-based index of a word among the *tappable* words of the verse text, exactly as
 the reader UI numbers them in `formatVerseText()` (frontend/static/js/app.js):
+every match of
 
-    text.split(/\\s+/) and each piece must fully match
-    /^([.,;:!?'"()—]*)([a-zA-Z'-]+)([.,;:!?'"()—]*)$/
+    /[A-Za-zÀ-ÖØ-öø-ÿ]+(?:['’-][A-Za-zÀ-ÖØ-öø-ÿ]+)*/g
 
-Pieces that do not match (for example ones containing a curly quote, a digit
-or a bracket) are not tappable and do not advance the counter. If the UI's
-tokenizer changes, this function must change with it and the alignment build
-must be re-run.
+in the verse text, in order. So "God’s", "bless'd" and "Beth-el" are one word
+each, quotes and dashes around a word do not hide it, and "word—word" is two
+words. If the UI's rule changes, TAPPABLE_WORD_RE must change with it and the
+alignment build must be re-run (tests/test_tokenizer_parity.py runs both sides
+against tests/fixtures/tokenizer_vectors.json).
 """
 import re
 import unicodedata
 
-_PUNCT = r"""[.,;:!?'"()—]*"""
-_TAP_RE = re.compile(rf"^({_PUNCT})([a-zA-Z'-]+)({_PUNCT})$")
-_WS_RE = re.compile(r"\s+")
+TAPPABLE_WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+(?:['’-][A-Za-zÀ-ÖØ-öø-ÿ]+)*")
 
 
 def tappable_words(text: str) -> list[str]:
     """Return the tappable words of a verse, in UI position order (position = index + 1)."""
-    out = []
-    for piece in _WS_RE.split(text):
-        m = _TAP_RE.match(piece)
-        if m:
-            out.append(m.group(2))
-    return out
+    return TAPPABLE_WORD_RE.findall(text)
 
 
 def tappable_spans(text: str) -> list[tuple[str, int, int]]:
     """Like tappable_words but with (word, start, end) character offsets into `text`."""
-    out = []
-    for m in re.finditer(r"\S+", text):
-        piece = m.group(0)
-        t = _TAP_RE.match(piece)
-        if t:
-            start = m.start() + t.start(2)
-            out.append((t.group(2), start, start + len(t.group(2))))
-    return out
+    return [(m.group(0), m.start(), m.end()) for m in TAPPABLE_WORD_RE.finditer(text)]
 
 
 def clean_word(word: str) -> str:
     """Strip characters the UI would not show inside a tappable word (for display rows)."""
-    return "".join(c for c in word if c.isalpha() or c in "'-")
+    return "".join(c for c in word if c.isalpha() or c in "'’-")
 
 
 # --- English normalization ---------------------------------------------------
@@ -152,7 +139,8 @@ def normalize(word: str, vocab=None) -> str:
     `vocab` (a set of lowercase modern words, from BSB/WEB) enables -eth/-est
     stripping for Early Modern English (KJV, YLT, ASV, Darby).
     """
-    w = unicodedata.normalize("NFKD", word).encode("ascii", "ignore").decode().lower()
+    w = word.replace("’", "'")
+    w = unicodedata.normalize("NFKD", w).encode("ascii", "ignore").decode().lower()
     w = w.strip("'-")
     if w.endswith("'s"):
         w = w[:-2]

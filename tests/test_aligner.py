@@ -29,9 +29,9 @@ from import_stepbible_alignment import parse_reference, renumber_split_verses  #
 
 def test_tappable_words_match_ui_rules():
     text = "And God said, “Let there be light,” and there was light."
-    # “Let and light,” contain curly quotes, so the UI does not make them tappable.
-    assert tappable_words(text) == ["And", "God", "said", "there", "be", "and", "there",
-                                    "was", "light"]
+    # Words touching curly quotes are tappable (they were not before 2026-11).
+    assert tappable_words(text) == ["And", "God", "said", "Let", "there", "be", "light",
+                                    "and", "there", "was", "light"]
 
 
 def test_tappable_words_keep_apostrophes_and_hyphens():
