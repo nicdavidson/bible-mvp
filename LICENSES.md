@@ -71,11 +71,13 @@ Full reasoning and the sources that were rejected: [docs/HYMN_INDEX_2026-11.md](
 | Resource | Status | Source | Notes |
 |----------|--------|--------|-------|
 | Open Hymnal Project, edition 2026.11 (metadata, topical and Scripture indexes) | Public Domain | [openhymnal.org](http://openhymnal.org/copying.html) | "All content produced specifically by the Open Hymnal which is not a part of a hymn is placed into the public domain ... compilation, indices ... and all other data files." Hymn words and music have per-hymn terms (`hymns.copyright`); we store a hymn's first line only when its words are public domain (`hymns.words_public_domain`) |
-| Computed hymn-to-KJV quotation links | Public Domain inputs | this project, `scripts/import_hymns.py` | Shared word runs between public-domain hymn words and the KJV |
+| Watts, *Psalms of David Imitated* (1719) and *Hymns and Spiritual Songs* (1707), 1818 printing | Public Domain | Project Gutenberg #13166, #13341 | PG license: with its license and references stripped the text is "unrestricted by U.S. intellectual property law"; only the text is used, nothing of PG's is stored |
+| Tate and Brady, *New Version of the Psalms* (1696) | Public Domain; TCP encoding CC0 1.0 | EEBO-TCP A27952 | CC0 statement in the file's `<availability>` |
+| Scottish Psalter (1650) + Paraphrases (1781); Olney Hymns (1779) | Public Domain works; CCEL site terms | CCEL ThML (`scotpsalter`, `olneyhymns`) | **Facts only** (first line, the printed Scripture reference, author, metre); no text stored. CCEL: "may be used for personal, educational, or non-profit purposes" and claims its markup. `hymn_sources.ENABLE_CCEL = False` removes them |
+| Computed hymn-to-KJV quotation links | Public Domain inputs | this project, `scripts/import_hymns.py` | Shared word runs between public-domain hymn words (Open Hymnal, Project Gutenberg, TCP) and the KJV |
 
 Not used without written permission: Hymnary.org (all rights reserved), the Cyber Hymnal
-(hymntime.com page code copyrighted). CCEL hymnals: not used (non-profit-only wording,
-markup claimed by CCEL).
+(hymntime.com page code copyrighted). CCEL: facts only, as above.
 
 ## Devotionals
 

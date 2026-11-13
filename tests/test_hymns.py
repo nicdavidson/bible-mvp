@@ -177,8 +177,93 @@ def test_hymn_detail_lookup_and_errors(client):
     assert h["title"] == "Amazing Grace" and h["words_public_domain"] is True
     assert any(p["reference"] == "John 9:25" for p in h["passages"])
     found = client.get("/api/hymns", params={"key": "Amazing Grace!"}).json()
-    assert [x["id"] for x in found["hymns"]] == ["oh-219"]
+    assert {x["id"] for x in found["hymns"]} == {"oh-219", "olney-book-1-hymn-41"}
     assert client.get("/api/hymns", params={"q": "wondrous cross"}).json()["total"] >= 3
     assert client.get("/api/hymns/nope").status_code == 404
     assert client.get("/api/hymns/for-passage").status_code == 400
     assert client.get("/api/hymns/for-passage", params={"ref": "Psalm 999"}).status_code == 404
+
+
+# --- psalters and hymnals with their own Scripture structure ---------------------------
+
+import hymn_sources as hs  # noqa: E402
+
+PG_PSALMS = """header
+*** START OF THE PROJECT GUTENBERG EBOOK THE PSALMS OF DAVID ***
+Psalm 90:2. 1-5. First Part. C. M.
+Man frail, and God eternal.
+
+1 Our God, our help in ages past,
+Our hope for years to come,
+
+Psalm 100:1. 1st M. A plain translation.
+Praise to our Creator.
+
+1 Ye nations round the earth, rejoice
+Before the Lord, your sovereign King;
+
+Psalm 148:1. As the 148th Psalm.
+Universal praise.
+
+[1 Ye tribes of Adam, join
+*** END OF THE PROJECT GUTENBERG EBOOK THE PSALMS OF DAVID ***
+"""
+
+PG_HSS = """*** START OF THE PROJECT GUTENBERG EBOOK HYMNS ***
+Hymn 3:7.
+Crucifixion to the world by the cross of Christ, Gal. 6. 14.
+
+1 When I survey the wondrous cross
+On which the Prince of glory died,
+
+Hymn 1:2.
+The deity of Christ, John 1. 1-3 14.
+Col. 9. 16.
+
+1 Ere the blue heavens were stretch'd abroad,
+*** END OF THE PROJECT GUTENBERG EBOOK HYMNS ***
+"""
+
+MV = {("Psalms", 90): 17, ("Psalms", 100): 5, ("Psalms", 148): 14, ("Galatians", 6): 18,
+      ("John", 1): 51, ("Colossians", 1): 29}
+
+
+def test_watts_psalm_headings(tmp_path):
+    f = tmp_path / "p.txt"
+    f.write_text(PG_PSALMS)
+    rows = {r["source_ref"]: r for r in hs.watts_psalms(f, MV)}
+    assert rows["Psalm 90:2"]["first_line"] == "Our God, our help in ages past"
+    assert [x[:4] for x in rows["Psalm 90:2"]["refs"]] == [("Psalms", 90, 1, 5)]
+    # '1st M.' is the metre, not verse 1; 'As the 148th Psalm.' is a tune note
+    assert [x[:4] for x in rows["Psalm 100:1"]["refs"]] == [("Psalms", 100, None, None)]
+    assert rows["Psalm 148:1"]["first_line"] == "Ye tribes of Adam, join"
+
+
+def test_watts_hss_text_headings(tmp_path):
+    from import_hymns import resolve_book
+    f = tmp_path / "h.txt"
+    f.write_text(PG_HSS)
+    rows = {r["source_ref"]: r for r in hs.watts_hss(f, MV, resolve_book)}
+    assert [x[:4] for x in rows["Hymn 3:7"]["refs"]] == [("Galatians", 6, 14, 14)]
+    # 'Col. 9. 16' is a misprint (Colossians has 4 chapters): dropped, not guessed
+    assert [x[:4] for x in rows["Hymn 1:2"]["refs"]] == [("John", 1, 1, 3), ("John", 1, 14, 14)]
+
+
+def test_osis_refs_drop_impossible_verses():
+    mv = {("Isaiah", 33): 24, ("1 Chronicles", 17): 27}
+    get = hs.OSIS_BOOKS.get
+    assert hs._osis_refs("Bible:Isa.33.27-Isa.33.28", get, mv) == []
+    assert hs._osis_refs("Bible:1Chr.17.16-1Chr.17.17", get, mv) == [("1 Chronicles", 17, 16, 17)]
+
+
+@needs_db
+def test_psalm_100_finds_old_hundredth_and_texts_merge(client):
+    d = client.get("/api/hymns/for-passage", params={"ref": "Psalm 100"}).json()
+    old100 = next(h for h in d["hymns"] if h["first_line"] == "All people that on earth do dwell")
+    assert set(old100["sources_for_text"]) == {"ccel-scottish-psalter", "openhymnal"}
+    grace = client.get("/api/hymns/for-passage", params={"ref": "1 Chronicles 17:16"}).json()
+    top = grace["hymns"][0]
+    assert top["links"][0]["kind"] == "based_on" and top["links"][0]["source"] == "ccel-olney"
+    assert {"ccel-olney", "openhymnal"} <= set(top["sources_for_text"])
+    joy = client.get("/api/hymns", params={"key": "Joy to the World"}).json()
+    assert joy["total"] >= 2   # title matches the start of the first line

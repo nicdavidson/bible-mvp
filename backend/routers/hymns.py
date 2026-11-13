@@ -11,11 +11,11 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..core import parse_reference
 from ..database import get_db_connection
-from ..hymn_keys import keys_for, title_key
+from ..hymn_keys import keys_for, keys_match, title_key
 
 router = APIRouter()
 
-KIND_ORDER = {"quotes": 0, "paraphrase": 0, "reference": 1}
+KIND_ORDER = {"quotes": 0, "paraphrase": 0, "based_on": 0, "reference": 1}
 RANKING = ("1) hymns linked to verses inside the passage before hymns linked only elsewhere "
            "in the same chapter; 2) a quotation or a paraphrase before a plain reference; "
            "3) the share of the hymn's linked verses that fall inside the passage; 4) the share "
@@ -35,7 +35,8 @@ def _hymn(row) -> dict:
 def _link(r) -> dict:
     v = "" if r["verse_start"] is None else f":{r['verse_start']}" + (
         f"-{r['verse_end']}" if r["verse_end"] != r["verse_start"] else "")
-    return {"reference": f"{r['book']} {r['chapter']}{v}", "book": r["book"],
+    return {"reference": f"{r['book']} {r['chapter']}{v}", "hymn_id": r["hymn_id"],
+            "book": r["book"],
             "chapter": r["chapter"], "verse_start": r["verse_start"],
             "verse_end": r["verse_end"], "kind": r["kind"], "source": r["source"],
             "as_written": r["ref_text"], "evidence": r["evidence"]}
@@ -108,25 +109,41 @@ def hymns_for_passage(
         ids = list(per_hymn)
         rows = {r["id"]: r for r in conn.execute(
             f"SELECT * FROM hymns WHERE id IN ({','.join('?' * len(ids))})", ids)}
+        # One result per text: every source's items for it (tunes, psalters, hymnals)
+        # are merged, keeping each link's source and item.
         groups = {}
         for hid, h in per_hymn.items():
             row = rows[hid]
             focus = h.get("touching", 0) / max(totals.get(hid, 1), 1)
             rank = (*h["best"], -focus, row["title"].lower())
-            g = groups.get(row["text_key"])
-            if g is None or rank < g["rank"]:
-                hymn = _hymn(row)
-                hymn["links"] = [lk for _, lk in sorted(h["links"], key=lambda x: x[0])]
-                hymn["match"] = "passage" if h["best"][0] == 0 else "chapter"
-                settings = g["hymn"]["settings"] if g else []
-                hymn["settings"] = settings
-                g = {"rank": rank, "hymn": hymn}
-                groups[row["text_key"]] = g
-            g["hymn"]["settings"].append({"id": hid, "tune": row["tune"],
-                                          "meter": row["meter"]})
+            g = groups.setdefault(row["text_key"], {"rank": None, "row": None, "links": {},
+                                                    "settings": []})
+            if g["rank"] is None or rank < g["rank"]:
+                g["rank"], g["row"] = rank, row
+            for key, lk in h["links"]:
+                dk = (lk["book"], lk["chapter"], lk["verse_start"], lk["verse_end"],
+                      lk["kind"], lk["source"])
+                if dk not in g["links"] or key < g["links"][dk][0]:
+                    g["links"][dk] = (key, lk)
+        tks = list(groups)
+        for r in conn.execute(f"SELECT * FROM hymns "
+                              f"WHERE text_key IN ({','.join('?' * len(tks))}) ORDER BY id", tks):
+            if r["source"] == "openhymnal" and groups[r["text_key"]]["row"]["source"] != \
+                    "openhymnal":
+                groups[r["text_key"]]["row"] = r   # show a hymnal's title, tune and metre
+            groups[r["text_key"]]["settings"].append(
+                {"id": r["id"], "source": r["source"], "title": r["title"], "tune": r["tune"],
+                 "meter": r["meter"]})
+        for g in groups.values():
+            hymn = _hymn(g["row"])
+            hymn["links"] = [lk for _, lk in sorted(g["links"].values(), key=lambda x: x[0])]
+            hymn["match"] = "passage" if g["rank"][0] == 0 else "chapter"
+            hymn["settings"] = g["settings"]
+            hymn["sources_for_text"] = sorted({x["source"] for x in g["settings"]})
+            g["hymn"] = hymn
         ordered = [g["hymn"] for g in sorted(groups.values(), key=lambda g: g["rank"])]
         for h in ordered:
-            h["settings"].sort(key=lambda s: s["id"] != h["id"])
+            h["settings"].sort(key=lambda x: (x["id"] != h["id"], x["id"]))
         return {"passage": {"book": book, "chapter": chapter, "verse_start": p1,
                             "verse_end": p2},
                 "ranking": RANKING, "total": len(ordered), "hymns": ordered[:limit],
@@ -151,7 +168,7 @@ def find_hymns(
         rows = conn.execute("SELECT * FROM hymns ORDER BY title").fetchall()
         if key:
             want = keys_for(key)
-            rows = [r for r in rows if want & set(json.loads(r["keys"]))]
+            rows = [r for r in rows if keys_match(want, json.loads(r["keys"]))]
         if q:
             words = [title_key(w) for w in q.split() if title_key(w)]
             rows = [r for r in rows if all(
@@ -170,7 +187,8 @@ def find_hymns(
 
 @router.get("/api/hymns/{hymn_id}")
 def get_hymn(hymn_id: str):
-    """One hymn: metadata and every passage it is linked to, in canonical order."""
+    """One hymn: metadata, and every passage any source links its text to (each with
+    `source` and `hymn_id`), in canonical order."""
     conn = get_db_connection()
     try:
         _require_table(conn)
@@ -180,12 +198,13 @@ def get_hymn(hymn_id: str):
         hymn = _hymn(row)
         hymn["passages"] = [_link(r) for r in conn.execute("""
             SELECT s.* FROM hymn_scripture s JOIN books b ON b.name = s.book
-            WHERE s.hymn_id = ?
-            ORDER BY b.book_order, s.chapter, COALESCE(s.verse_start, 0), s.kind""",
-            (hymn_id,))]
+            JOIN hymns h ON h.id = s.hymn_id
+            WHERE h.text_key = ?
+            ORDER BY b.book_order, s.chapter, COALESCE(s.verse_start, 0), s.kind, s.source""",
+            (row["text_key"],))]
         hymn["other_settings"] = [dict(r) for r in conn.execute(
-            "SELECT id, tune, meter FROM hymns WHERE text_key = ? AND id != ? ORDER BY id",
-            (row["text_key"], hymn_id))]
+            "SELECT id, source, title, tune, meter FROM hymns WHERE text_key = ? AND id != ? "
+            "ORDER BY id", (row["text_key"], hymn_id))]
         hymn["sources"] = _sources(conn)
         return hymn
     finally:

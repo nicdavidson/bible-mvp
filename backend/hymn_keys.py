@@ -26,3 +26,15 @@ def keys_for(value: str | None) -> set[str]:
     out |= {title_key(x) for x in re.findall(r"\(([^)]*)\)", value or "")}
     out.discard("")
     return out
+
+
+PREFIX_MIN = 12  # letters a title must have to match the start of a first line
+
+
+def keys_match(want: set[str], have) -> bool:
+    """Equal keys, or a title that is the start of a first line ("Joy to the World" ->
+    'joytotheworldthelordiscome'). Hymnals often title a hymn by its first words."""
+    have = set(have)
+    if want & have:
+        return True
+    return any(len(w) >= PREFIX_MIN and h.startswith(w) for w in want for h in have)
