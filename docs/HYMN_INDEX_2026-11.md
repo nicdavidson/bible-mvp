@@ -149,11 +149,21 @@ verses of the same chapter, after the others. `limit` (default 30, max 100).
 
 Ranking: (1) hymns linked to verses inside the passage before hymns linked
 only elsewhere in the chapter; (2) a quotation or paraphrase before a plain
-reference; (3) the share of the hymn's linked verses that fall inside the
-passage (a hymn on Ps 23:4 fits a reading of Ps 23:1-6 fully; one on
-Ps 23–24 only half); (4) the share of all the hymn's links that touch the
-passage (a hymn citing 3 passages is more about each of them than one citing
-12); (5) title. Several tunes of one text are one result (`settings`).
+reference; (3) among links of the same strength, the more familiar text first:
+printed in the Open Hymnal (the only source that is a hymnal with music, sung
+today) before a text found only in a historical psalter or hymn book, then
+carried by more independent sources, then with a tune recorded (tunes are only
+recorded in the Open Hymnal, so this only orders Open Hymnal texts); (4) the
+share of the hymn's linked verses that fall inside the passage (a hymn on Ps
+23:4 fits a reading of Ps 23:1-6 fully; one on Ps 23–24 only half); (5) the
+share of all the hymn's links that touch the passage (a hymn citing 3 passages
+is more about each of them than one citing 12); (6) title. Familiarity never
+lifts a plain reference above a paraphrase: Psalm 100 now leads with "All
+People That On Earth Do Dwell" (Open Hymnal + Scottish Psalter), then the four
+psalter versions, then "Open Now Thy Gates of Beauty". Topics and tune names are
+cleaned for display in the API (`&amp;` in 78 Open Hymnal topic lists, a
+backtick for an apostrophe in 10 tune names); the stored rows still carry them
+and `scripts/import_hymns.py` should unescape them at the next rebuild. Several tunes of one text are one result (`settings`).
 
 ### `GET /api/hymns/{id}`
 

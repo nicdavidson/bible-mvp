@@ -105,7 +105,7 @@ window.BibleModules = window.BibleModules || {};
     window.BibleRef = { parse: parseRef, format: formatRef, path: refPath, lookupBook };
 
     window.BibleModules.nav = {
-        navReturn: null,      // { ref | plan | study, label, idx, search? } while a jump can be undone
+        navReturn: null,      // { ref | plan | study | home, label, idx, search?: { idx } } while a jump can be undone
         navBusy: false,       // a navigation is between its start and its history/scroll update
         _navIdx: 0,
         picker: { open: false, step: 'books', book: null, tab: 'books', query: '' },
@@ -128,6 +128,14 @@ window.BibleModules = window.BibleModules || {};
             }
             // A bad link (unknown book, missing plan) shows Home with the reason
             if (!ok && (!loc || !loc.ref)) await this.navigate({ home: true }, { source: 'init' });
+            // ?search=... : the search screen over this place (a reload, or a shared link)
+            const searched = new URLSearchParams(window.location.search).get('search');
+            if (searched !== null && studySource === null && !this.ws?.open) {
+                Object.assign(this.srch, { q: st?.srch?.q ?? searched, scope: st?.srch?.scope || 'all', words: !!st?.srch?.words });
+                this.openSearch({ entry: 'replace' });
+                if (st?.srch?.meaning) this.srchMeaning();
+                if (st?.srchScroll != null) this._srchRestoreScroll(st.srchScroll);
+            }
 
             window.addEventListener('popstate', (e) => this.navOnPop(e));
             this.$watch('translation', () => this.navReloadHere());
@@ -144,6 +152,14 @@ window.BibleModules = window.BibleModules || {};
                 if (this.study?.open) this.studyHide();
                 return;
             }
+            if (st?.srch) {                              // the search screen (modules/search.js)
+                if (st?.nav) this._navIdx = st.idx || 0;
+                if (this.study?.open) this.studyHide();
+                this.srchHandlePop(e);
+                return;
+            }
+            const searchWasOpen = this.showSearch;
+            if (searchWasOpen) this.srchHide();
             const closedStudyHere = this.studyHandlePop(e);
             if (st?.nav) this._navIdx = st.idx || 0;
             if (st?.study) return;                       // a study view entry: study.js showed it
@@ -159,6 +175,11 @@ window.BibleModules = window.BibleModules || {};
                 if (r.book === this.currentBook && r.chapter === this.currentChapter) { this.navReturn = st?.ret || null; return; }
             }
             if (wordWasOpen && loc.home && !this.currentBook && !this.combinedPlanReading) { this.navReturn = st?.ret || null; return; }
+            // Search closed onto the place underneath it: nothing to reload
+            if (searchWasOpen && st?.nav && JSON.stringify(st.ref ?? st.plan ?? 'home') === JSON.stringify(this._navLocation().ref ?? this._navLocation().plan ?? 'home')) {
+                this.navReturn = st.ret || null;
+                return;
+            }
             this.navigate(loc.plan ? { plan: loc.plan } : loc.home ? loc : loc.ref, { source: 'pop', state: st });
         },
 
@@ -203,6 +224,8 @@ window.BibleModules = window.BibleModules || {};
 
         async _navigate(loc, { kind, source, state, section, fromSearch }) {
             const from = source === 'user' && kind === 'jump' ? this.navHere() : null;
+            // A result opened from the search screen: its entry, for "Results" and Back
+            const searchIdx = fromSearch && history.state?.srch ? this._navIdx : null;
             const keepScroll = kind === 'stay' ? this._navScroller()?.scrollTop : null;
             if (source === 'user') this._navSaveScroll();
             this._navCloseOverlays(kind);
@@ -223,8 +246,9 @@ window.BibleModules = window.BibleModules || {};
             // chained jumps); reading on forgets it; Back/Forward restore the entry's own.
             if (source === 'pop' || source === 'init') this.navReturn = state?.ret || null;
             else if (kind === 'jump') {
-                const base = this.navReturn || from;
-                this.navReturn = base && { ...base, search: fromSearch };   // "Results" goes back to the search
+                const base = this.navReturn || from || (searchIdx != null ? { home: true, label: 'Home', idx: searchIdx - 1 } : null);
+                // "Results" goes back to the search; a later jump keeps it
+                this.navReturn = base && { ...base, search: searchIdx != null ? { idx: searchIdx } : (base.search || null) };
             }
             else if (kind === 'read') this.navReturn = null;
 
@@ -248,12 +272,14 @@ window.BibleModules = window.BibleModules || {};
                 const what = { 'cross-references': 'cross-references', notes: 'your notes', hymns: 'hymns' }[this.study.active] || 'commentary';
                 return { study: true, ref: this.studyRefLabel().replace('–', '-'), label: `${what} on ${this.studyRefLabel()}`, idx };
             }
+            // Under the search screen: the entry below the one search pushed
+            const at = this.showSearch && history.state?.srch?.pushed ? idx - 1 : idx;
             if (this.combinedPlanReading && this.currentPlan) {
-                return { plan: { id: this.currentPlan.id, day: this.planDay }, label: `Day ${this.planDay} reading`, idx };
+                return { plan: { id: this.currentPlan.id, day: this.planDay }, label: `Day ${this.planDay} reading`, idx: at };
             }
             if (!this.currentBook || !this.currentChapter) return null;
             const ref = this.studySelectionRef();
-            return { ref, label: ref, idx };
+            return { ref, label: ref, idx: at };
         },
 
         // Tap on the chip: back to where reading was, the same way browser Back would.
@@ -268,7 +294,7 @@ window.BibleModules = window.BibleModules || {};
             // History was cut (new tab from a shared link): go there as reading
             if (ret.word) this.openWordStudy(ret.word, { homograph: ret.homograph || null });
             else if (ret.study) this.navigate(ret.ref, { kind: 'read' }).then(ok => ok && this.openStudy(ret.ref));
-            else this.navigate(ret.plan ? { plan: ret.plan } : ret.ref, { kind: 'read' });
+            else this.navigate(ret.plan ? { plan: ret.plan } : ret.home ? { home: true } : ret.ref, { kind: 'read' });
         },
 
         navDismissReturn() {
@@ -277,9 +303,12 @@ window.BibleModules = window.BibleModules || {};
             document.querySelector('.panel-text .panel-body')?.focus({ preventScroll: true });
         },
 
+        // "Results" on the chip: back to the search entry, the same way Back would
         navReopenSearch() {
-            this.showSearch = true;
-            this.$nextTick(() => this.$refs.searchInput?.focus());
+            const idx = this.navReturn?.search?.idx;
+            const here = history.state?.nav ? history.state.idx : null;
+            if (idx != null && here != null && idx < here) { history.go(idx - here); return; }
+            this.openSearch();
         },
 
         // ---------- reading on ----------
@@ -331,9 +360,12 @@ window.BibleModules = window.BibleModules || {};
         // Selecting verses inside the chapter rewrites the current entry (no new entry).
         // While the study view is open it owns the address bar (modules/study.js).
         updateURL() {
-            if (this.study?.open) return;
+            if (this.study?.open || this.showSearch) return;
             if (!this.combinedPlanReading && !this.currentBook) return;
-            this.navReplaceState({ ...(history.state?.study ? {} : history.state), nav: 1, ...this._navLocation(), ret: this.navReturn }, this._navPath());
+            // Reading on under a search entry (after a topic or study opened from it): the
+            // entry becomes plain reading again
+            const { srch, srchScroll, ...st } = history.state?.study ? {} : (history.state || {});
+            this.navReplaceState({ ...st, nav: 1, ...this._navLocation(), ret: this.navReturn }, this._navPath());
         },
 
         // ---------- internals ----------

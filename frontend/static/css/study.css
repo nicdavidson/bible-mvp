@@ -306,6 +306,22 @@ dialog.study-view::backdrop { background: var(--color-bg); }
 .study-tool:hover:not([aria-pressed="true"]) { background: var(--color-surface-hover); }
 .study-chips .study-manage-btn { color: var(--study-meta); }
 
+/* Phones: commentary is the main use, so the tools give it room. Each tool keeps its icon
+   and count (its name is in aria-label and its pane's title); the short label goes. With
+   tighter chip padding this shows two whole commentary chips at 360px instead of one. */
+@media (max-width: 480px) {
+    .study-tools { gap: 2px; padding-left: 4px; margin-left: 0; }
+    .study-tool { min-width: 38px; padding: 3px 4px; }
+    .study-tool-top { flex-direction: column; gap: 1px; }
+    .study-tool-count { font-size: 0.75rem; line-height: 1; min-height: 0.75rem; }
+    .study-tool-label {
+        position: absolute; width: 1px; height: 1px; overflow: hidden;
+        clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+    }
+    .study-chip { padding: 0 12px; gap: 5px; }
+    .study-chips { gap: 5px; }
+}
+
 /* ---------- panes (scroll-snap carousel: swipe between sources) ---------- */
 .study-track {
     grid-area: track;
@@ -822,8 +838,6 @@ dialog.study-sheet[open] { animation: study-sheet-in 0.18s ease-out; }
     .action-bar-count { position: static; transform: none; order: 3; }
 }
 
-/* License credit under a search hit from a source that requires it */
-.result-credit { margin-top: 4px; font-size: 0.75rem; color: var(--color-text-secondary); }
 
 /* ---------- Settings: commentary download list ---------- */
 .download-hint { margin: 0 0 6px; font-size: 0.8rem; color: var(--color-text-secondary); }
@@ -926,3 +940,11 @@ dialog.study-sheet[open] { animation: study-sheet-in 0.18s ease-out; }
     .study-track, .study-chips { scroll-behavior: auto; }
 }
 .hymn-sheet .study-attribution { padding-inline: 0; }
+
+/* Similar verses under the cross-references: computed, so set apart by a rule and a mark */
+.similar { max-width: 40rem; margin: 20px auto 8px; padding: 16px 20px 0; border-top: 1px solid var(--color-border); }
+.similar-title { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font: 650 1rem var(--font-sans); }
+.similar-mark { font: 700 1.25rem/1 var(--font-verse); color: var(--srch-mark, var(--color-accent)); }
+.similar .study-tool-sub { padding: 0; }
+.similar-load { margin-top: 4px; }
+@media (min-width: 960px) { .similar { padding-inline: 28px; } }

@@ -140,6 +140,31 @@ class TestSearch:
         r = client.get("/api/search?q=beginning&translation=BSB&scope=Genesis")
         assert r.status_code == 200
 
+    def test_one_result_per_verse_in_the_readers_translation(self, client):
+        """P1-7: a verse that matches in BSB, KJV and WEB is one result, shown in the
+        reader's translation; a match only in another translation carries its wording."""
+        d = client.get("/api/search", params={"q": "living water", "scope": "bible",
+                                              "translation": "BSB"}).json()
+        keys = [(r["book"], r["chapter"], r["verse"]) for r in d["results"]]
+        assert len(keys) == len(set(keys)) and ("Jeremiah", 2, 13) in keys
+        jer = next(r for r in d["results"] if (r["book"], r["chapter"]) == ("Jeremiah", 2))
+        assert jer["translation"] == "BSB" and set(jer["matched_in"]) == {"BSB", "KJV", "WEB"}
+        kjv = client.get("/api/search", params={"q": "thou preparest", "scope": "bible",
+                                                "translation": "BSB"}).json()["results"][0]
+        assert (kjv["book"], kjv["chapter"], kjv["verse"]) == ("Psalms", 23, 5)
+        assert kjv["snippet"].startswith("You prepare a table")        # BSB, unmarked
+        assert kjv["also"]["translation"] == "KJV" and "<mark>preparest</mark>" in kjv["also"]["snippet"]
+
+    def test_original_language_word_finds_its_entry(self, client):
+        greek = client.get("/api/search", params={"q": "ἀγάπη"}).json()
+        assert greek["word_info"]["strong_number"] == "G26" and greek["results"]
+        hebrew = client.get("/api/search", params={"q": "חסד"}).json()   # unpointed: commonest first
+        assert hebrew["word_info"]["strong_number"] == "H2617"
+        assert {w["strong_number"] for w in hebrew["word_suggestions"]} >= {"H2616"}
+        translit = client.get("/api/search", params={"q": "agape"}).json()
+        assert [w["strong_number"] for w in translit["word_suggestions"]] == ["G26"]
+        assert "word_suggestions" not in client.get("/api/search", params={"q": "man"}).json()
+
 
 # ========== INTERLINEAR ==========
 

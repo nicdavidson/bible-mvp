@@ -603,23 +603,6 @@ dialog.picker-sheet::backdrop {
 .crossref-for { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--color-text-secondary); }
 .crossref-for span { font-weight: 600; color: var(--color-text); }
 
-/* ---------- search: a typed reference ---------- */
-.search-goto {
-    width: 100%;
-    min-height: 44px;
-    margin-bottom: 0.75rem;
-    padding: 0 1rem;
-    border: 1px solid var(--nav-chip-rule);
-    border-radius: var(--radius);
-    background: var(--nav-chip-bg);
-    color: var(--color-text);
-    font: inherit;
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-}
-.search-goto span { font-family: var(--font-verse); }
-
 /* ---------- a weak word link ---------- */
 .word-unsure p { line-height: 1.55; color: var(--color-text-secondary); }
 .word-reveal {

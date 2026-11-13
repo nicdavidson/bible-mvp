@@ -13,6 +13,11 @@
 //   hymns             Hymns linked to the selection, then to the rest of its chapter
 //                     (modules/hymns.js). Only on the track when there are some.
 //
+// Under the cross-references, apart and labelled as computed: "Similar verses"
+// (GET /api/search/similar/{ref}), verses close in wording or meaning. Cross-references
+// are an editor's judgment; these are found by comparing texts, so they load only when
+// asked for and never mix into the list above.
+//
 // The panes sit after the commentary sources on the track (swipe past the last source)
 // and their buttons are pinned at the end of the rail, so they never push commentary
 // out of view and are always one tap away. They are not commentary sources: they are
@@ -35,6 +40,7 @@ window.BibleModules = window.BibleModules || {};
     window.BibleModules.study_panes = {
         studyXref: { key: null, status: 'idle', items: [], credit: '', offline: false, showAll: false, order: 'rank', missing: 0 },
         studyNote: { editing: null, text: '', saving: false },   // editing: null | 'new' | note id
+        studySimilar: { key: null, status: 'idle', items: [], showAll: false },   // status: idle | loading | ready | unavailable | error
         studyWriting: false,
 
         studyToolSlugs() { return [XREF, ...(this.studyHymnsShown() ? [HYMNS] : []), NOTES]; },
@@ -52,6 +58,7 @@ window.BibleModules = window.BibleModules || {};
         studyPanesReset() {
             Object.assign(this.studyNote, { editing: null, text: '', saving: false });
             this.studyXref.showAll = false;
+            Object.assign(this.studySimilar, { key: null, status: 'idle', items: [], showAll: false });
             this.studyLoadXrefs();
             this.studyLoadHymns();
         },
@@ -143,6 +150,38 @@ window.BibleModules = window.BibleModules || {};
             this.studyXref.showAll = true;
             // Keep the reader's place: the button they tapped is replaced by the rest of the list
             this.$nextTick(() => document.querySelector('.xref-order button[aria-pressed="true"]')?.focus({ preventScroll: true }));
+        },
+
+        // ---------- similar verses (computed, on request) ----------
+        studySimilarVerse() { return `${this.study.book} ${this.study.chapter}:${this.study.vs}`; },
+        studySimilarOffered() {
+            return this.isOnline && !this.forcedOffline && !this.studyXref.offline && !!this.study.vs
+                && this.srch?.semantic?.available !== false;
+        },
+        async studyLoadSimilar() {
+            const ref = this.studySimilarVerse();
+            const key = `${ref}|${this.translation}`;
+            if (this.studySimilar.key === key && this.studySimilar.status === 'ready') return;
+            Object.assign(this.studySimilar, { key, status: 'loading', items: [], showAll: false });
+            try {
+                const d = await this.studyFetch(`/api/search/similar/${encodeURIComponent(ref)}?limit=20&translation=${encodeURIComponent(this.translation)}`);
+                if (this.studySimilar.key !== key) return;
+                if (d.fallback) { this.studySimilar.status = 'unavailable'; return; }
+                const xrefs = new Set(this.studyXref.items.map(refOf));
+                Object.assign(this.studySimilar, {
+                    status: 'ready',
+                    // A verse already in the editor's list is not repeated here
+                    items: (d.results || []).map(r => ({ ref: `${r.book} ${r.chapter}:${r.verse}`, text: r.snippet }))
+                        .filter(r => !xrefs.has(r.ref)),
+                });
+                this.$nextTick(() => document.querySelector('.similar-list .xref-item')?.focus({ preventScroll: true }));
+            } catch (err) {
+                if (this.studySimilar.key === key) this.studySimilar.status = err.status === 429 ? 'limited' : 'error';
+            }
+        },
+        studySimilarShown() {
+            const x = this.studySimilar;
+            return x.showAll ? x.items : x.items.slice(0, FIRST_SINGLE);
         },
 
         // Path to Christ is a reader dialog: leave the study view, then trace from verse vs

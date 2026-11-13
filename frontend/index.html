@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/static/css/study.css?v=__SW_VERSION__">
     <link rel="stylesheet" href="/static/css/nav.css?v=__SW_VERSION__">
     <link rel="stylesheet" href="/static/css/wordstudy.css?v=__SW_VERSION__">
+    <link rel="stylesheet" href="/static/css/search.css?v=__SW_VERSION__">
     <script src="/static/vendor/supabase-2.117.2.min.js"></script>
     <script src="/config.js"></script>
     <script src="/static/js/supabase-client.js?v=__SW_VERSION__"></script>
@@ -236,7 +237,7 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
                     <span>Back to <span class="return-chip-place" x-text="navReturn?.label"></span></span>
                 </button>
-                <button type="button" class="return-chip-results" x-show="navReturn?.search && searchResults.length" @click="navReopenSearch()">Results</button>
+                <button type="button" class="return-chip-results" x-show="navReturn?.search" @click="navReopenSearch()">Results</button>
                 <button type="button" class="return-chip-dismiss" @click="navDismissReturn()" aria-label="Dismiss: stay here">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
                 </button>
@@ -823,134 +824,194 @@
         </div>
     </div>
 
-    <!-- Search Modal -->
-    <div class="modal-overlay" x-show="showSearch" x-transition @click.self="showSearch = false">
-        <div class="modal search-modal" role="dialog" aria-modal="true" aria-label="Search the Bible">
-            <div class="modal-header">
-                <h2>Search</h2>
-                <button @click="showSearch = false" class="btn-close">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="search-input-group">
-                    <input
-                        type="text"
-                        x-model="searchQuery"
-                        @input="handleSearchInput"
-                        @keydown="handleSearchKeydown"
-                        placeholder="Search Bible, commentary... (min 2 chars)"
-                        class="input-search"
-                        x-ref="searchInput"
-                        autocomplete="off"
-                    >
-                    <select x-model="searchScope" @change="performSearch" class="select-scope">
-                        <option value="all">All</option>
-                        <option value="bible">Bible Text</option>
-                        <option value="ot">Old Testament</option>
-                        <option value="nt">New Testament</option>
-                        <option :value="'book:' + currentBook" x-show="currentBook" x-text="'In ' + currentBook"></option>
-                        <option value="commentary">Commentary</option>
-                    </select>
-                </div>
-
-                <!-- The query is a reference: offer to go there (P1-7) -->
-                <button type="button" class="search-goto" x-show="BibleRef.parse(searchQuery).chapter"
-                        @click="navigate(searchQuery, { kind: 'jump' })">
-                    Go to <span x-text="BibleRef.parse(searchQuery).chapter ? BibleRef.format(BibleRef.parse(searchQuery)) : ''"></span>
+    <!-- Search: references, words, phrases, Strong's numbers, topics and questions in one
+         screen (modules/search.js, css/search.css) -->
+    <dialog id="search-view" class="srch" aria-labelledby="srch-title" @keydown="srchKeydown($event)">
+        <div class="srch-shell" x-show="showSearch">
+            <form class="srch-bar" role="search" @submit.prevent="srchSubmit()">
+                <button type="button" class="srch-close" @click="srchClose()" aria-label="Close search">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
                 </button>
+                <h2 id="srch-title" class="sr-only">Search the Bible</h2>
+                <label for="srch-input" class="sr-only">Search for a reference, words, a topic or a question</label>
+                <input id="srch-input" class="srch-input" type="search" enterkeyhint="search" autocomplete="off" spellcheck="false"
+                       placeholder="Reference, words or a question" x-model="srch.q" @input="srchInput()" aria-describedby="srch-status">
+                <button type="submit" class="srch-submit" aria-label="Search">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                </button>
+            </form>
+            <div class="srch-scopes" role="group" aria-label="Search in" x-show="srchKind() !== 'reference'">
+                <template x-for="sc in srchScopes()" :key="sc.id">
+                    <button type="button" class="srch-scope" :aria-pressed="srch.scope === sc.id ? 'true' : 'false'" :title="sc.name"
+                            :aria-label="sc.name" @click="srchSetScope(sc.id)" x-text="sc.label"></button>
+                </template>
+            </div>
+            <p id="srch-status" class="sr-only" role="status" aria-live="polite" x-text="srch.announce"></p>
 
-                <!-- Loading indicator -->
-                <div x-show="searchLoading" class="search-loading">
-                    <div class="loading-spinner"></div>
-                    <span>Searching...</span>
-                </div>
+            <div class="srch-body" tabindex="-1">
+                <!-- Nothing typed yet: what can be searched, by example -->
+                <section class="srch-start" x-show="srchKind() === 'empty'">
+                    <p class="srch-start-lead">Type a reference, words you remember, a topic, or a question.</p>
+                    <ul class="srch-examples" aria-label="Examples">
+                        <template x-for="ex in srchExamples()" :key="ex">
+                            <li><button type="button" class="srch-example" data-srch-nav @click="srchExample(ex)" x-text="ex"></button></li>
+                        </template>
+                    </ul>
+                    <p class="srch-start-tip">Put words in "quotes" to find only that exact phrase.</p>
+                </section>
 
-                <!-- No results message -->
-                <div x-show="searchPerformed && !searchLoading && searchResults.length === 0" class="search-no-results">
-                    <span class="empty-state-icon">🔍</span>
-                    <span>No results found for "<span x-text="searchQuery"></span>"</span>
-                    <span class="search-tip">Try different keywords or check spelling</span>
-                </div>
-
-                <!-- Strong's word info card -->
-                <div x-show="searchWordInfo" class="strongs-word-card">
-                    <div class="strongs-header">
-                        <span class="strongs-number" x-text="searchWordInfo?.strong_number"></span>
-                        <span class="strongs-original ws-orig" :class="searchWordInfo?.strong_number?.[0] === 'H' ? 'hebrew' : 'greek'" x-text="searchWordInfo?.original"></span>
-                        <span class="strongs-transliteration" x-text="'(' + (searchWordInfo?.transliteration || '') + ')'"></span>
+                <!-- A reference: go there -->
+                <template x-if="srchKind() === 'reference'">
+                    <div class="srch-lead">
+                        <button type="button" class="srch-goto" data-srch-nav @click="srchGoRef()">
+                            <span class="srch-goto-label">Go to</span>
+                            <span class="srch-goto-ref" x-text="srchRefLabel()"></span>
+                        </button>
+                        <button type="button" class="srch-textbtn" data-srch-nav @click="srchSearchWords()">Search for these words instead</button>
                     </div>
-                    <div class="strongs-definition" x-text="searchWordInfo?.definition"></div>
-                    <button type="button" class="qw-study strongs-study" @click="showSearch = false; openWordStudy(searchWordInfo.strong_number)">
-                        <span>Study <span x-text="searchWordInfo?.original || searchWordInfo?.strong_number"></span></span>
-                        <span class="qw-study-sub">Lexicons, translations, where it occurs, verses</span>
+                </template>
+
+                <!-- A Strong's number or a Hebrew/Greek word: its card, then its word study -->
+                <template x-if="srch.kw.word && srch.kw.q === _srchKey()">
+                    <div class="srch-lead">
+                        <button type="button" class="srch-word" data-srch-nav @click="srchWordStudy(srch.kw.word.strong_number)">
+                            <span class="srch-word-head">
+                                <span class="srch-word-orig ws-orig" :class="srch.kw.word.strong_number[0] === 'H' ? 'hebrew' : 'greek'" x-text="srch.kw.word.original"></span>
+                                <span class="srch-word-tr" x-text="srch.kw.word.transliteration"></span>
+                                <span class="srch-word-num" x-text="srch.kw.word.strong_number"></span>
+                            </span>
+                            <span class="srch-word-def" x-text="srch.kw.word.definition"></span>
+                            <span class="srch-word-go">Open the word study</span>
+                        </button>
+                        <p class="srch-also-words" x-show="srch.kw.suggestions.length">Other words written the same way:
+                            <template x-for="w in srch.kw.suggestions" :key="w.strong_number">
+                                <button type="button" class="srch-textbtn" data-srch-nav @click="srchWordStudy(w.strong_number)" x-text="w.strong_number + ' ' + (w.definition || '').split(/[;,.]/)[0]"></button>
+                            </template>
+                        </p>
+                    </div>
+                </template>
+                <!-- "agape": the English hits, and the Greek word too -->
+                <template x-if="!srch.kw.word && srch.kw.suggestions.length && srch.kw.q === _srchKey()">
+                    <div class="srch-lead">
+                        <template x-for="w in srch.kw.suggestions" :key="w.strong_number">
+                            <button type="button" class="srch-row" data-srch-nav @click="srchWordStudy(w.strong_number)">
+                                <span class="srch-row-main"><span class="ws-orig" :class="w.strong_number[0] === 'H' ? 'hebrew' : 'greek'" x-text="w.original"></span> <span x-text="w.transliteration"></span>: <span x-text="(w.definition || '').split(/[;]/)[0]"></span></span>
+                                <span class="srch-row-sub" x-text="(w.strong_number[0] === 'H' ? 'Hebrew' : 'Greek') + ' word ' + w.strong_number + '. Open the word study'"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Nave's topic with exactly this name -->
+                <template x-if="srch.topic">
+                    <div class="srch-lead">
+                        <button type="button" class="srch-row" data-srch-nav @click="srchOpenTopic()">
+                            <span class="srch-row-main">Topic: <span x-text="srch.topic.name"></span></span>
+                            <span class="srch-row-sub" x-text="srch.topic.count + ' passages in Nave’s Topical Bible'"></span>
+                        </button>
+                    </div>
+                </template>
+
+                <p class="srch-note" x-show="srch.kw.offline && srch.kw.q === _srchKey() && srchKind() !== 'reference' && srch.scope !== 'commentary'">
+                    You're offline. Searching the <span x-text="srch.kw.chapters"></span> chapters saved on this device, in the <span x-text="translation"></span>.
+                    <span x-show="srchWantsMeaning()">Search by meaning needs a connection.</span>
+                </p>
+                <p class="srch-note" x-show="srch.kw.status === 'limited' || srch.meaning.status === 'limited'">Too many searches in a minute. Wait a moment, then press Search.</p>
+
+                <!-- The two lists, in the order this query calls for; a verse appears once -->
+                <div class="srch-lists">
+                    <template x-for="name in srchOrder()" :key="name">
+                        <div class="srch-slot">
+                    <template x-if="name === 'kw'">
+                    <section class="srch-section srch-kw" data-list="kw" aria-labelledby="srch-kw-h"
+                             x-show="srch.kw.q === _srchKey() && srch.kw.status === 'ready' && srch.scope !== 'commentary' && srchKind() !== 'reference' && !srchNothing() && (srchKwVerses().length || (srchMeaningFirst() && srchKind() !== 'question'))">
+                        <h3 id="srch-kw-h" class="srch-h"><span class="srch-mark" aria-hidden="true">“ ”</span><span x-text="srchHeading('kw')"></span>
+                            <span class="srch-count" x-show="srchKwVerses().length" x-text="srchKwVerses().length"></span></h3>
+                        <p class="srch-empty-line" x-show="!srchKwVerses().length">No verse has all of these words<span x-show="srch.scope !== 'all'"> here</span>.</p>
+                        <ol class="srch-hits">
+                            <template x-for="h in srchShown(srchKwVerses(), 'kw')" :key="'k' + srchHitKey(h)">
+                                <li><button type="button" class="srch-hit" data-srch-nav :data-hit="srchHitKey(h)" @click="srchGo(h)">
+                                    <span class="srch-ref"><span x-text="srchHitRef(h)"></span><span class="srch-orig ws-orig" x-show="h.original_word" x-text="h.original_word"></span></span>
+                                    <span class="srch-text" x-html="h.snippet"></span>
+                                    <template x-if="h.also"><span class="srch-alt"><span class="srch-alt-tr" x-text="h.also.translation"></span> <span x-html="h.also.snippet"></span></span></template>
+                                </button></li>
+                            </template>
+                        </ol>
+                        <button type="button" class="srch-more" data-srch-nav x-show="!srch.all.kw && srchKwVerses().length > 5" @click="srchShowAll('kw')">
+                            Show all <span x-text="srchKwVerses().length"></span>
+                        </button>
+                    </section>
+                    </template>
+                    <template x-if="name === 'meaning'">
+                    <section class="srch-section srch-meaning" data-list="meaning" aria-labelledby="srch-m-h" x-show="srchMeaningShown() && !srchNothing() && srch.meaning.status !== 'offline'" :aria-busy="srch.meaning.status === 'loading' ? 'true' : 'false'">
+                        <h3 id="srch-m-h" class="srch-h" :class="{ 'sr-only': srchMeaningGuessOnly() && !srch.meaning.reveal }"><span class="srch-mark" aria-hidden="true" x-show="!srch.meaning.fallback">≈</span><span x-text="srchHeading('meaning')"></span>
+                            <span class="srch-count" x-show="srchMeaningItems().length" x-text="srchMeaningItems().length"></span></h3>
+                        <p class="srch-empty-line" x-show="srchMeaningGuessOnly() && !srch.meaning.reveal">None of your words appear in the Bible's text, so verses close in meaning would only be a guess.
+                            <button type="button" class="srch-textbtn" data-srch-nav @click="srch.meaning.reveal = true">Show them anyway</button></p>
+                        <details class="srch-how" x-show="!srch.meaning.fallback && !(srchMeaningGuessOnly() && !srch.meaning.reveal)">
+                            <summary>Found by meaning, not exact words. Read each in its context.</summary>
+                            <p>The app compares what you typed with every verse and lists the closest in meaning. It finds and orders verses; it does not write anything or answer the question. It can miss verses you know and include ones that only sound alike, so try other words if these aren't right.</p>
+                        </details>
+                        <p class="srch-note" x-show="srch.meaning.fallback">Search by meaning isn't available right now, so these verses share some of your words instead.</p>
+                        <p class="srch-loading" x-show="srch.meaning.status === 'loading'"><span class="srch-dots" aria-hidden="true"></span>Looking for verses about this idea…</p>
+                        <p class="srch-note" x-show="srch.meaning.status === 'error'">Couldn't search by meaning. <button type="button" class="srch-textbtn" @click="srchMeaning()">Try again</button></p>
+                        <p class="srch-empty-line" x-show="srch.meaning.status === 'ready' && !srchMeaningGuessOnly() && !srchMeaningItems().length && srch.meaning.items.length">Every verse found by meaning is already listed above.</p>
+                        <ol class="srch-hits">
+                            <template x-for="h in srchShown(srchMeaningItems(), 'meaning')" :key="'m' + srchHitKey(h)">
+                                <li><button type="button" class="srch-hit" data-srch-nav :data-hit="srchHitKey(h)" @click="srchGo(h)">
+                                    <span class="srch-ref" x-text="srchHitRef(h)"></span>
+                                    <span class="srch-text" x-html="h.snippet"></span>
+                                </button></li>
+                            </template>
+                        </ol>
+                        <button type="button" class="srch-more" data-srch-nav x-show="!srch.all.meaning && srchMeaningItems().length > 5" @click="srchShowAll('meaning')">
+                            Show <span x-text="srchMeaningItems().length - 5"></span> more
+                        </button>
+                        <p class="srch-tip" x-show="srchMeaningItems().length && !srch.meaning.fallback && srchKind() === 'question'">Not finding a verse you expected? Try the words a verse would use, like “worry” instead of “anxiety”.</p>
+                    </section>
+                    </template>
+                        </div>
+                    </template>
+
+                    <!-- Words or a short topic: the idea is one tap away until it loads by itself -->
+                    <button type="button" class="srch-find-idea" data-srch-nav
+                            x-show="srchWantsMeaning() && !srchMeaningShown() && srch.kw.q === _srchKey() && srch.kw.status === 'ready' && !srch.kw.offline"
+                            @click="srchMeaning()">
+                        <span class="srch-mark" aria-hidden="true">≈</span> Find verses about this idea
                     </button>
                 </div>
 
-                <!-- Results grouped by type -->
-                <div class="search-results" x-show="searchResults.length > 0">
-                    <!-- Bible Results -->
-                    <template x-if="getGroupedResults().verse.length > 0">
-                        <div class="results-group">
-                            <div class="results-group-header">
-                                <span class="group-icon">📖</span>
-                                <span x-text="searchWordInfo ? 'Verses with this word' : 'Bible Text'"></span>
-                                <span class="group-count" x-text="'(' + getGroupedResults().verse.length + ')'"></span>
-                            </div>
-                            <template x-for="(result, i) in getGroupedResults().verse" :key="'v' + i">
-                                <div
-                                    class="search-result"
-                                    :class="{ 'selected': selectedResultIndex === searchResults.indexOf(result) }"
-                                    @click="goToSearchResult(result)"
-                                    @mouseenter="selectedResultIndex = searchResults.indexOf(result)"
-                                >
-                                    <div class="result-ref">
-                                        <span x-text="result.book + ' ' + result.chapter + ':' + result.verse"></span>
-                                        <span x-show="result.original_word" class="result-original-word" x-text="result.original_word"></span>
-                                    </div>
-                                    <div class="result-snippet" x-html="result.snippet"></div>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
+                <!-- Commentary hits: after the verses, a few at a time -->
+                <section class="srch-section srch-comm" data-list="commentary" aria-labelledby="srch-c-h"
+                         x-show="srch.kw.q === _srchKey() && srch.kw.commentary.length && srchKind() !== 'reference'">
+                    <h3 id="srch-c-h" class="srch-h">In the commentaries <span class="srch-count" x-text="srch.kw.commentary.length"></span></h3>
+                    <ol class="srch-hits">
+                        <template x-for="(h, i) in srchShown(srch.kw.commentary, 'commentary')" :key="'c' + i + h.book + h.chapter + h.source">
+                            <li><button type="button" class="srch-hit" data-srch-nav :data-hit="'c|' + h.book + '|' + h.chapter + '|' + h.source" @click="srchGoCommentary(h)">
+                                <span class="srch-ref"><span x-text="h.book + ' ' + h.chapter"></span> <span class="srch-source" x-text="h.source"></span></span>
+                                <span class="srch-text srch-text-comm" x-html="h.snippet"></span>
+                                <span class="srch-credit" x-show="studyCredit(h.source)" x-text="studyCredit(h.source)"></span>
+                            </button></li>
+                        </template>
+                    </ol>
+                    <button type="button" class="srch-more" data-srch-nav x-show="!srch.all.commentary && srch.kw.commentary.length > 3" @click="srchShowAll('commentary')">
+                        Show all <span x-text="srch.kw.commentary.length"></span> commentary results
+                    </button>
+                </section>
 
-                    <!-- Commentary Results -->
-                    <template x-if="getGroupedResults().commentary.length > 0">
-                        <div class="results-group">
-                            <div class="results-group-header">
-                                <span class="group-icon">📝</span>
-                                Commentary
-                                <span class="group-count" x-text="'(' + getGroupedResults().commentary.length + ')'"></span>
-                            </div>
-                            <template x-for="(result, i) in getGroupedResults().commentary" :key="'c' + i">
-                                <div
-                                    class="search-result"
-                                    :class="{ 'selected': selectedResultIndex === searchResults.indexOf(result) }"
-                                    @click="goToSearchResult(result)"
-                                    @mouseenter="selectedResultIndex = searchResults.indexOf(result)"
-                                >
-                                    <div class="result-ref">
-                                        <span x-text="result.book + ' ' + result.chapter"></span>
-                                        <span class="result-source" x-text="'(' + result.source + ')'"></span>
-                                    </div>
-                                    <div class="result-snippet" x-html="result.snippet"></div>
-                                    <div class="result-credit" x-show="studyCredit(result.source)" x-text="studyCredit(result.source)"></div>
-                                </div>
-                            </template>
-                        </div>
+                <div class="srch-nothing" x-show="srchNothing()">
+                    <p class="srch-nothing-title">Nothing found for “<span x-text="srch.q.trim()"></span>”</p>
+                    <p>Check the spelling, or try fewer or different words.</p>
+                    <button type="button" class="srch-textbtn" data-srch-nav x-show="srch.scope !== 'all'" @click="srchSetScope('all')">Search everything instead</button>
+                    <template x-if="srchMeaningGuessOnly()">
+                        <p>None of these words appear in the Bible's text, so verses close in meaning would only be a guess.
+                            <button type="button" class="srch-textbtn" data-srch-nav @click="srch.meaning.reveal = true">Show the closest verses anyway</button></p>
                     </template>
                 </div>
-
-                <!-- Search tips -->
-                <div x-show="!searchPerformed && searchQuery.length < 2" class="search-tips">
-                    <p><strong>Search tips:</strong></p>
-                    <ul>
-                        <li>Use quotes for exact phrases: <code>"in the beginning"</code></li>
-                        <li>Search Strong's numbers: <code>G26</code> or <code>H430</code></li>
-                        <li>Use arrow keys to navigate results</li>
-                    </ul>
-                </div>
+                <p class="srch-loading" x-show="srch.kw.status === 'loading' && !srchKwVerses().length && srch.meaning.status !== 'loading'"><span class="srch-dots" aria-hidden="true"></span>Searching…</p>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <!-- Verse Preview Tooltip -->
     <div
@@ -2740,6 +2801,33 @@
                             <button type="button" class="study-text-btn" @click="studyXref.key = null; studyLoadXrefs()">Try again</button>
                         </div>
                         <p class="study-attribution" x-show="studyXref.status === 'ready' && studyXref.items.length" x-text="studyXref.credit"></p>
+
+                        <!-- Computed, apart from the editor's list, and only when asked for (modules/study_panes.js) -->
+                        <section class="similar" aria-labelledby="similar-title" x-show="studyXref.status === 'ready' && studySimilarOffered()">
+                            <h4 class="similar-title" id="similar-title"><span class="similar-mark" aria-hidden="true">≈</span> Similar verses</h4>
+                            <p class="study-tool-sub">Found by comparing the wording and meaning of every verse with <span x-text="studySimilarVerse()"></span>. Computed, not chosen by an editor like the cross-references<span x-show="studyXref.items.length"> above</span>.</p>
+                            <button type="button" class="study-text-btn similar-load" x-show="studySimilar.status === 'idle'" @click="studyLoadSimilar()">
+                                <span x-text="study.vs === study.ve ? 'Find similar verses' : 'Find verses similar to verse ' + study.vs"></span>
+                            </button>
+                            <div class="study-pane-state" x-show="studySimilar.status === 'loading'"><div class="loading-spinner"></div></div>
+                            <p class="study-note" x-show="studySimilar.status === 'unavailable'">Finding similar verses isn't available right now.</p>
+                            <p class="study-note" x-show="studySimilar.status === 'limited'">Too many searches in a minute. Try again shortly.</p>
+                            <p class="study-note" x-show="studySimilar.status === 'error'">Couldn't find similar verses. <button type="button" class="study-text-btn" @click="studySimilar.status = 'idle'; studyLoadSimilar()">Try again</button></p>
+                            <p class="study-note" x-show="studySimilar.status === 'ready' && !studySimilar.items.length">No other verses came close.</p>
+                            <ol class="xref-list similar-list" x-show="studySimilar.status === 'ready'">
+                                <template x-for="it in studySimilarShown()" :key="'sim-' + it.ref">
+                                    <li>
+                                        <button type="button" class="xref-item" @click="studyPeek(it.ref, { context: true })">
+                                            <span class="xref-ref" x-text="it.ref"></span>
+                                            <span class="xref-text" x-html="it.text"></span>
+                                        </button>
+                                    </li>
+                                </template>
+                            </ol>
+                            <button type="button" class="xref-more" x-show="studySimilar.status === 'ready' && !studySimilar.showAll && studySimilar.items.length > 6" @click="studySimilar.showAll = true">
+                                Show all <span x-text="studySimilar.items.length"></span>
+                            </button>
+                        </section>
                     </div>
                 </section>
 
@@ -2943,7 +3031,7 @@
                     <p class="hymn-first" x-show="hymnFirstLine(hymnSheet.data)" x-text="hymnFirstLine(hymnSheet.data)"></p>
                     <dl class="study-info-facts hymn-facts">
                         <template x-if="hymnWho(hymnSheet.data)"><div><dt>Words</dt><dd x-text="hymnWho(hymnSheet.data)"></dd></div></template>
-                        <template x-if="hymnSheet.data.tune"><div><dt>Tune</dt><dd x-text="hymnDecode(hymnSheet.data.tune).replace(/`/g, '’') + (hymnSheet.data.composer ? ', ' + hymnDecode(hymnSheet.data.composer).replace(/(\d)-(\d)/g, '$1–$2') : '')"></dd></div></template>
+                        <template x-if="hymnSheet.data.tune"><div><dt>Tune</dt><dd x-text="hymnDecode(hymnSheet.data.tune) + (hymnSheet.data.composer ? ', ' + hymnDecode(hymnSheet.data.composer).replace(/(\d)-(\d)/g, '$1–$2') : '')"></dd></div></template>
                         <template x-if="hymnSheet.data.meter"><div><dt>Meter</dt><dd x-text="hymnSheet.data.meter"></dd></div></template>
                         <template x-if="hymnSheet.data.copyright"><div><dt>Copyright</dt><dd x-text="hymnSheet.data.words_public_domain ? 'Words in the public domain' : hymnDecode(hymnSheet.data.copyright)"></dd></div></template>
                     </dl>
@@ -3144,6 +3232,7 @@
     <script src="/static/js/modules/study_panes.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/hymns.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/wordstudy.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/search.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/nav.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/wordlink.js?v=__SW_VERSION__"></script>
     <script src="/static/js/app.js?v=__SW_VERSION__"></script>

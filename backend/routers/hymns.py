@@ -4,6 +4,7 @@ GET /api/hymns/for-passage?ref=Psalm 23:1-4   hymns built on or quoting a passag
 GET /api/hymns/{hymn_id}                      one hymn with all its passages
 GET /api/hymns?q=grace | ?key=amazinggrace    find hymns by words or by join key
 """
+import html
 import json
 from typing import Optional
 
@@ -16,17 +17,37 @@ from ..hymn_keys import keys_for, keys_match, title_key
 router = APIRouter()
 
 KIND_ORDER = {"quotes": 0, "paraphrase": 0, "based_on": 0, "reference": 1}
+HYMNAL = "openhymnal"   # the one source that is a hymnal sung from today, with scores
 RANKING = ("1) hymns linked to verses inside the passage before hymns linked only elsewhere "
            "in the same chapter; 2) a quotation or a paraphrase before a plain reference; "
-           "3) the share of the hymn's linked verses that fall inside the passage; 4) the share "
-           "of all the hymn's Scripture links that touch the passage (a hymn citing 3 "
-           "passages is more about each than one citing 12); 5) title")
+           "3) among links of the same strength, the more familiar text first: a text printed "
+           "in the Open Hymnal (a hymnal with music, sung today) before one found only in a "
+           "historical psalter or hymn book, then a text carried by more independent sources, "
+           "then one with a tune recorded; 4) the share of the hymn's linked verses that fall "
+           "inside the passage; 5) the share of all the hymn's Scripture links that touch the "
+           "passage (a hymn citing 3 passages is more about each than one citing 12); 6) title")
+
+
+def _clean(s):
+    """Source text as a reader should see it: the Open Hymnal escapes '&' in topics
+    ('Majesty &amp; Power') and writes a backtick for an apostrophe in tune names
+    ("Brother James` Air"). Fixed here for display; the stored rows are unchanged."""
+    return html.unescape(s).replace("`", "’") if isinstance(s, str) else s
+
+
+def _familiarity(settings) -> tuple:
+    """Sort key, lower = more familiar to a congregation, from facts in the index only."""
+    sources = {x["source"] for x in settings}
+    return (0 if HYMNAL in sources else 1, -len(sources),
+            0 if any(x["tune"] for x in settings) else 1)
 
 
 def _hymn(row) -> dict:
     d = dict(row)
     for k in ("alt_titles", "topics", "keys"):
         d[k] = json.loads(d[k]) if d.get(k) else []
+    d["topics"] = [_clean(t) for t in d["topics"]]
+    d["tune"] = _clean(d.get("tune"))
     d["words_public_domain"] = bool(d["words_public_domain"])
     d.pop("title_key", None)
     return d
@@ -132,9 +153,11 @@ def hymns_for_passage(
                     "openhymnal":
                 groups[r["text_key"]]["row"] = r   # show a hymnal's title, tune and metre
             groups[r["text_key"]]["settings"].append(
-                {"id": r["id"], "source": r["source"], "title": r["title"], "tune": r["tune"],
-                 "meter": r["meter"]})
+                {"id": r["id"], "source": r["source"], "title": r["title"],
+                 "tune": _clean(r["tune"]), "meter": r["meter"]})
         for g in groups.values():
+            # match, link strength, then familiarity, then share / focus / title
+            g["rank"] = (*g["rank"][:2], *_familiarity(g["settings"]), *g["rank"][2:])
             hymn = _hymn(g["row"])
             hymn["links"] = [lk for _, lk in sorted(g["links"].values(), key=lambda x: x[0])]
             hymn["match"] = "passage" if g["rank"][0] == 0 else "chapter"
@@ -202,7 +225,7 @@ def get_hymn(hymn_id: str):
             WHERE h.text_key = ?
             ORDER BY b.book_order, s.chapter, COALESCE(s.verse_start, 0), s.kind, s.source""",
             (row["text_key"],))]
-        hymn["other_settings"] = [dict(r) for r in conn.execute(
+        hymn["other_settings"] = [{**dict(r), "tune": _clean(r["tune"])} for r in conn.execute(
             "SELECT id, source, title, tune, meter FROM hymns WHERE text_key = ? AND id != ? "
             "ORDER BY id", (row["text_key"], hymn_id))]
         hymn["sources"] = _sources(conn)
