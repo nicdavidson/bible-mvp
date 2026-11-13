@@ -23,6 +23,7 @@ Data sources:
     Network APIs:
         - KJV/WEB translations  (GitHub raw files)
         - Strong's lexicon      (openscriptures GitHub)
+        - Dodson, Abbott-Smith, OpenScriptures BDB (GitHub, pinned commits)
         - KJV Strong's tags     (eBible.org eng-kjv2006 USFM, for the alignments step)
         - Commentary            (HelloAO Bible API, CrossWire SWORD modules, Tyndale Open
                                  Resources; cached in data/sources/)
@@ -87,6 +88,14 @@ IMPORT_STEPS = [
         "description": "Strong's Hebrew & Greek lexicon",
         "version": "1.0",
         "script": "import_strongs.py",
+    },
+    {
+        # Dodson + Abbott-Smith (Greek), OpenScriptures BDB (Hebrew), each kept separate;
+        # pinned GitHub commits cached in data/sources/lexicons/. docs/WORD_STUDY_2026-11.md
+        "name": "lexicons",
+        "description": "Dodson, Abbott-Smith and BDB lexicons + stated lemma relations",
+        "version": "1.0",
+        "script": "import_lexicons.py",
     },
     {
         "name": "alignments",
@@ -171,6 +180,13 @@ IMPORT_STEPS = [
         "version": "1.0",
         "script": "import_naves.py",
         "requires_data": "naves/NavesTopicalDictionary.csv",
+    },
+    {
+        # Needs interlinear, alignments, lexicons, cross_refs and naves.
+        "name": "word_study",
+        "description": "Word study tables: lemma profiles, collocates, topics, xrefs, samples",
+        "version": "1.0",
+        "script": "build_word_study.py",
     },
     {
         "name": "tidy",
@@ -406,6 +422,8 @@ def count_rows(conn, step_name):
         "speakers": "speaker_verses",
         "spurgeon": "devotionals",
         "naves": "naves_topics",
+        "lexicons": "lexicon_entries",
+        "word_study": "lemma_profile",
     }
     if step_name.startswith("commentary_"):
         table = "commentary_entries"
@@ -568,7 +586,7 @@ def main():
             sys.exit(1)
 
     # Network steps
-    NETWORK_STEPS = {"full_bibles", "web", "strongs", "alignments", "spurgeon"} | {
+    NETWORK_STEPS = {"full_bibles", "web", "strongs", "lexicons", "alignments", "spurgeon"} | {
         s["name"] for s in IMPORT_STEPS if s["name"].startswith("commentary_")
     }
 
