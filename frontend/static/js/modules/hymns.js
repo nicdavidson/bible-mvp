@@ -83,7 +83,7 @@ window.BibleModules = window.BibleModules || {};
         hymnWho(h) {
             const parts = [];
             if (h.author) parts.push(decode(h.author).replace(/(\d)-(\d)/g, '$1–$2'));
-            if (h.translator) parts.push(`tr. ${decode(h.translator)}`);
+            if (h.translator) parts.push(`tr. ${decode(h.translator).replace(/(\d)-(\d)/g, '$1–$2')}`);
             let who = parts.join('; ');
             if (h.words_year && !who.includes(String(h.words_year))) who += who ? `, ${h.words_year}` : String(h.words_year);
             return who;

@@ -2334,7 +2334,7 @@
                                                     <button type="button" class="ws-col" :class="{ 'is-zero': !b.count }" :aria-pressed="ws.book?.book === b.book ? 'true' : 'false'"
                                                             :aria-label="b.book + ': ' + (b.count === 1 ? 'once' : b.count + ' times')" :title="b.book + ': ' + b.count"
                                                             :disabled="!b.count" @click="wsPickBook(b)">
-                                                        <span class="ws-col-bar" :style="'height:' + (b.count ? Math.max(8, b.h) : 0) + '%'"></span>
+                                                        <span class="ws-col-bar" :style="'height:' + (b.count ? Math.max(5, b.h) : 0) + '%'"></span>
                                                     </button>
                                                 </template>
                                             </span>
@@ -2364,7 +2364,7 @@
                                 </div>
                                 <template x-if="wsEditions()">
                                     <p class="ws-sec-sub ws-editions">Counted in the SBL Greek New Testament (the BSB's Greek). The Greek behind the KJV has it
-                                        <button type="button" class="ws-inline-link" @click="wsOpenList({ kind: 'edition', value: 'TR' })" x-text="wsEditions().TR + ' times'"></button>, the Byzantine text
+                                        <button type="button" class="ws-inline-link" @click="wsOpenList({ kind: 'edition', value: 'TR' })" x-text="wsEditions().TR + ' times'"></button>, the Byzantine text (the WEB's)
                                         <button type="button" class="ws-inline-link" @click="wsOpenList({ kind: 'edition', value: 'Byz' })" x-text="wsEditions().Byz + ' times'"></button>.</p>
                                 </template>
                                 <p class="ws-credit" x-text="wsCredit('stepbible')"></p>
@@ -2402,7 +2402,7 @@
                             <!-- Related by the lexicons' own statements -->
                             <section class="ws-sec" id="ws-sec-related" aria-labelledby="ws-h-related" x-show="wsRelated().length">
                                 <h2 id="ws-h-related">Related words</h2>
-                                <p class="ws-sec-sub" x-text="'Only relations a lexicon states. Tap a word to study it.'"></p>
+                                <p class="ws-sec-sub">Only relations a lexicon states. Tap a word to study it.</p>
                                 <ul class="ws-rows">
                                     <template x-for="r in wsRelated()" :key="'r-' + r.strong_number">
                                         <li><button type="button" class="ws-word-row" @click="wsGoWord(r.strong_number)">
@@ -2415,6 +2415,7 @@
                                         </button></li>
                                     </template>
                                 </ul>
+                                <p class="ws-credit">Glosses: <span x-text="wsGlossSources(wsRelated())"></span>.</p>
                             </section>
 
                             <!-- Computed from the data: lower, and labelled -->
@@ -2434,7 +2435,7 @@
                                         </button></li>
                                     </template>
                                 </ul>
-                                <p class="ws-credit"><span x-text="wsCredit('stepbible')"></span> Glosses: Dodson (Greek), Brown–Driver–Briggs (Hebrew).</p>
+                                <p class="ws-credit"><span x-text="wsCredit('stepbible')"></span>. Glosses: <span x-text="wsGlossSources(wsCollocates())"></span>.</p>
                             </section>
 
                             <section class="ws-sec is-computed" aria-labelledby="ws-h-xref" x-show="wsXrefs().length">

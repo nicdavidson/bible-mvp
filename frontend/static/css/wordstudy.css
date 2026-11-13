@@ -229,7 +229,7 @@ dialog.word-study::backdrop { background: var(--color-bg); }
 .ws-lex-entry + .ws-lex-entry { margin-top: 0.75rem; }
 .ws-lex-entry.is-other { opacity: 0.8; }
 .ws-lex-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.5rem; margin: 0 0 0.25rem; }
-.ws-lex-head .ws-orig { font-size: 1.3rem; }
+.ws-lex-head .ws-orig { font-size: 1.15rem; }
 .ws-lex-hg { font: 0.8rem var(--font-sans); color: var(--color-text-secondary); }
 .ws-lex-gloss { font-family: var(--font-verse); font-size: 1.05rem; font-weight: 600; }
 .ws-lex-def {
@@ -284,7 +284,7 @@ dialog.word-study::backdrop { background: var(--color-bg); }
 .ws-tr-other { margin: 0.25rem 0 0; font: 0.8rem var(--font-sans); color: var(--color-text-secondary); }
 
 /* Where it occurs: a row per part of the Bible, a column per book, one shared scale */
-.ws-dist { display: grid; gap: 4px; }
+.ws-dist { display: grid; gap: 10px; }
 .ws-dist-row { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) 2.6rem; align-items: end; gap: 0.5rem; }
 .ws-dist-name { font: 0.8rem/1.2 var(--font-sans); color: var(--color-text-secondary); padding-bottom: 2px; }
 .ws-dist-total { font: 0.85rem var(--font-sans); font-variant-numeric: tabular-nums; text-align: right; color: var(--color-text); padding-bottom: 2px; }
@@ -308,7 +308,7 @@ dialog.word-study::backdrop { background: var(--color-bg); }
     cursor: pointer;
 }
 .ws-col:disabled { cursor: default; }
-.ws-col-bar { display: block; width: min(100%, 14px); background: var(--ws-ink); border-radius: 3px 3px 0 0; }
+.ws-col-bar { display: block; width: min(100%, 14px); min-height: 2px; background: var(--ws-ink); border-radius: 2px 2px 0 0; }
 .ws-col.is-zero::after {
     content: '';
     position: absolute;

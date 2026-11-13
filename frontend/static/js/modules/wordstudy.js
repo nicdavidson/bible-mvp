@@ -288,7 +288,7 @@ window.BibleModules = window.BibleModules || {};
         // The one-line answer to "what is this word": the briefest lexicon gloss, named
         wsGlance() {
             const sel = this.wsOcc().homograph;
-            const order = this.wsLang() === 'hebrew' ? ['bdb', 'strongs'] : ['dodson', 'abbott-smith', 'strongs'];
+            const order = this.wsLang() === 'hebrew' ? ['bdb', 'strongs'] : ['abbott-smith', 'dodson', 'strongs'];   // as the word panel
             for (const key of order) {
                 const l = (this.ws.data?.lexicons || []).find(x => x.source === key);
                 const e = l && ((sel && l.entries.find(x => x.homograph === sel)) || l.entries[0]);
@@ -401,6 +401,9 @@ window.BibleModules = window.BibleModules || {};
             }));
         },
         wsCollocates() { return this.ws.data?.collocates?.items || []; },
+        wsGlossSources(items) {
+            return [...new Set(items.map(i => i.gloss_source).filter(Boolean))].map(k => this.wsSourceName(k)).join(', ');
+        },
         wsRelated() { return this.ws.data?.related?.items || []; },
         wsRelationLabel(link) {
             const r = RELATION[link.relation] || link.relation;
