@@ -23,6 +23,8 @@ Usage:
 """
 import json
 import os
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -61,12 +63,21 @@ def write_cache(key: str, data: str):
     p.write_text(data, encoding="utf-8")
 
 
+class NotFound(Exception):
+    """Upstream answered 404; remembered in the cache so rebuilds stay offline."""
+
+
 def _fetch_url(url: str, timeout: int = 30) -> str | None:
-    """Fetch raw text from URL."""
+    """Fetch raw text from URL. Raises NotFound on HTTP 404."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "BibleMVP/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as response:
             return response.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise NotFound(url) from e
+        print(f"    Error fetching {url}: {e}")
+        return None
     except Exception as e:
         print(f"    Error fetching {url}: {e}")
         return None
@@ -89,8 +100,18 @@ def cached_fetch(key: str, url: str, timeout: int = 30) -> str | None:
     if cached is not None:
         return cached
 
+    missing = _cache_path(key + ".404")
+    if missing.exists():
+        return None
+
     # Fetch from network
-    data = _fetch_url(url, timeout)
+    try:
+        data = _fetch_url(url, timeout)
+    except NotFound:
+        print(f"    Not found upstream (cached as missing): {url}")
+        _ensure_dir(missing)
+        missing.write_text(url + "\n", encoding="utf-8")
+        return None
     if data is not None:
         write_cache(key, data)
     return data
@@ -106,6 +127,38 @@ def cached_fetch_json(key: str, url: str, timeout: int = 30) -> dict | list | No
     except json.JSONDecodeError as e:
         print(f"    JSON parse error for {key}: {e}")
         return None
+
+
+_last_fetch = 0.0
+
+
+def cached_fetch_bytes(key: str, url: str, timeout: int = 120, min_interval: float = 2.0) -> bytes | None:
+    """Fetch a binary file (e.g. a SWORD module zip) from cache or URL.
+
+    Network fetches are spaced at least `min_interval` seconds apart to be polite to
+    upstream servers. Returns None on failure.
+    """
+    global _last_fetch
+    p = _cache_path(key)
+    if p.exists() and p.stat().st_size > 0:
+        return p.read_bytes()
+    wait = _last_fetch + min_interval - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "BibleMVP/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            data = response.read()
+    except Exception as e:
+        print(f"    Error fetching {url}: {e}")
+        return None
+    finally:
+        _last_fetch = time.time()
+    _ensure_dir(p)
+    tmp = p.with_suffix(p.suffix + ".part")
+    tmp.write_bytes(data)
+    tmp.replace(p)
+    return data
 
 
 def cached_fetch_html(key: str, url: str, timeout: int = 30) -> str | None:

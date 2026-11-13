@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
 """
 Add clickable Bible reference links to commentary entries.
-This is a one-time migration that processes all commentary and embeds links.
+
+scripts/import_commentary.py already links references while importing, so a normal build
+does not need this. It is kept for re-linking existing rows (e.g. after improving the
+abbreviation table): it adds links to references that are not linked yet, never touches
+existing anchors, and only links verses that exist (KJV versification).
+
+Usage:
+    python scripts/add_commentary_links.py                  # all sources
+    python scripts/add_commentary_links.py --source "John Gill"
+
+Honors DATABASE_PATH like the other import scripts.
 """
 
+import argparse
+import os
 import sqlite3
 import re
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "data" / "bible.db"
+DB_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 
 # Book abbreviation mappings (Matthew Henry style -> full name)
 # Includes both abbreviations and full names for comprehensive matching
@@ -142,42 +154,42 @@ def add_links(content):
 
 
 def main():
+    # Imported here: commentary_text imports BOOK_ABBREVS from this module.
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from commentary_text import RefResolver, link_text_refs
+    from sword_reader import kjv_versification
+
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--source", help="only this commentary_entries.source")
+    args = parser.parse_args()
+
     print(f"Opening database: {DB_PATH}")
     conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    # Get all commentary entries
-    cursor.execute("SELECT id, content FROM commentary_entries")
-    entries = cursor.fetchall()
+    resolver = RefResolver(kjv_versification(conn))
+    sql = "SELECT id, content FROM commentary_entries"
+    params = ()
+    if args.source:
+        sql += " WHERE source = ?"
+        params = (args.source,)
+    entries = conn.execute(sql, params).fetchall()
     print(f"Found {len(entries)} commentary entries")
 
-    updated = 0
-    links_added = 0
-
+    updated = links_added = 0
     for entry_id, content in entries:
         if not content:
             continue
-
-        # Count existing refs
-        original_refs = len(REF_PATTERN.findall(content))
-
-        # Add links
-        new_content = add_links(content)
-
-        if new_content != content:
-            cursor.execute(
-                "UPDATE commentary_entries SET content = ? WHERE id = ?",
-                (new_content, entry_id)
-            )
+        new_content, added = link_text_refs(content, resolver)
+        if added:
+            conn.execute("UPDATE commentary_entries SET content = ? WHERE id = ?",
+                         (new_content, entry_id))
             updated += 1
-            links_added += original_refs
+            links_added += added
 
     conn.commit()
     conn.close()
-
     print(f"\nUpdated {updated} entries")
     print(f"Added {links_added} clickable links")
-    print("Done!")
 
 
 if __name__ == "__main__":
