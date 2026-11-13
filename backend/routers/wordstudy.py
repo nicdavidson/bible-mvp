@@ -97,6 +97,30 @@ def _brief(conn, strongs) -> dict:
     return out
 
 
+HOMOGRAPH_ORDER = ("Several BDB entries share this Strong's number. Ordered by how often "
+                   "BSB, KJV and WEB render the lemma with a word from the entry's glosses, "
+                   "then by the count BDB prints, then the longer article first.")
+
+
+def _order_homographs(conn, plain, entries):
+    """BDB homographs (e.g. H3581 'chameleon' vs 'strength, power'): the entry whose
+    glosses match the lemma's actual renderings first. Each entry gets `rendering_matches`."""
+    renderings = conn.execute("SELECT rendering, SUM(count) FROM lemma_renderings "
+                              "WHERE strong_number = ? GROUP BY rendering", (plain,)).fetchall() \
+        if _has(conn, "lemma_renderings") else []
+
+    def stems(text):
+        return {w[:5] for w in re.findall(r"[a-z]{3,}", (text or "").lower())}
+
+    for e in entries:
+        g = stems(e["gloss"])
+        e["rendering_matches"] = sum(n for r, n in renderings if g & stems(r))
+    return sorted(entries, key=lambda e: (-e["rendering_matches"],
+                                          -(e["meta"].get("count") or 0),
+                                          -len(e["definition"] or ""),
+                                          e["meta"].get("aug") or ""))
+
+
 def _lexicons(conn, plain, hebrew, word):
     sections = []
     if _has(conn, "lexicon_entries"):
@@ -107,9 +131,14 @@ def _lexicons(conn, plain, hebrew, word):
                 "headword": r["headword"], "gloss": r["gloss"], "definition": r["definition"],
                 "notes": r["notes"], "source_key": r["source_key"],
                 "meta": json.loads(r["meta"]) if r["meta"] else {}})
+        if len(rows.get("bdb", [])) > 1:
+            rows["bdb"] = _order_homographs(conn, plain, rows["bdb"])
         for src in (("bdb",) if hebrew else ("abbott-smith", "dodson")):
             if rows.get(src):
-                sections.append({"source": src, "entries": rows[src]})
+                section = {"source": src, "entries": rows[src]}
+                if src == "bdb" and len(rows[src]) > 1:
+                    section["order"] = HOMOGRAPH_ORDER
+                sections.append(section)
     if word:
         sections.append({"source": "strongs", "entries": [{
             "headword": word["original"], "transliteration": word["transliteration"],

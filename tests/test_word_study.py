@@ -228,3 +228,11 @@ def test_verses_endpoint(client):
 def test_errors(client):
     assert client.get("/api/word/G99999/study").status_code == 404
     assert client.get("/api/word/love/study").status_code == 400
+
+
+@needs_db
+def test_bdb_homographs_follow_the_renderings(client):
+    # H3581 kōaḥ: BDB I 'chameleon' (Lv 11:30) vs II 'strength, power' (125 more uses)
+    d = client.get("/api/word/H3581/study").json()
+    bdb = next(s for s in d["lexicons"] if s["source"] == "bdb")
+    assert bdb["entries"][0]["gloss"] == "strength, power" and "order" in bdb
