@@ -24,6 +24,7 @@ Data sources:
         - KJV/WEB translations  (GitHub raw files)
         - Strong's lexicon      (openscriptures GitHub)
         - Dodson, Abbott-Smith, OpenScriptures BDB (GitHub, pinned commits)
+        - Open Hymnal Project ABC file (openhymnal.org, one edition)
         - KJV Strong's tags     (eBible.org eng-kjv2006 USFM, for the alignments step)
         - Commentary            (HelloAO Bible API, CrossWire SWORD modules, Tyndale Open
                                  Resources; cached in data/sources/)
@@ -180,6 +181,14 @@ IMPORT_STEPS = [
         "version": "1.0",
         "script": "import_naves.py",
         "requires_data": "naves/NavesTopicalDictionary.csv",
+    },
+    {
+        # Open Hymnal (public-domain indices) -> hymns + hymn_scripture; needs KJV verses.
+        # docs/HYMN_INDEX_2026-11.md
+        "name": "hymns",
+        "description": "Scripture-to-hymn index (Open Hymnal Project)",
+        "version": "1.0",
+        "script": "import_hymns.py",
     },
     {
         # Needs interlinear, alignments, lexicons, cross_refs and naves.
@@ -424,6 +433,7 @@ def count_rows(conn, step_name):
         "naves": "naves_topics",
         "lexicons": "lexicon_entries",
         "word_study": "lemma_profile",
+        "hymns": "hymns",
     }
     if step_name.startswith("commentary_"):
         table = "commentary_entries"
@@ -586,7 +596,8 @@ def main():
             sys.exit(1)
 
     # Network steps
-    NETWORK_STEPS = {"full_bibles", "web", "strongs", "lexicons", "alignments", "spurgeon"} | {
+    NETWORK_STEPS = {"full_bibles", "web", "strongs", "lexicons", "alignments", "spurgeon",
+                     "hymns"} | {
         s["name"] for s in IMPORT_STEPS if s["name"].startswith("commentary_")
     }
 

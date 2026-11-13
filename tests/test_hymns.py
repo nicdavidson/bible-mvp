@@ -1,0 +1,184 @@
+"""Scripture-to-hymn index: ABC parsing, reference parsing, join keys, and the API."""
+import sqlite3
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from backend.hymn_keys import keys_for, title_key  # noqa: E402
+from import_hymns import (credit_refs, first_line, hymn_rows, parse_refs,  # noqa: E402
+                          quotes_for, syllables, words_public_domain)
+
+MAXV = {("Luke", 1): 80, ("Psalms", 33): 22}
+
+ABC = """%OHSCRIP Jn 9:25, Eph 2:4-9, 43:1
+%OHTOPICS {Assurance}, {Grace [1,2]}
+%OHCATEGORY CROSS AND COMFORT
+%OHMETRICAL 8 6 8 6
+%OHAUTHOR Newton, John (1725-1807)
+%OHTRANSLATOR none
+X: 219
+T: Amazing Grace
+T: (also known as Faith's Review and Expectation)
+C: Words: John Newton, 1779.
+C: Music: 'New Britain' James P. Carrell, 1831.
+C: copyright: public domain.  This score is a part of the Open Hymnal Project.
+[V: S1V1]  D | G2 B/G/ |
+w: 1.~A- maz- ing * grace! How sweet the sound That
+w: 2.~'Twas grace that * taught my heart to fear, And
+[V: S1V1]  G2 B/G/ |
+w: saved a * wretch like me!
+w: grace my * fears re- lieved;
+%OHSCRIP Ps 23
+%OHMETRICAL 8 6 8 6
+%OHAUTHOR Someone, Modern
+X: 1
+T: A Modern Text
+C: Words: Psalm 23, para. A. Writer, 2009.
+C: copyright: music and setting public domain.  Words: Copyright 2009, A. Writer.
+[V: S1V1] D |
+w: 1.~The Lord's my shep- herd, I'll not want
+"""
+
+
+def test_syllables_and_first_line_by_metre():
+    syl = syllables("1.~A- maz- ing * grace! How sweet the sound That")
+    assert syl[:3] == [("A", True), ("maz", True), ("ing", False)]
+    assert first_line(syl, "8 6 8 6") == "Amazing grace! How sweet the sound"
+    assert first_line(syllables("1.~Ho- ly, ho- ly, ho- ly! Lord"), "6 6 6 6") == \
+        "Holy, holy, holy!"
+
+
+def test_words_public_domain():
+    assert words_public_domain("public domain.  This score is a part of the Open Hymnal")
+    assert words_public_domain("Words and Music, public domain.  Setting: Copyright 2009 B.")
+    assert not words_public_domain("music and setting public domain.  Words: Copyright 2005")
+    assert not words_public_domain("Tune public domain.  Lyrics and Setting Copyright 2012")
+    assert not words_public_domain("This hymn (lyrics, music, and setting) may be freely ...")
+
+
+def test_parse_refs():
+    refs = parse_refs("Jn 9:25, Eph 2:4-9, 43:2-5, Ps 33, Lv 25:9-10, 1Pt 2:5, 1Cor 5:7b", MAXV)
+    assert [r[:4] for r in refs] == [
+        ("John", 9, 25, 25), ("Ephesians", 2, 4, 9), ("Ephesians", 43, 2, 5),
+        ("Psalms", 33, None, None), ("Leviticus", 25, 9, 10), ("1 Peter", 2, 5, 5),
+        ("1 Corinthians", 5, 7, 7)]
+    cross = parse_refs("Lk 1:67-2:10", MAXV)
+    assert [r[:4] for r in cross] == [("Luke", 1, 67, 80), ("Luke", 2, 1, 10)]
+    assert parse_refs("\\nMal 4:2", MAXV)[0][:4] == ("Malachi", 4, 2, 2)
+
+
+def test_credit_refs():
+    assert [r[:4] for r in credit_refs("Psalm 146.  Translated by ..., 1909.", MAXV)] == \
+        [("Psalms", 146, None, None)]
+    assert [r[:4] for r in credit_refs("Martin Luther, 1526, after Is 6:1-4.", MAXV)] == \
+        [("Isaiah", 6, 1, 4)]
+
+
+def test_title_keys():
+    assert title_key("The Lord's My Shepherd") == "lordsmyshepherd"
+    assert title_key("Holy, Holy, Holy!") == title_key("Holy Holy Holy")
+    assert keys_for("Some Glad Morning (I'll Fly Away)") == {"somegladmorning", "illflyaway"}
+
+
+def test_hymn_rows_from_abc():
+    index = ({("i", "once", "was", "lost", "but"): {("John", 9, 25)}},
+             {w: 1000 for w in ("i", "once", "was", "lost", "but")})
+    hymns, links = hymn_rows(ABC, MAXV, None)
+    amazing, modern = hymns
+    assert amazing[0] == "oh-219" and amazing[1] == "Amazing Grace"
+    assert amazing[3] == "Amazing grace! How sweet the sound"   # first line (PD words)
+    assert amazing[4] == "Newton, John (1725-1807)" and amazing[6] == 1779
+    assert amazing[8] == "New Britain" and amazing[10] == "8 6 8 6" and amazing[13] == 1
+    assert "faithsreviewandexpectation" in amazing[16]
+    assert modern[3] is None and modern[13] == 0   # copyrighted words: no text stored
+    kinds = {(lk[0], lk[5]) for lk in links}
+    assert ("oh-219", "reference") in kinds and ("oh-1", "paraphrase") in kinds
+    assert ("Ephesians", 43, 1, 1) in [lk[1:5] for lk in links]  # book carried forward
+    assert quotes_for(["I once was lost but now am found"], index) == []  # common words only
+
+
+def test_quotes_need_a_long_run_or_a_rare_word():
+    index = {("holy", "holy", "holy", "lord", "god"): {("Revelation", 4, 8)},
+             ("holy", "holy", "lord", "god", "almighty"): {("Revelation", 4, 8)},
+             ("that", "we", "may", "live", "and"): {("Genesis", 42, 2)}}
+    freq = {"almighty": 57, "holy": 500, "live": 600, "may": 900}
+    found = quotes_for(["Holy, holy, holy! Lord God Almighty!", "that we may live and die"],
+                       (index, freq))
+    assert found == [(("Revelation", 4, 8), "holy holy holy lord god almighty")]
+
+
+# --- API on the built database --------------------------------------------------------------
+
+DB = ROOT / "data" / "bible.db"
+
+
+def _built():
+    if not DB.exists():
+        return False
+    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    try:
+        return conn.execute("SELECT 1 FROM sqlite_master WHERE name='hymn_scripture'"
+                            ).fetchone() is not None
+    finally:
+        conn.close()
+
+
+needs_db = pytest.mark.skipif(not _built(), reason="hymn index not built")
+
+
+@pytest.fixture(scope="module")
+def client():
+    from fastapi.testclient import TestClient
+
+    from backend.main import app
+    return TestClient(app)
+
+
+@needs_db
+def test_for_passage_ranks_paraphrase_first(client):
+    d = client.get("/api/hymns/for-passage", params={"ref": "Psalm 23"}).json()
+    assert d["hymns"][0]["title"] == "The Lord's My Shepherd"
+    assert d["hymns"][0]["links"][0]["kind"] == "paraphrase"
+    assert all(h["match"] in ("passage", "chapter") for h in d["hymns"])
+    for h in d["hymns"]:
+        for lk in h["links"]:
+            assert lk["source"] in d["sources"]
+
+
+@needs_db
+def test_for_passage_quote_and_groups_tunes(client):
+    d = client.get("/api/hymns/for-passage", params={"ref": "Revelation 4:8"}).json()
+    top = d["hymns"][0]
+    assert top["title"] == "Holy, Holy, Holy" and top["links"][0]["kind"] == "quotes"
+    assert "holy holy holy" in top["links"][0]["evidence"]
+    fortress = client.get("/api/hymns/for-passage",
+                          params={"book": "Romans", "chapter": 8, "verse_start": 37,
+                                  "verse_end": 39}).json()
+    f = next(h for h in fortress["hymns"] if h["title"] == "A Mighty Fortress Is Our God")
+    assert len(f["settings"]) == 2
+
+
+@needs_db
+def test_chapter_only_matches_can_be_excluded(client):
+    d = client.get("/api/hymns/for-passage",
+                   params={"ref": "Lamentations 3:22-23", "include_chapter": "false"}).json()
+    assert {h["match"] for h in d["hymns"]} == {"passage"}
+    assert "Great Is Thy Faithfulness" in [h["title"] for h in d["hymns"]]
+
+
+@needs_db
+def test_hymn_detail_lookup_and_errors(client):
+    h = client.get("/api/hymns/oh-219").json()
+    assert h["title"] == "Amazing Grace" and h["words_public_domain"] is True
+    assert any(p["reference"] == "John 9:25" for p in h["passages"])
+    found = client.get("/api/hymns", params={"key": "Amazing Grace!"}).json()
+    assert [x["id"] for x in found["hymns"]] == ["oh-219"]
+    assert client.get("/api/hymns", params={"q": "wondrous cross"}).json()["total"] >= 3
+    assert client.get("/api/hymns/nope").status_code == 404
+    assert client.get("/api/hymns/for-passage").status_code == 400
+    assert client.get("/api/hymns/for-passage", params={"ref": "Psalm 999"}).status_code == 404
