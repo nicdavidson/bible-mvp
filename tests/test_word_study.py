@@ -272,6 +272,33 @@ def test_verses_endpoint(client):
 
 
 @needs_db
+def test_verses_with_text_and_topic(client):
+    # ?translation=: each row carries its verse text and the words linked to it
+    r = client.get("/api/word/G26/verses", params={"with": "G4102", "translation": "KJV"}).json()
+    row = next(o for o in r["occurrences"]
+               if (o["book"], o["chapter"], o["verse"]) == ("1 Corinthians", 13, 13))
+    assert row["text"].startswith("And now abideth faith, hope, charity")
+    words = row["text"].replace(",", " ").split()
+    assert [words[p - 1] for p in row["word_positions"]] in (["charity"], ["charity."])
+    assert "text" not in client.get("/api/word/G26/verses").json()["occurrences"][0]
+    assert client.get("/api/word/G26/verses", params={"translation": "NIV"}).status_code == 400
+    # ?topic=: the verses behind a Nave's topic match (hits)
+    topics = client.get("/api/word/G26/study").json()["topics"]["items"]
+    love = next(t for t in topics if t["topic"] == "LOVE")
+    t = client.get("/api/word/G26/verses", params={"topic": love["topic_id"]}).json()
+    assert t["verses"] == love["hits"]
+
+
+@needs_db
+def test_renderings_list_carries_text_and_word_page_serves_app(client):
+    r = client.get("/api/word/G26/renderings",
+                   params={"translation": "KJV", "rendering": "charity"}).json()
+    assert r["total"] == 27 and "charity" in r["occurrences"][0]["text"].lower()
+    page = client.get("/word/G26")
+    assert page.status_code == 200 and "word-study" in page.text
+
+
+@needs_db
 def test_errors(client):
     assert client.get("/api/word/G99999/study").status_code == 404
     assert client.get("/api/word/love/study").status_code == 400
