@@ -24,6 +24,14 @@ The BibleMVP source code is licensed under the **MIT License**.
 | Resource | Status | Source | Notes |
 |----------|--------|--------|-------|
 | Strong's Concordance | Public Domain | [openscriptures](https://github.com/openscriptures/strongs) | Original 1890 work |
+| Dodson Greek Lexicon | Public Domain / CC0 1.0 | [biblicalhumanities/Dodson-Greek-Lexicon](https://github.com/biblicalhumanities/Dodson-Greek-Lexicon) | Repo LICENSE is CC0; Dodson's own note releases it into the public domain. Kept as its own rows in `lexicon_entries` |
+| Abbott-Smith, *Manual Greek Lexicon of the NT* (1922) | Public Domain | [translatable-exegetical-tools/Abbott-Smith](https://github.com/translatable-exegetical-tools/Abbott-Smith) | README: the TEI file "including the marked up version ... is in the public domain". The repo's archive.org PDF has restrictions and is not used |
+| Brown-Driver-Briggs + Lexical Index (OpenScriptures) | **CC BY 4.0** (markup); BDB text public domain | [openscriptures/HebrewLexicon](https://github.com/openscriptures/HebrewLexicon) | Credit "Open Scriptures Hebrew Bible Project" wherever BDB entries or BDB root families are shown (`word_study_sources.attribution`). Abridged edition: most entries carry the sense outline only |
+| Nave's Topical Bible (1896) | Public Domain | `data/naves/` | Topic verse lists |
+| Derived word-study tables (`lemma_*`) | CC BY 4.0 | this project, `scripts/build_word_study.py` | Computed from STEPBible data, the alignments, Nave's and OpenBible.info cross-references; see docs/WORD_STUDY_2026-11.md |
+
+STEPBible's own lexicons (TBESH, TBESG, TFLSJ) are **not** used: see Traps 1 in
+docs/RESOURCE_LICENSES_2026-10.md.
 
 ---
 
@@ -55,6 +63,19 @@ still under renewed copyright), NET Bible notes and KingComments (copyrighted, n
 Luther (CrossWire module mixes in translations from 1915-1949), Matthew Poole (only source is
 non-commercial), HistoricalChristianFaith Commentaries-Database (mixes in copyrighted "fair use"
 excerpts), Pulpit, Ellicott, Expositor's, Cambridge Bible (no clean verse-keyed source found).
+
+## Hymns
+
+Full reasoning and the sources that were rejected: [docs/HYMN_INDEX_2026-11.md](docs/HYMN_INDEX_2026-11.md).
+
+| Resource | Status | Source | Notes |
+|----------|--------|--------|-------|
+| Open Hymnal Project, edition 2026.11 (metadata, topical and Scripture indexes) | Public Domain | [openhymnal.org](http://openhymnal.org/copying.html) | "All content produced specifically by the Open Hymnal which is not a part of a hymn is placed into the public domain ... compilation, indices ... and all other data files." Hymn words and music have per-hymn terms (`hymns.copyright`); we store a hymn's first line only when its words are public domain (`hymns.words_public_domain`) |
+| Computed hymn-to-KJV quotation links | Public Domain inputs | this project, `scripts/import_hymns.py` | Shared word runs between public-domain hymn words and the KJV |
+
+Not used without written permission: Hymnary.org (all rights reserved), the Cyber Hymnal
+(hymntime.com page code copyrighted). CCEL hymnals: not used (non-profit-only wording,
+markup claimed by CCEL).
 
 ## Devotionals
 
