@@ -81,7 +81,7 @@ CACHE_SHORT = "public, max-age=3600"  # 1 hour for semi-dynamic content (devotio
 _CACHEABLE_PREFIXES = (
     "/api/passage/", "/api/verse/", "/api/word/", "/api/word-alignment",
     "/api/offline/", "/api/reading-plans", "/api/crossref-map/",
-    "/api/path-to-christ/", "/api/search", "/api/topics/",
+    "/api/path-to-christ/", "/api/search", "/api/topics/", "/api/commentary/",
 )
 _SHORT_CACHE_PREFIXES = ("/api/devotional",)
 
@@ -191,9 +191,9 @@ def root():
 
 
 
-from .routers import passages, words, devotional, plans, offline, crossref_map, topics  # noqa: E402
+from .routers import passages, words, devotional, plans, offline, crossref_map, topics, study  # noqa: E402
 
-for _r in (passages, words, devotional, plans, offline, crossref_map, topics):
+for _r in (passages, words, devotional, plans, offline, crossref_map, topics, study):
     app.include_router(_r.router)
 
 @app.get("/map")

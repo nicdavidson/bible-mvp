@@ -210,6 +210,12 @@ window.BibleModules.feedback = {
 
         // Go to search result
         goToSearchResult(result) {
+            if (result.type === 'commentary' && result.book && result.chapter && result.source) {
+                // A commentary hit opens that source in the study view for its chapter
+                this.showSearch = false;
+                this.openStudy(`${result.book} ${result.chapter}`, { source: result.source });
+                return;
+            }
             if (result.book && result.chapter) {
                 const ref = result.verse
                     ? `${result.book} ${result.chapter}:${result.verse}`

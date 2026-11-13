@@ -16,16 +16,16 @@ const SHELL = [
     '/', '/config.js', '/static/manifest.json', '/static/icons/icon.svg',
     '/static/vendor/alpine-3.17.4.min.js', '/static/vendor/supabase-2.117.2.min.js',
     ...[
-        '/static/css/style.css', '/static/js/app.js', '/static/js/offline-storage.js',
+        '/static/css/style.css', '/static/css/study.css', '/static/js/app.js', '/static/js/offline-storage.js',
         '/static/js/supabase-client.js',
-        ...['tts', 'menus', 'share', 'feedback', 'tags', 'selection', 'offline', 'plans', 'study_extras']
+        ...['tts', 'menus', 'share', 'feedback', 'tags', 'selection', 'offline', 'plans', 'study_extras', 'study']
             .map(m => `/static/js/modules/${m}.js`),
     ].map(u => u + V),
 ];
 
 const CACHEABLE_API = [
     /^\/api\/passage\//, /^\/api\/verse\//, /^\/api\/word\//, /^\/api\/word-alignment/,
-    /^\/api\/topics\//, /^\/api\/reading-plans/, /^\/api\/devotional/,
+    /^\/api\/topics\//, /^\/api\/reading-plans/, /^\/api\/commentary\//, /^\/api\/devotional/,
 ];
 const CONTENT_MAX = 300;
 

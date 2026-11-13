@@ -75,10 +75,7 @@ window.BibleModules.offline = {
                 if (this.crossRefs?.length > 0) {
                     await os.saveChapterCrossRefs(book, ch, this.crossRefs);
                 }
-                // Save commentary
-                if (this.commentary?.length > 0) {
-                    await os.saveChapterCommentary(book, ch, this.commentary);
-                }
+                // Commentary is cached by the study view as each source is read
                 // Save interlinear
                 if (Object.keys(this.interlinearData).length > 0) {
                     const words = [];

@@ -1,0 +1,196 @@
+"""Study view API: sources with per-selection availability, and per-source entries.
+
+Most tests run against a small throwaway SQLite DB (built here) so they can cover
+both states of the data contract: without `commentary_sources` (today) and with it
+(after the commentary import lands). One test runs against the real DB.
+"""
+import sqlite3
+
+import pytest
+from fastapi.testclient import TestClient
+
+from backend.main import app
+from backend.routers import study
+from tests.fixtures import study_seed
+
+
+def _make_db(path, with_sources: bool):
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        CREATE TABLE verses (id INTEGER PRIMARY KEY, translation_id TEXT, book TEXT,
+            book_order INTEGER, chapter INTEGER, verse INTEGER, text TEXT);
+        CREATE TABLE commentary_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT,
+            book TEXT, chapter INTEGER, reference_start INTEGER, reference_end INTEGER,
+            content TEXT, searchable_text TEXT);
+    """)
+    for v in range(1, 37):
+        conn.execute("INSERT INTO verses (translation_id, book, book_order, chapter, verse, text)"
+                     " VALUES ('BSB', 'John', 43, 3, ?, ?)", (v, f"John three {v}"))
+    for v in range(1, 22):
+        conn.execute("INSERT INTO verses (translation_id, book, book_order, chapter, verse, text)"
+                     " VALUES ('BSB', 'Jude', 65, 1, ?, ?)", (v, f"Jude {v}"))
+    # Henry-style passage rows stored with start only; Gill-style verse rows
+    rows = [("Matthew Henry", 1, 1, "henry one"), ("Matthew Henry", 22, 22, "henry two")]
+    rows += [("John Gill", v, v, f"gill {v}") for v in range(1, 37)]
+    for src, s, e, c in rows:
+        conn.execute("INSERT INTO commentary_entries (source, book, chapter, reference_start,"
+                     " reference_end, content) VALUES (?, 'John', 3, ?, ?, ?)", (src, s, e, c))
+    conn.execute("INSERT INTO commentary_entries (source, book, chapter, reference_start,"
+                 " reference_end, content) VALUES ('John Gill', 'Jude', 1, 3, 3, 'gill jude 3')")
+    if with_sources:
+        study_seed.seed(conn, chapters=(("John", 3),))
+    conn.commit()
+    conn.close()
+
+
+@pytest.fixture(params=[False, True], ids=["no-sources-table", "with-sources-table"])
+def tmp_client(request, tmp_path, monkeypatch):
+    db = tmp_path / "study.db"
+    _make_db(db, with_sources=request.param)
+
+    def conn_factory():
+        c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        c.row_factory = sqlite3.Row
+        return c
+
+    monkeypatch.setattr(study, "get_db_connection", conn_factory)
+    monkeypatch.setattr(study, "DATABASE_PATH", db)
+    study._cache.update(key=None, sources=None)
+    yield TestClient(app), request.param
+    study._cache.update(key=None, sources=None)
+
+
+def _by_name(data):
+    return {s["source"]: s for s in data["sources"]}
+
+
+class TestStudyEndpoint:
+    def test_selection_text_and_canonical_reference(self, tmp_client):
+        client, _ = tmp_client
+        r = client.get("/api/passage/jn 3:16-18/study")
+        assert r.status_code == 200
+        d = r.json()
+        assert d["reference"] == "John 3:16-18"
+        assert (d["verse_start"], d["verse_end"], d["chapter_verses"]) == (16, 18, 36)
+        assert [v["verse"] for v in d["verses"]] == [16, 17, 18]
+
+    def test_passage_entry_stored_with_start_only_covers_its_passage(self, tmp_client):
+        client, _ = tmp_client
+        henry = _by_name(client.get("/api/passage/John 3:16/study").json())["Matthew Henry"]
+        assert henry["kind"] == "passage"
+        assert henry["selection_entries"] == 1
+        assert henry["ranges"] == [{"start": 1, "end": 21}]
+        assert henry["short_name"] == "Henry"
+        assert henry["author"] == "Matthew Henry"
+
+    def test_verse_source_counts_each_selected_verse(self, tmp_client):
+        client, _ = tmp_client
+        gill = _by_name(client.get("/api/passage/John 3:16-18/study").json())["John Gill"]
+        assert gill["kind"] == "verse"
+        assert gill["selection_entries"] == 3
+        assert gill["chapter_entries"] == 36
+
+    def test_every_source_listed_even_without_entries(self, tmp_client):
+        client, with_sources = tmp_client
+        srcs = _by_name(client.get("/api/passage/John 3:16/study").json())
+        if not with_sources:
+            assert set(srcs) == {"John Gill", "Matthew Henry"}
+            return
+        assert len(srcs) >= 11
+        pell = srcs["Pell's Expositor"]           # passage that stops at v12
+        assert pell["selection_entries"] == 0
+        assert pell["nearest"] == {"start": 1, "end": 12}
+        cal = srcs["Calloway Word Notes"]          # verse source with a gap 11-24
+        assert cal["selection_entries"] == 0 and cal["nearest"]["start"] in (10, 25)
+        assert srcs["Lindqvist Chapter Studies"]["ranges"] == [{"start": 1, "end": 36}]
+        assert srcs["Okafor Study Notes"]["license"] == "CC BY 4.0"
+        assert srcs["Okafor Study Notes"]["attribution"]
+
+    def test_table_sort_order_wins(self, tmp_client):
+        client, with_sources = tmp_client
+        names = [s["source"] for s in client.get("/api/passage/John 3:16/study").json()["sources"]]
+        if with_sources:
+            assert names[:3] == ["John Gill", "Matthew Henry", "Whitcombe's Verse Notes"]
+        else:
+            assert names == sorted(names, key=str.lower)
+
+    def test_whole_chapter_selection(self, tmp_client):
+        client, _ = tmp_client
+        d = client.get("/api/passage/John 3/study").json()
+        assert d["reference"] == "John 3"
+        assert (d["verse_start"], d["verse_end"]) == (1, 36)
+        assert _by_name(d)["Matthew Henry"]["selection_entries"] == 2
+
+    def test_range_past_chapter_end_is_clamped(self, tmp_client):
+        client, _ = tmp_client
+        d = client.get("/api/passage/John 3:35-50/study").json()
+        assert d["verse_end"] == 36
+
+    def test_bad_reference(self, tmp_client):
+        client, _ = tmp_client
+        assert client.get("/api/passage/John 99:1/study").status_code == 404
+        assert client.get("/api/passage/John 3:80/study").status_code == 404
+
+    def test_single_chapter_book(self, tmp_client):
+        client, _ = tmp_client
+        d = client.get("/api/passage/Jude 3/study").json()
+        assert (d["chapter"], d["verse_start"]) == (1, 3)
+        assert _by_name(d)["John Gill"]["selection_entries"] == 1
+
+
+class TestCommentaryEntries:
+    def test_source_filter_by_slug_and_effective_range(self, tmp_client):
+        client, _ = tmp_client
+        d = client.get("/api/passage/John 3:16/commentary?source=matthew-henry").json()
+        assert len(d["entries"]) == 1
+        e = d["entries"][0]
+        assert (e["source"], e["range_start"], e["range_end"]) == ("Matthew Henry", 1, 21)
+        assert e["content"] == "henry one"
+
+    def test_source_filter_by_name(self, tmp_client):
+        client, _ = tmp_client
+        d = client.get("/api/passage/John 3:16-17/commentary", params={"source": "John Gill"}).json()
+        assert [e["range_start"] for e in d["entries"]] == [16, 17]
+
+    def test_whole_chapter_all_sources(self, tmp_client):
+        client, _ = tmp_client
+        d = client.get("/api/passage/John 3/commentary").json()
+        srcs = {e["source"] for e in d["entries"]}
+        assert {"John Gill", "Matthew Henry"} <= srcs
+        assert all("range_start" in e and "range_end" in e for e in d["entries"])
+
+    def test_unknown_source_is_empty_not_error(self, tmp_client):
+        client, _ = tmp_client
+        r = client.get("/api/passage/John 3:16/commentary?source=nobody")
+        assert r.status_code == 200 and r.json()["entries"] == []
+
+
+class TestSourcesEndpoint:
+    def test_lists_sources_with_metadata(self, tmp_client):
+        client, with_sources = tmp_client
+        r = client.get("/api/commentary/sources")
+        assert r.status_code == 200
+        srcs = {s["slug"]: s for s in r.json()["sources"]}
+        assert srcs["john-gill"]["kind"] == "verse"
+        assert srcs["matthew-henry"]["kind"] == "passage"
+        if with_sources:
+            assert srcs["lindqvist-chapter-studies"]["kind"] == "chapter"
+            assert srcs["okafor-study-notes"]["kind"] == "notes"
+        assert "cache-control" in {k.lower() for k in r.headers}
+
+
+def test_effective_ranges_rules():
+    rows = [{"reference_start": 1, "reference_end": None},
+            {"reference_start": 5, "reference_end": 9},
+            {"reference_start": 12, "reference_end": 12}]
+    assert study.effective_ranges(rows, "passage", 20) == [(1, 4), (5, 9), (12, 20)]
+    assert study.effective_ranges(rows, "verse", 20) == [(1, 1), (5, 9), (12, 12)]
+    assert study.effective_ranges(rows, "chapter", 20) == [(1, 20)] * 3
+
+
+def test_real_db_henry_reaches_john_3_16():
+    """Against the real DB: Henry's John 3 passage entry now matches v16."""
+    study._cache.update(key=None, sources=None)
+    d = TestClient(app).get("/api/passage/John 3:16/study").json()
+    henry = _by_name(d)["Matthew Henry"]
+    assert henry["selection_entries"] == 1 and henry["ranges"][0]["start"] == 1

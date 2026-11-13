@@ -146,9 +146,16 @@ class TestJS:
 
     def test_study_tab_methods_exist(self, js):
         assert "activeTab: 'study'" in js
-        assert "getStudyCommentaryGroups" in js
-        assert "getCommentarySourceTabs" in js
-        assert "return sources.length > 1 ? ['All', ...sources] : sources" in js
+        # Commentary moved to the study view module; the old tab helpers are gone
+        assert "getStudyCommentaryGroups" not in js
+        assert "loadCommentary" not in js
+
+    def test_study_view_module(self):
+        study = (FRONTEND / "static" / "js" / "modules" / "study.js").read_text()
+        for name in ("openStudy(", "studyHandlePop(", "studyLoadAvailability(", "sanitize("):
+            assert name in study
+        sw = SW_PATH.read_text()
+        assert "'study'" in sw and "/static/css/study.css" in sw
 
 
 # ========== HTML INTEGRITY ==========
@@ -198,5 +205,7 @@ class TestHTML:
 
     def test_study_tab_markup_exists(self, html):
         assert "activeTab === 'study'" in html
-        assert "study-commentary-compare" in html
-        assert "getStudyCommentaryGroups()" in html
+        assert '<dialog id="study-view"' in html
+        assert "modules/study.js" in html and "css/study.css" in html
+        # One way to read commentary: the old Commentary tab is gone
+        assert "activeTab === 'commentary'" not in html
