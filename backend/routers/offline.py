@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
+from .. import alignment_store
 from ..database import get_db_connection, get_writable_db_connection, DATABASE_PATH
 from ..core import (OT_BOOKS, NT_BOOKS, CANONICAL_BOOKS, limiter,
                     parse_reference, get_cross_references, get_speaker_verses)
@@ -42,6 +43,48 @@ def _source_clause(names: Optional[list]) -> tuple[str, tuple]:
 
 _sizes_cache: dict = {"key": None, "rows": None}
 
+_LEXICON_JOIN = """
+    LEFT JOIN lexicon l ON l.strong_number = CASE
+        WHEN w.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
+        WHEN w.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
+        ELSE w.strong_number END"""
+
+
+def _chapter_alignments(conn, translation, book, chapter, source_cols) -> dict:
+    """{chapter: [alignment row]} for one chapter (or the whole book when chapter is None).
+
+    Each row: verse, position, word, original_word_position, then `source_cols`
+    (from word_alignments w / lexicon l), in verse and English word order. Links
+    whose source word is missing from word_alignments are skipped, like the
+    inner join over the per-word table this replaces.
+    """
+    where, params = ("AND chapter = ?", (translation, book, chapter)) if chapter is not None \
+        else ("", (translation, book))
+    src = {}
+    for r in conn.execute(f"""
+            SELECT w.chapter AS _ch, w.verse AS _v, w.word_position AS _pos, {source_cols}
+            FROM word_alignments w {_LEXICON_JOIN}
+            WHERE w.book = ? {where.replace('chapter', 'w.chapter')}""", params[1:]):
+        d = dict(r)
+        src[(d.pop("_ch"), d.pop("_v"), d.pop("_pos"))] = d
+    out = {} if chapter is None else {chapter: []}
+    for r in conn.execute(f"""
+            SELECT p.chapter, p.verse, p.method, p.links, v.text
+            FROM {alignment_store.TABLE} p
+            JOIN verses v ON v.translation_id = p.translation_id AND v.book = p.book
+                 AND v.chapter = p.chapter AND v.verse = p.verse
+            WHERE p.translation_id = ? AND p.book = ? {where.replace('chapter', 'p.chapter')}
+            ORDER BY p.chapter, p.verse""", params):
+        words = alignment_store.tappable_words(r["text"])
+        rows = out.setdefault(r["chapter"], [])
+        for epos, opos, conf, method in alignment_store.unpack(r["method"], r["links"]):
+            s = src.get((r["chapter"], r["verse"], opos))
+            if s is not None:
+                rows.append({"verse": r["verse"], "position": epos, "word": words[epos - 1],
+                             "original_word_position": opos, "confidence": conf,
+                             "method": method, **s})
+    return out
+
 # ========== OFFLINE DATA EXPORT ENDPOINTS ==========
 
 @router.get("/api/offline/chapter")
@@ -67,24 +110,11 @@ def get_chapter_offline_data(
         """, (book, chapter, translation))
         verses = [dict(v) for v in cursor.fetchall()]
 
-        # Get word alignments for this chapter (BSB only has deterministic alignments)
-        cursor = conn.execute("""
-            SELECT e.verse, e.english_word_position as position,
-                   e.english_word as word, e.original_word_position, e.confidence, e.method,
-                   w.hebrew_text as original_text, w.transliteration,
-                   w.english_gloss as gloss, w.strong_number, w.grammar,
-                   l.definition, l.extended_definition, l.language
-            FROM english_word_alignments e
-            JOIN word_alignments w ON w.book = e.book AND w.chapter = e.chapter
-                 AND w.verse = e.verse AND w.word_position = e.original_word_position
-            LEFT JOIN lexicon l ON l.strong_number = CASE
-                WHEN w.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
-                WHEN w.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
-                ELSE w.strong_number END
-            WHERE e.translation_id = ? AND e.book = ? AND e.chapter = ?
-            ORDER BY e.verse, e.english_word_position
-        """, (translation, book, chapter))
-        alignments = [dict(a) for a in cursor.fetchall()]
+        # Word alignments for this chapter (packed per verse; same rows as the old join)
+        alignments = _chapter_alignments(
+            conn, translation, book, chapter,
+            "w.hebrew_text as original_text, w.transliteration, w.english_gloss as gloss, "
+            "w.strong_number, w.grammar, l.definition, l.extended_definition, l.language")[chapter]
 
         # Get interlinear data
         cursor = conn.execute("""
@@ -193,22 +223,9 @@ def get_book_offline_data(
 
         alignments_by_ch = {}
         if include_alignments:
-            cursor = conn.execute("""
-                SELECT e.chapter, e.verse, e.english_word_position as position,
-                       e.english_word as word, e.original_word_position, e.confidence, e.method,
-                       w.hebrew_text as original_text, w.strong_number,
-                       l.definition, l.language
-                FROM english_word_alignments e
-                JOIN word_alignments w ON w.book = e.book AND w.chapter = e.chapter
-                     AND w.verse = e.verse AND w.word_position = e.original_word_position
-                LEFT JOIN lexicon l ON l.strong_number = CASE
-                    WHEN w.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
-                    WHEN w.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(w.strong_number, 2) AS INTEGER) AS TEXT)
-                    ELSE w.strong_number END
-                WHERE e.translation_id = ? AND e.book = ?
-                ORDER BY e.chapter, e.verse, e.english_word_position
-            """, (translation, book))
-            alignments_by_ch = _group_by_chapter(cursor, "chapter")
+            alignments_by_ch = _chapter_alignments(
+                conn, translation, book, None,
+                "w.hebrew_text as original_text, w.strong_number, l.definition, l.language")
 
         interlinear_by_ch = {}
         if include_interlinear:
@@ -355,10 +372,10 @@ def get_offline_stats(request: Request):
             "size_mb": round(row['size_bytes'] / 1024 / 1024, 2)
         } for row in cursor.fetchall()}
 
-        # Alignments by translation
-        cursor = conn.execute("""
-            SELECT translation_id, COUNT(*) as count
-            FROM english_word_alignments GROUP BY translation_id
+        # Alignments by translation (linked words)
+        cursor = conn.execute(f"""
+            SELECT translation_id, SUM(n_links) as count
+            FROM {alignment_store.TABLE} GROUP BY translation_id
         """)
         stats["alignments"] = {row['translation_id']: {
             "count": row['count'],

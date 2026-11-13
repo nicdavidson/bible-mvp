@@ -192,8 +192,9 @@ def root():
 
 
 from .routers import passages, words, devotional, plans, offline, crossref_map, topics, study  # noqa: E402
+from .routers import hymns, wordstudy  # noqa: E402
 
-for _r in (passages, words, devotional, plans, offline, crossref_map, topics, study):
+for _r in (passages, words, devotional, plans, offline, crossref_map, topics, study, wordstudy, hymns):
     app.include_router(_r.router)
 
 @app.get("/map")

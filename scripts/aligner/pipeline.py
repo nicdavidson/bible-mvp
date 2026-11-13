@@ -1,7 +1,13 @@
 """Training sets, calibration and database writers for the alignment build."""
 import bisect
 import sqlite3
+import sys
+from collections import defaultdict
 from dataclasses import replace
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from backend import alignment_store as store  # noqa: E402
 
 from .data import (bsb_examples, flag_suspect_gold, implausible_links, kjv_examples,
                    modern_vocab, plain_examples, split_of)
@@ -18,20 +24,9 @@ METHOD_GOLD = 0    # human alignment (Clear-Bible, BSB)
 METHOD_TAGGED = 1  # resolved from a human Strong's tag (KJV)
 METHOD_MODEL = 2   # statistical aligner
 
-TABLE_SQL = """
-CREATE TABLE IF NOT EXISTS english_word_alignments (
-    translation_id TEXT NOT NULL,
-    book TEXT NOT NULL,
-    chapter INTEGER NOT NULL,
-    verse INTEGER NOT NULL,
-    english_word_position INTEGER NOT NULL,  -- 1-based tappable-word index (see aligner/text.py)
-    english_word TEXT NOT NULL,
-    original_word_position INTEGER,         -- word_alignments.word_position, same verse
-    confidence REAL DEFAULT 1.0,            -- calibrated: about P(link is right)
-    method INTEGER NOT NULL DEFAULT 0,      -- 0 human alignment, 1 Strong's tag, 2 aligner
-    PRIMARY KEY (translation_id, book, chapter, verse, english_word_position)
-) WITHOUT ROWID
-"""
+# Storage: one packed row per verse in english_alignment_verses
+# (backend/alignment_store.py). The per-word english_word_alignments table of
+# earlier builds is converted by ensure_table() and dropped.
 
 
 class Context:
@@ -195,36 +190,56 @@ def train_reranker(ctx: Context, splits) -> Reranker:
 
 # --- writing --------------------------------------------------------------------------
 
+def _verse_words(conn, translation):
+    return {(b, c, v): store.tappable_words(t) for b, c, v, t in conn.execute(
+        "SELECT book, chapter, verse, text FROM verses WHERE translation_id = ?", (translation,))}
+
+
+def _check_word(words, key, pos, word):
+    """The packed table does not store the English word: it must be the tappable word there."""
+    ws = words.get(key)
+    if ws is None or not 1 <= pos <= len(ws) or ws[pos - 1] != word:
+        raise ValueError(f"{key} word {pos} {word!r} is not the verse's tappable word there "
+                         f"({ws[pos - 1] if ws and 0 < pos <= len(ws) else None!r}); "
+                         "re-run the alignment build after changing verse text")
+
+
 def ensure_table(conn):
-    """Create the alignment table; migrate the old rowid layout without losing rows."""
-    cols = [r[1] for r in conn.execute("PRAGMA table_info(english_word_alignments)")]
-    if cols and ("id" in cols or "method" not in cols):
-        conn.execute("ALTER TABLE english_word_alignments RENAME TO _ewa_old")
-        conn.execute(TABLE_SQL)
-        conn.execute("""
-            INSERT OR REPLACE INTO english_word_alignments
-            (translation_id, book, chapter, verse, english_word_position, english_word,
-             original_word_position, confidence, method)
-            SELECT translation_id, book, chapter, verse, english_word_position, english_word,
-                   original_word_position, confidence, 0 FROM _ewa_old
-        """)
-        conn.execute("DROP TABLE _ewa_old")
-    else:
-        conn.execute(TABLE_SQL)
+    """Create the packed table; convert a per-word english_word_alignments table if present.
+
+    Every legacy row is checked against the verse text before the legacy table
+    is dropped, so a conversion never loses or changes a link.
+    """
+    store.ensure_table(conn)
+    legacy = [r[1] for r in conn.execute(f"PRAGMA table_info({store.LEGACY_TABLE})")]
+    if legacy:
+        has_method = "method" in legacy
+        for (tr,) in conn.execute(
+                f"SELECT DISTINCT translation_id FROM {store.LEGACY_TABLE}").fetchall():
+            words = _verse_words(conn, tr)
+            by_verse = defaultdict(list)
+            for b, c, v, pos, word, orig, conf, method in conn.execute(f"""
+                    SELECT book, chapter, verse, english_word_position, english_word,
+                           original_word_position, confidence, {'method' if has_method else 0}
+                    FROM {store.LEGACY_TABLE} WHERE translation_id = ?
+                      AND original_word_position IS NOT NULL""", (tr,)):
+                _check_word(words, (b, c, v), pos, word)
+                by_verse[(b, c, v)].append((pos, orig, 1.0 if conf is None else conf, method))
+            n = store.write_verse_rows(conn, tr, by_verse)
+            print(f"  packed {tr}: {n} links in {len(by_verse)} verses")
+        conn.execute(f"DROP TABLE {store.LEGACY_TABLE}")
     conn.commit()
 
 
 def write_rows(conn, translation: str, rows):
     """Replace all rows of one translation. rows: (key, pos, word, orig_pos, conf, method)."""
     ensure_table(conn)
-    conn.execute("DELETE FROM english_word_alignments WHERE translation_id = ?", (translation,))
-    conn.executemany("""
-        INSERT INTO english_word_alignments
-        (translation_id, book, chapter, verse, english_word_position, english_word,
-         original_word_position, confidence, method)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, ((translation, k[0], k[1], k[2], pos, clean_word(word), orig, round(conf, 3), method)
-          for k, pos, word, orig, conf, method in rows))
+    words = _verse_words(conn, translation)
+    by_verse = defaultdict(list)
+    for k, pos, word, orig, conf, method in rows:
+        _check_word(words, k, pos, clean_word(word))
+        by_verse[k].append((pos, orig, conf, method))
+    store.write_verse_rows(conn, translation, by_verse)
     conn.commit()
 
 

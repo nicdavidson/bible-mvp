@@ -23,6 +23,8 @@ Data sources:
     Network APIs:
         - KJV/WEB translations  (GitHub raw files)
         - Strong's lexicon      (openscriptures GitHub)
+        - Dodson, Abbott-Smith, OpenScriptures BDB (GitHub, pinned commits)
+        - Open Hymnal Project ABC file (openhymnal.org, one edition)
         - KJV Strong's tags     (eBible.org eng-kjv2006 USFM, for the alignments step)
         - Commentary            (HelloAO Bible API, CrossWire SWORD modules, Tyndale Open
                                  Resources; cached in data/sources/)
@@ -89,13 +91,31 @@ IMPORT_STEPS = [
         "script": "import_strongs.py",
     },
     {
+        # Dodson + Abbott-Smith (Greek), OpenScriptures BDB (Hebrew), each kept separate;
+        # pinned GitHub commits cached in data/sources/lexicons/. docs/WORD_STUDY_2026-11.md
+        "name": "lexicons",
+        "description": "Dodson, Abbott-Smith and BDB lexicons + stated lemma relations",
+        "version": "1.0",
+        "script": "import_lexicons.py",
+    },
+    {
         "name": "alignments",
         "description": "Word alignments for BSB, KJV, WEB + lemma_renderings index",
-        "version": "1.1",  # 1.1: every word tappable, reranker, KJV calibration
+        "version": "1.2",  # 1.2: TR«n / Byz»n displaced words are candidates; 1.1: tappable words, reranker
         "script": "build_alignments.py",
         "args": ["all"],
         "requires_data": "clear-bible",
         "data_source": "https://github.com/Clear-Bible/Alignments",
+    },
+    {
+        # Storage only: converts a per-word english_word_alignments table left by an
+        # older build into english_alignment_verses (one row per verse). A no-op when
+        # the alignments step already wrote the packed table. See backend/alignment_store.py.
+        "name": "alignments_pack",
+        "description": "Pack word alignments into one row per verse (english_alignment_verses)",
+        "version": "1.0",
+        "script": "build_alignments.py",
+        "args": ["pack"],
     },
     {
         "name": "cross_refs",
@@ -142,6 +162,14 @@ IMPORT_STEPS = [
         ]
     ],
     {
+        # Commentary search text derived from content through a view instead of a stored
+        # copy (backend/commentary_search.py); converts an older DB, no-op on a new one.
+        "name": "commentary_search",
+        "description": "Commentary FTS over a view (drop the stored searchable_text copy)",
+        "version": "1.0",
+        "script": "migrate_commentary_search.py",
+    },
+    {
         "name": "speakers",
         "description": "Red letter speaker data (6,896 divine speech verses)",
         "version": "1.0",
@@ -162,7 +190,43 @@ IMPORT_STEPS = [
         "script": "import_naves.py",
         "requires_data": "naves/NavesTopicalDictionary.csv",
     },
+    {
+        # Open Hymnal (public-domain indices) -> hymns + hymn_scripture; needs KJV verses.
+        # docs/HYMN_INDEX_2026-11.md
+        "name": "hymns",
+        "description": "Scripture-to-hymn index (Open Hymnal Project)",
+        "version": "1.0",
+        "script": "import_hymns.py",
+    },
+    {
+        # Needs interlinear, alignments, lexicons, cross_refs and naves.
+        "name": "word_study",
+        "description": "Word study tables: lemma profiles, collocates, topics, xrefs, samples",
+        "version": "1.0",
+        "script": "build_word_study.py",
+    },
+    {
+        "name": "tidy",
+        "description": "Drop redundant indexes (idx_alignment_ref, idx_alignment_word_type)",
+        "version": "1.0",
+        "script": "tidy_db.py",
+    },
 ]
+
+# After a build that leaves more than this share of the file as free pages
+# (e.g. the alignments_pack conversion frees ~70 MB), VACUUM so the released
+# file is actually smaller. VACUUM needs about the DB's size in free disk.
+VACUUM_FREE_SHARE = 0.05
+
+
+def vacuum_if_fragmented(conn):
+    pages = conn.execute("PRAGMA page_count").fetchone()[0]
+    free = conn.execute("PRAGMA freelist_count").fetchone()[0]
+    if pages and free / pages > VACUUM_FREE_SHARE:
+        print(f"\nVACUUM ({free} of {pages} pages free)...")
+        t = time.time()
+        conn.execute("VACUUM")
+        print(f"  done in {time.time() - t:.0f}s")
 
 
 def get_db_connection():
@@ -368,12 +432,16 @@ def count_rows(conn, step_name):
         "full_bibles": "verses",
         "web": "verses",
         "interlinear": "word_alignments",
-        "alignments": "english_word_alignments",
+        "alignments": "english_alignment_verses",
+        "alignments_pack": "english_alignment_verses",
         "strongs": "lexicon",
         "cross_refs": "cross_references",
         "speakers": "speaker_verses",
         "spurgeon": "devotionals",
         "naves": "naves_topics",
+        "lexicons": "lexicon_entries",
+        "word_study": "lemma_profile",
+        "hymns": "hymns",
     }
     if step_name.startswith("commentary_"):
         table = "commentary_entries"
@@ -382,6 +450,8 @@ def count_rows(conn, step_name):
     if not table:
         return 0
     try:
+        if table == "english_alignment_verses":  # one row per verse: count linked words
+            return conn.execute(f"SELECT COALESCE(SUM(n_links), 0) FROM {table}").fetchone()[0]
         cursor = conn.execute(f"SELECT COUNT(*) FROM {table}")
         return cursor.fetchone()[0]
     except sqlite3.OperationalError:
@@ -534,7 +604,8 @@ def main():
             sys.exit(1)
 
     # Network steps
-    NETWORK_STEPS = {"full_bibles", "web", "strongs", "alignments", "spurgeon"} | {
+    NETWORK_STEPS = {"full_bibles", "web", "strongs", "lexicons", "alignments", "spurgeon",
+                     "hymns"} | {
         s["name"] for s in IMPORT_STEPS if s["name"].startswith("commentary_")
     }
 
@@ -599,6 +670,9 @@ def main():
     # Summary
     print("\n" + "=" * 60)
     print(f"Build complete: {completed} done, {skipped} skipped, {failed} failed")
+
+    if completed and DB_PATH.exists():
+        vacuum_if_fragmented(conn)
 
     if DB_PATH.exists() and DB_PATH.stat().st_size > 0:
         size_mb = DB_PATH.stat().st_size / 1024 / 1024

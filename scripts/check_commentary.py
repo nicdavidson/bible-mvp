@@ -25,6 +25,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from sword_reader import kjv_versification  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from backend import commentary_search  # noqa: E402
+from backend.commentary_search import SEARCH_TEXT_SQL  # noqa: E402
 
 DB = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 ANCHOR = re.compile(r'<a href="#" class="commentary-ref" data-ref="([^"]*)">')
@@ -74,7 +77,7 @@ def shift_check(conn, src, mode, rx, kjv):
     import collections
     pat = re.compile(rx) if rx else None
     out = collections.Counter()
-    col = "content" if mode == "selfref" else "searchable_text"
+    col = "content" if mode == "selfref" else SEARCH_TEXT_SQL
     for b, ch, s, e, t in conn.execute(
             "SELECT book, chapter, reference_start, COALESCE(reference_end, reference_start), "
             f"{col} FROM commentary_entries WHERE source = ?", (src,)):
@@ -117,6 +120,7 @@ def main():
     args = ap.parse_args()
 
     conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    commentary_search.register(conn)
     v11n = kjv_versification(conn)
     book_names = {r[0] for r in conn.execute("SELECT name FROM books")}
     total_verses = sum(sum(c) for c in v11n.values())
@@ -148,7 +152,7 @@ def main():
     except sqlite3.OperationalError:
         commentary_pages = None
     total_payload = conn.execute(
-        "SELECT SUM(LENGTH(content) + LENGTH(COALESCE(searchable_text, ''))) FROM commentary_entries"
+        "SELECT SUM(LENGTH(content) + LENGTH(COALESCE(search_override, ''))) FROM commentary_entries"
     ).fetchone()[0]
 
     hdr = f"{'source':26} {'chip':9} {'kind':7} {'entries':>7} {'books':>5} {'cover':>6} {'scope':>6} " \
@@ -159,7 +163,7 @@ def main():
     for src in sources:
         rows = conn.execute(
             "SELECT id, book, chapter, reference_start, reference_end, content, "
-            "LENGTH(content) + LENGTH(COALESCE(searchable_text, '')) FROM commentary_entries "
+            "LENGTH(content) + LENGTH(COALESCE(search_override, '')) FROM commentary_entries "
             "WHERE source = ?", (src,)).fetchall()
         covered = set()
         books = set()
@@ -243,8 +247,8 @@ def main():
           f"over {CAP_SIGNATURE:,} chars (cap signature), marked incomplete, leftover navigation")
     for src in sources:
         mid = capped = marked = debris = n = 0
-        for (t,) in conn.execute("SELECT searchable_text FROM commentary_entries WHERE source = ?",
-                                 (src,)):
+        for (t,) in conn.execute(f"SELECT {SEARCH_TEXT_SQL} FROM commentary_entries "
+                                 "WHERE source = ?", (src,)):
             n += 1
             if (t or "").rstrip().endswith(INCOMPLETE_MARK):
                 marked += 1

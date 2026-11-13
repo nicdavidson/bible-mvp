@@ -48,21 +48,38 @@ Recommended rule: **show content-word links at ≥ 0.5 and function-word links a
 ≥ 0.7.** On BSB that hides 19% of function-word links for +5.3 points of
 precision on them, and changes nothing for content words. YLT function words
 (archaic English) are 8–10 points less accurate than stated, so for KJV and
-WEB the 0.7 function cut is the minimum. `lemma_renderings` keeps one 0.5 cut
-(it counts content words in practice).
+WEB the 0.7 function cut is the minimum. `lemma_renderings` and the
+renderings verse lists apply the same rule (content words ≥ 0.5, function
+words ≥ 0.7; `backend.alignment_store.rendering_link_ok`, since 2026-11-13).
 
 Shipped coverage in the combined database (share of tappable words with a
-link) and confidence:
+link) and confidence, alignments step 1.2 (2026-11-13; previous build in
+brackets where it changed):
 
 | Translation | Tappable words | Linked | conf ≥ 0.9 | 0.7–0.9 | 0.5–0.7 | < 0.5 | Shown under the recommended rule |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| BSB | 726,093 | 721,560 (99.4%) | 703,533 | 9,670 | 6,745 | 1,612 | 99.0% |
-| KJV | 789,633 | 762,603 (96.6%) | 537,859 | 135,090 | 66,108 | 23,546 | 86.6% |
-| WEB | 750,447 | 750,318 (100%) | 431,671 | 197,695 | 75,363 | 45,589 | 87.2% |
+| BSB | 726,093 | 721,574 (99.4%) | 704,789 | 8,020 | 6,954 | 1,811 | 98.9% (99.0%) |
+| KJV | 789,633 | 762,504 (96.6%) | 545,520 | 119,529 | 69,731 | 27,724 | 85.4% (86.6%) |
+| WEB | 750,447 | 750,198 (100%) | 418,313 | 194,962 | 82,961 | 53,962 | 85.6% (87.2%) |
 
-BSB: 692,981 human links + 28,579 aligner links (shifted verses and isolated
-bad gold). KJV: 354,443 from Strong's tags + 408,160 aligner links; the 26,988
-italic words have no link by design.
+BSB: 693,052 human links + 28,522 aligner links (shifted verses and isolated
+bad gold). KJV: 355,557 from Strong's tags (was 354,443) + 406,947 aligner
+links; the 26,988 italic words have no link by design.
+
+**Step 1.2: displaced words are in their edition.** TAGNT lists editions that
+have a word in a different order with the displacement ("TR«3": in the TR,
+three words earlier; the file header: "Editions that have words in a different
+order are listed with the amount of displacement"). `SourceToken.in_edition`
+compared exact strings, so 482 TR, 507 Byzantine and 27 SBL words could not be
+candidates for KJV, WEB and BSB links. Fixed; it needs the full rebuild
+(candidates change self-training, calibration and KJV tag resolution, so a
+patch of the affected verses would not equal a fresh build). Effect: KJV tags
+that resolve to no source word 6,638 → 5,524 (+691 unique, +542 by order);
+held-out scores unchanged within ±0.04 points (BSB F1 84.05, KJV 86.93, YLT
+83.59; `docs/alignment-eval-2026-11.json` re-run); calibrated KJV/WEB
+confidences moved down a little, so the share shown under the rule fell by
+1.2 (KJV) and 1.6 (WEB) points. Rebuild 30.7 min, 2.77 GB peak; evaluation
+11.3 min, 1.87 GB.
 
 ## Round two changes and measurements
 
@@ -171,23 +188,31 @@ Found while building the gold set. All four affected what users see today.
 
 ## Data model
 
-`english_word_alignments` (one row per tappable English word that has a source word):
+Links are stored packed, one row per verse and translation, in
+`english_alignment_verses` (`backend/alignment_store.py`; packed in 2026-11,
+see Storage). The logical record is still one link per tappable English word:
 
-| Column | Meaning |
+| Field | Meaning |
 |---|---|
 | translation_id, book, chapter, verse | verse, English versification (as in `verses`) |
-| english_word_position | 1-based index among the verse's tappable words (the UI contract, `scripts/aligner/text.py`) |
-| english_word | the word as displayed |
-| original_word_position | `word_alignments.word_position` in the same verse |
-| confidence | calibrated: roughly the probability the link is right (see calibration tables) |
+| english position | 1-based index among the verse's tappable words (the UI contract, `scripts/aligner/text.py`): entry *i* of `links` |
+| english word | not stored: the tappable word at that position in `verses.text` (the build refuses a link whose word differs) |
+| original position | `word_alignments.word_position` in the same verse |
+| confidence | calibrated: roughly the probability the link is right (see calibration tables); 3 decimals |
 | method | 0 = human alignment (Clear-Bible BSB), 1 = resolved from a human Strong's tag (KJV), 2 = statistical aligner |
 
-The table is now `WITHOUT ROWID` with the primary key on
-(translation, book, chapter, verse, position); the old `id` column and its
-separate unique index are gone (no code read `id`). Words with no source word
-(KJV italics, a word the aligner leaves unlinked, verses whose source text
-lacks the words) simply have no row: `/api/word-alignment` returns
-`found: false`, which the UI already handles.
+`links` is a comma-separated list, entry *i* for English word *i*: empty (no
+link), `O` (source position O, confidence 1.0, the row's default `method`),
+`O:C` (confidence C/1000) or `O:C:M` (method M differs from the row's).
+Trailing unlinked words are omitted. Example, KJV John 3:16 (`method` 1,
+`n_links` 25): `2,5,1,3,7,7,8,14,14,11:900,13,...`: "For" → word 2 (γὰρ),
+"God" → 5, "so" → 1 (οὕτως) ..., the tenth word at confidence 0.9.
+`n_links` counts the linked words. Code reads it only
+through `alignment_store.unpack()` / `link_at()`; the API responses are the
+same as from the per-word table (5,661 sampled requests compared byte for byte).
+Words with no source word (KJV italics, a word the aligner leaves unlinked,
+verses whose source text lacks the words) have an empty entry:
+`/api/word-alignment` returns `found: false`, which the UI already handles.
 
 `lemma_renderings (strong_number, translation_id, rendering, count)`: for each
 lemma and translation, the English renderings with counts. A rendering is the
@@ -240,9 +265,9 @@ Hebrew: one Masoretic text for all three; LXX-reconstructed rows (`=X`) are excl
   tagged spans as occurrences, otherwise *ambiguous*. Strong's 1890 gives some
   inflected forms their own numbers (ὑμῖν G5213, ἐστί G2076); 20 lemma classes
   map these to STEPBible's lemma (from the lexicon's own "dative case of
-  G4771" derivations and from data). Of 787,634 tappable KJV words: 283,021
-  unique, 61,814 ordered, 7,629 ambiguous, 6,629 unresolvable, 26,988 italic,
-  401,553 untagged (mostly function words: the KJV tagging skips "the", "of",
+  G4771" derivations and from data). Of the tappable KJV words (step 1.2):
+  285,126 unique, 63,352 ordered, 7,079 ambiguous, 5,524 unresolvable, 26,997
+  italic, 401,555 untagged (mostly function words: the KJV tagging skips "the", "of",
   "unto"...).
 - **YLT (Clear-Bible manual alignment).** Used only as a second evaluation set
   (YLT is not in the app).
@@ -431,7 +456,7 @@ neighbouring words ("seen *with*"), which our scorer counts against us.
 | eBible.org `eng-kjv2006` USFM (cached at `data/sources/kjv-strongs/`, sha256 prefix `dce1ec3ea45a155a`) | KJV Strong's tags and italics | Public domain ("You may copy the King James Version of the Holy Bible freely", copr.htm in the zip; checked at ebible.org/find/details.php?id=eng-kjv2006) | Crown patent applies only to printing in the UK. eBible regenerates the file; the cached zip pins it. |
 | seven1m/open-bibles `eng-web.usfx.xml` | WEB text (re-imported) | Public domain; "World English Bible" is a trademark | Text unchanged except whitespace. |
 
-The derived tables (`english_word_alignments` for KJV and WEB, the re-keyed BSB
+The derived tables (`english_alignment_verses` for KJV and WEB, the re-keyed BSB
 rows and `lemma_renderings`) derive from CC BY 4.0 data and carry its
 attribution requirement (LICENSES.md now lists them).
 
@@ -477,9 +502,41 @@ about 25 MB per translation; the BSB-only table was 44.2 MB before this
 work), `lemma_renderings` 5.4 MB, `word_alignments` 36.4 MB (+2.5 MB for the
 22,310 recovered words), `commentary_entries` 479.0 MB.
 
-Packed storage (Next steps, item 7) would bring the alignments to about 8 MB
-per translation, saving about 50 MB for the three. Not done this round (it
-touches `offline.py`, which `v2/study-view` is changing).
+### Packed (2026-11-13, `v2/wordstudy`)
+
+Measured on the integration database of 2026-11-13 (bytes; MiB in brackets):
+
+| | before | after |
+|---|---:|---:|
+| alignment table (`dbstat`, incl. its key) | 92.3 MB (88.1 MiB) | 15.8 MB (15.1 MiB) |
+| link text (`SUM(length(links))`) | | BSB 1.8 MB, KJV 5.1 MB, WEB 4.8 MB |
+| whole file, as built | 830,648,320 | |
+| whole file after `VACUUM` | 809,684,992 (772.2 MiB) | 742,715,392 (708.3 MiB) |
+| + `tidy` step (two redundant indexes), after `VACUUM` | | 728,936,448 (695.2 MiB) |
+| round two, final (adds word-study, lexicon and hymn tables, ~13 MB; commentary search text derived instead of stored, −228 MB; see docs/COMMENTARY_LIBRARY_2026-11.md), after `VACUUM` | | 514,793,472 (490.9 MiB) |
+
+So packing saves 67.0 MB and the index cleanup another 13.8 MB: 80.7 MB in all
+(10%). Per added translation the packed table costs about 5 MB instead of ~25.
+
+How it is built: `build_alignments.py` writes packed rows directly
+(`pipeline.write_rows`). An older database is converted by the
+`alignments_pack` step (`build_alignments.py pack`, 32 s, 230 MB RAM), which
+checks every link's word against the verse text, writes the packed table and
+drops `english_word_alignments`; `build_db.py` then VACUUMs when more than 5%
+of the file is free pages. Speed (TestClient on bridge, median): word tap
+5.6 → 7.6 ms, rendering verse list 600 → 11 ms, `/api/offline/stats`
+12.2 → 1.0 s, chapter export 52 → 61 ms.
+
+### Other size options (not done unless marked)
+
+| Option | Saves | Risk / why not |
+|---|---:|---|
+| **Done:** drop `idx_alignment_ref` (prefix of the UNIQUE index) and `idx_alignment_word_type` (no query filters on it) | 13.8 MB | none found: same query plans (test). The interlinear importer still creates them; the `tidy` step drops them |
+| Commentary `searchable_text` (plain copy of `content`, 207.6 MB of text) | ~200 MB | `commentary_fts` is an external-content FTS5 table reading that column for `snippet()` and for deletes. Options: (a) contentless FTS (`content=''`, `contentless_delete=1`, SQLite ≥ 3.43): search keeps working but `snippet()` does not, so search results would need snippets cut from `content` in Python; (b) external content on a view that strips HTML with an app-registered SQL function: every connection (CLI, build scripts) must register the identical function or deletes corrupt the index. Biggest win, real work, needs its own tests |
+| FTS5 `detail=column` / `detail=none` on `commentary_fts` (88 MB index) | ~40-60 MB (estimate) | breaks phrase queries, which `/api/search` uses (`"quoted phrases"`) |
+| `word_alignments.editions` as a code (repeats `NA28+NA27+...` 142K times, 4.4 MB) | ~4 MB | API returns the string and filters with `LIKE`; all readers would change |
+| `naves_topics.refs_json` (duplicates `naves_topic_refs`, 3.5 MB) | 3.5 MB | no reader in this repo, but another branch may use it; ask first |
+| `verses` second index `idx_verses_lookup` (2.4 MB) | 2.4 MB | used by translation-less lookups (parallel view); keep |
 
 ## How to add a translation
 
@@ -518,11 +575,4 @@ touches `offline.py`, which `v2/study-view` is changing).
    ~450K source tokens (gloss + lemma) and ~2.2M English tokens in context
    once, store a compact cosine table per verse, add as an emission feature;
    about one GPU-hour. Justify it by the BSB dev F1 like the ablations above.
-7. **Packed storage**: one row per verse with the links as a compact string
-   (`position:original:confidence%:method,…`). Measured on the built table:
-   ~7–7.5 MB of link text per translation, about 8 MB per translation with row
-   overhead, vs ~25 MB today: about 50 MB saved for three translations (~17 MB
-   per added translation). The API contract can stay the same, but
-   `words.py` (word lookup, renderings) and `offline.py` (chapter and book
-   exports) must unpack, and `offline.py` is being changed on
-   `v2/study-view`; not done in this round to avoid that conflict.
+7. ~~Packed storage~~: done (see Storage).

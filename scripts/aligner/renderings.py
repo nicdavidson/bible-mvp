@@ -3,10 +3,11 @@
 One row per (lemma, translation, rendering) with a count. A rendering is the
 English words of one verse that are linked to the same source word, in English
 order, lowercased, with leading and trailing function words trimmed
-('his mercy' -> 'mercy'); words that are not adjacent are joined with ' … '. Only links at or above a confidence threshold
-are counted. Occurrences are listed on demand by
-GET /api/word/{strong}/renderings (backend/routers/words.py), which joins
-english_word_alignments to word_alignments with the same grouping rule.
+('his mercy' -> 'mercy'); words that are not adjacent are joined with ' … '. Only links
+the reader would be shown are counted: content words at confidence >= 0.5, function
+words at >= 0.7 (backend.alignment_store.rendering_link_ok). Occurrences are listed on demand by
+GET /api/word/{strong}/renderings (backend/routers/words.py), which unpacks
+english_alignment_verses (backend/alignment_store.py) with the same grouping rule.
 """
 from collections import Counter, defaultdict
 
@@ -49,32 +50,31 @@ def group_rendering(words) -> str:
     return out
 
 
-def build_renderings(conn, min_confidence: float) -> int:
+def build_renderings(conn, min_confidence: float = 0.5) -> int:
+    """`min_confidence` is kept for callers; the rule is alignment_store.rendering_link_ok."""
+    from backend import alignment_store as store  # project root is on sys.path (pipeline.py)
+
     conn.execute(TABLE_SQL)
     conn.execute("DELETE FROM lemma_renderings")
     counts = Counter()
-    cur = conn.execute("""
-        SELECT e.translation_id, e.book, e.chapter, e.verse, e.original_word_position,
-               e.english_word_position, e.english_word, w.strong_number
-        FROM english_word_alignments e
-        JOIN word_alignments w ON w.book = e.book AND w.chapter = e.chapter
-             AND w.verse = e.verse AND w.word_position = e.original_word_position
-        WHERE e.confidence >= ? AND w.strong_number IS NOT NULL
-        ORDER BY e.translation_id, e.book, e.chapter, e.verse
-    """, (min_confidence,))
-    verse_key, groups = None, defaultdict(list)
-
-    def flush():
-        for (strong, _opos, tr), ws in groups.items():
+    strongs = {(b, c, v, p): s for b, c, v, p, s in conn.execute(
+        "SELECT book, chapter, verse, word_position, strong_number FROM word_alignments "
+        "WHERE strong_number IS NOT NULL")}
+    cur = conn.execute(f"""
+        SELECT p.translation_id, p.book, p.chapter, p.verse, p.method, p.links, v.text
+        FROM {store.TABLE} p
+        JOIN verses v ON v.translation_id = p.translation_id AND v.book = p.book
+             AND v.chapter = p.chapter AND v.verse = p.verse
+    """)
+    for tr, book, ch, v, method, links, text in cur:
+        words = store.tappable_words(text)
+        groups = defaultdict(list)
+        for epos, opos, conf, _ in store.unpack(method, links):
+            strong = strongs.get((book, ch, v, opos))
+            if strong is not None and store.rendering_link_ok(words[epos - 1], conf):
+                groups[(strong, opos)].append((epos, words[epos - 1]))
+        for (strong, _opos), ws in groups.items():
             counts[(unpad(strong), tr, group_rendering(ws))] += 1
-        groups.clear()
-
-    for tr, book, ch, v, opos, epos, word, strong in cur:
-        if (tr, book, ch, v) != verse_key:
-            flush()
-            verse_key = (tr, book, ch, v)
-        groups[(strong, opos, tr)].append((epos, word))
-    flush()
     conn.executemany("INSERT INTO lemma_renderings VALUES (?, ?, ?, ?)",
                      [(s, tr, r, n) for (s, tr, r), n in counts.items()])
     conn.commit()
