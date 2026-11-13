@@ -29,7 +29,7 @@ from aligner.kjv import KJV_CACHE_KEY, KJV_USFM_URL  # noqa: E402
 from aligner.metrics import (calibration, error_classes, score_examples,  # noqa: E402
                              threshold_curve)
 from aligner.pipeline import (Context, bsb_rows, fit_calibrator, kjv_rows,  # noqa: E402
-                              model_rows, train, write_rows)
+                              model_rows, self_train, train, write_rows)
 from aligner.renderings import build_renderings  # noqa: E402
 from source_cache import cached_fetch_bytes  # noqa: E402
 
@@ -48,27 +48,33 @@ def kjv_zip():
     return path
 
 
-def production_model(ctx, with_kjv):
-    """All clean BSB gold (+ KJV tags); calibrated on the dev books with a model that
-    has not seen them (same recipe), so the calibration is out-of-sample."""
+def production_model(ctx, translation):
+    """The model used to write one translation's rows, and its calibrator.
+
+    Trained on all clean BSB gold, then (for a translation other than BSB) one
+    round of self-training on that translation's own text. Calibrated on the
+    dev books with a model built by the same recipe without them, so the
+    calibration is out-of-sample.
+    """
     cache = ctx.__dict__.setdefault("_production", {})
-    if with_kjv not in cache:
-        held = train(ctx, ("train", "test"), with_kjv)
-        calib = fit_calibrator(held, ctx.bsb_clean(("dev",)))
-        model = train(ctx, ("train", "dev", "test"), with_kjv)
-        cache[with_kjv] = (model, calib)
-    return cache[with_kjv]
+    if translation not in cache:
+        def recipe(splits):
+            m = train(ctx, splits, with_kjv=False)
+            return m if translation == "BSB" else self_train(ctx, m, splits, translation)
+        calib = fit_calibrator(recipe(("train", "test")), ctx.bsb_clean(("dev",)))
+        cache[translation] = (recipe(("train", "dev", "test")), calib)
+    return cache[translation]
 
 
 def step_bsb(ctx):
-    model, calib = production_model(ctx, with_kjv=False)
+    model, calib = production_model(ctx, "BSB")
     rows = list(bsb_rows(ctx, model, calib))
     write_rows(ctx.conn, "BSB", rows)
     print(f"BSB: {len(rows)} alignments ({Counter(r[5] for r in rows)})")
 
 
 def step_kjv(ctx):
-    model, calib = production_model(ctx, with_kjv=False)
+    model, calib = production_model(ctx, "KJV")
     stats = {}
     rows = list(kjv_rows(ctx, model, calib, stats))
     write_rows(ctx.conn, "KJV", rows)
@@ -78,7 +84,7 @@ def step_kjv(ctx):
 
 
 def step_web(ctx):
-    model, calib = production_model(ctx, with_kjv=False)
+    model, calib = production_model(ctx, "WEB")
     rows = list(model_rows(ctx, "WEB", model, calib))
     write_rows(ctx.conn, "WEB", rows)
     print(f"WEB: {len(rows)} alignments")
@@ -132,6 +138,18 @@ def step_evaluate(ctx):
     out["kjv_thresholds"] = threshold_curve(kjv_test, preds)
     c, s = error_classes(kjv_test, preds, srcidx)
     out["kjv_errors"] = {"counts": dict(c), "examples": s}
+    # 2b. The production recipe for an untagged translation: + self-training on
+    #     the KJV's own text (no tags used), calibrated on BSB dev.
+    st = self_train(ctx, model, ("train",), "KJV")
+    st_calib = fit_calibrator(st, ctx.bsb_clean(("dev",)))
+    preds = {e.key: [(p, st_calib(c)) for p, c in st.align(e.english, e.sources)]
+             for e in kjv_test}
+    out["kjv_test_selftrained"] = _scores(kjv_test, preds)
+    out["kjv_selftrained_calibration"] = calibration(kjv_test, preds)
+    out["kjv_selftrained_thresholds"] = threshold_curve(kjv_test, preds)
+    c, s = error_classes(kjv_test, preds, srcidx)
+    out["kjv_selftrained_errors"] = {"counts": dict(c), "examples": s}
+    print(f"KJV self-trained done ({time.time() - t:.0f}s)", out["kjv_test_selftrained"]["all"])
     status = Counter(st for res in resolution.values() for st, _ in res)
     out["kjv_tag_resolution"] = dict(status)
     print(f"KJV test done ({time.time() - t:.0f}s)", out["kjv_test_vs_tags"]["all"])

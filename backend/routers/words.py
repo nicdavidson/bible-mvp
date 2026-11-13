@@ -181,13 +181,25 @@ def get_word(
 RENDERING_MIN_CONFIDENCE = 0.5
 
 
+# Leading/trailing words dropped from a rendering so 'his mercy', 'the love',
+# 'and mercy' count as 'mercy' / 'love' (kept when nothing else is left).
+RENDERING_STRIP = frozenset(
+    "a an the and or but of to in into on at by for from with unto upon his her its their "
+    "my your our thy thine thee thou him them me us you he she it they we i is are was were "
+    "be been shall will let so then also even according o".split())
+
+
 def _group_rendering(words):
-    """Same rule as scripts/aligner/renderings.py: [(position, word)] -> 'in the beginning'."""
-    words = sorted(words)
+    """Same rule as scripts/aligner/renderings.py: [(position, word)] -> 'loving devotion'."""
+    words = sorted((p, w.lower()) for p, w in words)
+    while len(words) > 1 and words[0][1] in RENDERING_STRIP:
+        words = words[1:]
+    while len(words) > 1 and words[-1][1] in RENDERING_STRIP:
+        words = words[:-1]
     out = words[0][1]
     for (p0, _), (p1, w) in zip(words, words[1:]):
         out += (" " if p1 == p0 + 1 else " … ") + w
-    return out.lower()
+    return out
 
 
 @router.get("/api/word/{strong_number}/renderings")

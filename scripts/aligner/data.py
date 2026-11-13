@@ -29,6 +29,37 @@ FUNCTION_WORDS = set(
     "now if or no into because may let one up out".split())
 
 
+def implausible_links(ex, model, floor: float = 0.002) -> tuple[list[int], int]:
+    """Indices of content words whose gold link looks wrong, and the number of
+    content words with a gold link.
+
+    A gold link on a content word is implausible when its source lemma
+    practically never produces that word anywhere else (model table
+    probability < floor) and the word is not in that token's STEPBible gloss.
+    """
+    by_pos = {t.pos: t for t in ex.sources}
+    bad, n = [], 0
+    for j, (e, g) in enumerate(zip(ex.english, ex.gold or [])):
+        if not g or e in FUNCTION_WORDS:
+            continue
+        n += 1
+        best = 0.0
+        for p in g:
+            tok = by_pos.get(p)
+            if tok is None:
+                continue
+            feats, gloss = model._features(tok)
+            if e in gloss:
+                best = 1.0
+                break
+            for f in feats:
+                if f.startswith("L:"):
+                    best = max(best, model.table.get(f, {}).get(e, 0.0))
+        if best < floor:
+            bad.append(j)
+    return bad, n
+
+
 def flag_suspect_gold(examples, model, min_bad: int = 2, min_rate: float = 0.3,
                       floor: float = 0.002) -> set:
     """Verses whose gold looks shifted (Clear-Bible links attached to the wrong words).
@@ -36,35 +67,13 @@ def flag_suspect_gold(examples, model, min_bad: int = 2, min_rate: float = 0.3,
     In a few percent of verses the Clear-Bible BSB alignment points English
     words at the wrong source words, apparently after the BSB text was revised
     and target token ids moved (e.g. John 10:36 links 'Father' to the relative
-    pronoun). A gold link on a content word is implausible when its source
-    lemma practically never produces that word anywhere else (model table
-    probability < floor) and the word is not in that token's gloss. A verse is
-    suspect when at least `min_bad` of its content-word links, and at least
-    `min_rate` of them, are implausible.
+    pronoun). A verse is suspect when at least `min_bad` of its content-word
+    links, and at least `min_rate` of them, are implausible (implausible_links).
     """
     suspect = set()
     for ex in examples:
-        by_pos = {t.pos: t for t in ex.sources}
-        n = bad = 0
-        for e, g in zip(ex.english, ex.gold or []):
-            if not g or e in FUNCTION_WORDS:
-                continue
-            n += 1
-            best = 0.0
-            for p in g:
-                tok = by_pos.get(p)
-                if tok is None:
-                    continue
-                feats, gloss = model._features(tok)
-                if e in gloss:
-                    best = 1.0
-                    break
-                for f in feats:
-                    if f.startswith("L:"):
-                        best = max(best, model.table.get(f, {}).get(e, 0.0))
-            if best < floor:
-                bad += 1
-        if bad >= min_bad and bad >= min_rate * n:
+        bad, n = implausible_links(ex, model, floor)
+        if len(bad) >= min_bad and len(bad) >= min_rate * n:
             suspect.add(ex.key)
     return suspect
 

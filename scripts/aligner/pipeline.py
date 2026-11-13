@@ -3,8 +3,8 @@ import bisect
 import sqlite3
 from dataclasses import replace
 
-from .data import (bsb_examples, flag_suspect_gold, kjv_examples, modern_vocab,
-                   plain_examples, split_of)
+from .data import (bsb_examples, flag_suspect_gold, implausible_links, kjv_examples,
+                   modern_vocab, plain_examples, split_of)
 from .kjv import ADDED, AMBIGUOUS, ORDERED, UNIQUE
 from .model import NO_LINK, Aligner, Params
 from .sources import load_source_tokens
@@ -77,6 +77,26 @@ def train(ctx: Context, splits, with_kjv: bool, params: Params | None = None) ->
     examples = bsb + (ctx.kjv_training(splits) if with_kjv else [])
     m = Aligner(params or Params())
     m.fit(examples, ctx.vocab, log=ctx.log, jump_examples=bsb)
+    return m
+
+
+def self_train(ctx: Context, base: Aligner, splits, translation: str,
+               tau: float = 0.7, params: Params | None = None) -> Aligner:
+    """One round of self-training on a translation's own (unlabeled) text.
+
+    Links the base model is confident about (posterior >= tau) become extra
+    training pairs, which teaches the emission tables that translation's
+    vocabulary (archaic forms, spelling of names). No gold of that translation
+    is used. Jumps stay estimated from BSB gold only.
+    """
+    pseudo = []
+    for ex in plain_examples(ctx.conn, translation, ctx.src, ctx.vocab):
+        links = base.align(ex.english, ex.sources)
+        pseudo.append(replace(ex, gold=[frozenset({p}) if p is not None and c >= tau else None
+                                        for p, c in links]))
+    bsb = ctx.bsb_clean(splits)
+    m = Aligner(params or base.p)
+    m.fit(bsb + pseudo, ctx.vocab, log=ctx.log, jump_examples=bsb)
     return m
 
 
@@ -167,7 +187,17 @@ def bsb_rows(ctx: Context, model: Aligner, calib: Calibrator):
                     yield ex.key, j, ex.words[j - 1], pos, calib(conf), METHOD_MODEL
             continue
         by_pos = {t.pos: t for t in ex.sources}
+        bad, _ = implausible_links(ex, model)
+        if bad:
+            # Isolated gold errors (Genesis 1:3 links the second 'light' to
+            # 'and there was'): take the aligner's link for those words only.
+            predicted = model.align(ex.english, ex.sources)
         for j, (e, g) in enumerate(zip(ex.english, ex.gold), 1):
+            if g and (j - 1) in bad:
+                pos, conf = predicted[j - 1]
+                if pos is not None:
+                    yield ex.key, j, ex.words[j - 1], pos, calib(conf), METHOD_MODEL
+                continue
             if g:
                 # One row per English word. When gold links it to several source
                 # words ('the evil one' -> article + adjective), keep the one the

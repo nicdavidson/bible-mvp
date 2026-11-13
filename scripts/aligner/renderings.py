@@ -2,8 +2,8 @@
 
 One row per (lemma, translation, rendering) with a count. A rendering is the
 English words of one verse that are linked to the same source word, in English
-order, lowercased ('in the beginning', 'beginning'); words that are not
-adjacent are joined with ' … '. Only links at or above a confidence threshold
+order, lowercased, with leading and trailing function words trimmed
+('his mercy' -> 'mercy'); words that are not adjacent are joined with ' … '. Only links at or above a confidence threshold
 are counted. Occurrences are listed on demand by
 GET /api/word/{strong}/renderings (backend/routers/words.py), which joins
 english_word_alignments to word_alignments with the same grouping rule.
@@ -28,13 +28,25 @@ def unpad(strong: str) -> str:
     return strong
 
 
+# Leading/trailing words dropped from a rendering so 'his mercy', 'the love',
+# 'and mercy' count as 'mercy' / 'love' (kept when nothing else is left).
+RENDERING_STRIP = frozenset(
+    "a an the and or but of to in into on at by for from with unto upon his her its their "
+    "my your our thy thine thee thou him them me us you he she it they we i is are was were "
+    "be been shall will let so then also even according o".split())
+
+
 def group_rendering(words) -> str:
     """[(english_position, word)] linked to one source word -> rendering text."""
-    words = sorted(words)
+    words = sorted((p, w.lower()) for p, w in words)
+    while len(words) > 1 and words[0][1] in RENDERING_STRIP:
+        words = words[1:]
+    while len(words) > 1 and words[-1][1] in RENDERING_STRIP:
+        words = words[:-1]
     out = words[0][1]
     for (p0, _), (p1, w) in zip(words, words[1:]):
         out += (" " if p1 == p0 + 1 else " … ") + w
-    return out.lower()
+    return out
 
 
 def build_renderings(conn, min_confidence: float) -> int:

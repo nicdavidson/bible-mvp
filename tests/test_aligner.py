@@ -245,7 +245,9 @@ def test_flag_suspect_gold_catches_shifted_links():
 
 
 def test_group_rendering_and_unpad():
-    assert group_rendering([(3, "beginning"), (1, "In"), (2, "the")]) == "in the beginning"
+    assert group_rendering([(3, "beginning"), (1, "In"), (2, "the")]) == "beginning"
+    assert group_rendering([(1, "his"), (2, "loving"), (3, "devotion")]) == "loving devotion"
+    assert group_rendering([(1, "the")]) == "the"
     assert group_rendering([(1, "did"), (3, "go")]) == "did … go"
     assert unpad("H0430") == "H430" and unpad("G0026") == "G26"
 
