@@ -1,7 +1,9 @@
+import html
 import json
 import logging
 import re
 import sqlite3
+import unicodedata
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
@@ -184,45 +186,141 @@ def _fts_query(q: str) -> str:
     return " ".join(parts)
 
 
+_ORIGINAL_SCRIPT = re.compile(r"[\u0370-\u03ff\u1f00-\u1fff\u0590-\u05ff]")
+_lexicon_keys: dict = {}   # (kind, folded) -> [strong numbers], built once per process
+_ON, _OFF = "\x01", "\x02"   # highlight() markers, swapped for <mark> after escaping
+VERSE_LIMIT = 50
+
+
+def _fold(s: str) -> str:
+    """Letters only, without accents, breathings or Hebrew points: ἀγάπη -> αγαπη, agápē -> agape."""
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"[^\w]", "", s.lower().replace("ς", "σ"))
+
+
+def _lexicon_lookup(conn, q: str) -> list:
+    """Strong's numbers whose original word (Greek/Hebrew typed) or transliteration (one
+    Latin word of 4+ letters) is exactly the query, ignoring accents."""
+    if not _lexicon_keys:
+        for r in conn.execute("SELECT strong_number, original, transliteration FROM lexicon"):
+            _lexicon_keys.setdefault(("orig", _fold(r["original"])), []).append(r["strong_number"])
+            if r["transliteration"]:
+                _lexicon_keys.setdefault(("tr", _fold(r["transliteration"])), []).append(
+                    r["strong_number"])
+    q = q.strip()
+    if _ORIGINAL_SCRIPT.search(q):
+        found = _lexicon_keys.get(("orig", _fold(q)), [])
+    elif re.fullmatch(r"[A-Za-z\u00c0-\u024f\u1e00-\u1eff']{4,}", q):
+        found = _lexicon_keys.get(("tr", _fold(q)), [])
+    else:
+        return []
+    if len(found) < 2:
+        return list(found)
+    # Unpointed Hebrew names several entries (חסד: H2616-H2618): the commonest first
+    uses = {s: conn.execute("SELECT COUNT(*) FROM word_alignments WHERE strong_number IN (?, ?)",
+                            (s, s[0] + s[1:].zfill(4))).fetchone()[0] for s in found}
+    return sorted(found, key=lambda s: -uses[s])
+
+
+def _word_info(conn, strongs_num: str):
+    row = conn.execute("SELECT original, transliteration, definition FROM lexicon "
+                       "WHERE strong_number = ?", (strongs_num,)).fetchone()
+    if not row:
+        return None
+    return {"strong_number": strongs_num, "original": row["original"],
+            "transliteration": row["transliteration"], "definition": row["definition"]}
+
+
+def _marked(text: str) -> str:
+    return html.escape(text, quote=False).replace(_ON, "<mark>").replace(_OFF, "</mark>")
+
+
+def _verse_hits(conn, verses_query: str, books, translation: str) -> list:
+    """One result per verse, whichever translations matched (P1-7).
+
+    The snippet is the whole verse in the reader's translation, marked where it matched.
+    When only other translations hold the words ("thou" in the KJV), the reader's text is
+    still shown, and `also` carries the first matching translation's marked text so the
+    reader can see why the verse is here. Order: the verse's best-ranked row.
+    """
+    sql = (f"SELECT v.book, v.chapter, v.verse, v.translation_id AS tr, "
+           f"highlight(verses_fts, 0, '{_ON}', '{_OFF}') AS hl "
+           f"FROM verses_fts JOIN verses v ON v.id = verses_fts.rowid WHERE verses_fts MATCH ?")
+    params: list = [verses_query]
+    if books:
+        sql += f" AND verses_fts.book IN ({','.join('?' * len(books))})"
+        params += list(books)
+    sql += " ORDER BY rank LIMIT ?"
+    params.append(VERSE_LIMIT * 4)   # every translation's row; deduplicated below
+    hits: dict = {}
+    for r in conn.execute(sql, params):
+        key = (r["book"], int(r["chapter"]), int(r["verse"]))
+        h = hits.setdefault(key, {"matched": {}})
+        h["matched"].setdefault(r["tr"], r["hl"])
+    keys = list(hits)[:VERSE_LIMIT]
+    need = [k for k in keys if translation not in hits[k]["matched"]]
+    own = {}
+    if need:
+        clause = " OR ".join(["(book = ? AND chapter = ? AND verse = ?)"] * len(need))
+        for b, c, v, t in conn.execute(
+                f"SELECT book, chapter, verse, text FROM verses WHERE translation_id = ? "
+                f"AND ({clause})", [translation, *[x for k in need for x in k]]):
+            own[(b, c, v)] = t
+    out = []
+    for k in keys:
+        matched = hits[k]["matched"]
+        item = {"type": "verse", "book": k[0], "chapter": k[1], "verse": k[2],
+                "translation": translation, "matched_in": sorted(matched)}
+        if translation in matched:
+            item["snippet"] = _marked(matched[translation])
+        else:
+            other = next(iter(matched))
+            item["snippet"] = html.escape(own.get(k, ""), quote=False) or _marked(matched[other])
+            if k in own:
+                item["also"] = {"translation": other, "snippet": _marked(matched[other])}
+            else:   # the reader's translation lacks this verse (versification)
+                item["translation"] = other
+        out.append(item)
+    return out
+
+
 @router.get("/api/search")
 @limiter.limit("30/minute")
 def search(
     request: Request,
     q: str = Query(..., min_length=2, max_length=100, description="Search query"),
-    scope: str = Query(default="all", description="Search scope: bible, ot, nt, book:BookName, commentary, all")
+    scope: str = Query(default="all", description="Search scope: bible, ot, nt, book:BookName, commentary, all"),
+    translation: str = Query(default="BSB", max_length=10,
+                             description="The reader's translation: verse text is shown in it"),
 ):
-    """Full-text search across Bible text, notes, and commentaries."""
+    """Full-text search across Bible text and commentaries.
+
+    Verses: one result per verse, the reader's translation shown (see _verse_hits).
+    A Strong's number (G26), or a Greek/Hebrew word (ἀγάπη), lists the verses with that
+    word and returns `word_info`; a transliteration (agape) adds `word_suggestions`.
+    """
     conn = get_db_connection()
     try:
         results = []
+        query = q.strip()
 
-        # Check if this is a Strong's number search (G### or H###)
-        strongs_match = re.match(r'^([GH])(\d+)$', q.strip(), re.IGNORECASE)
-        if strongs_match:
-            prefix = strongs_match.group(1).upper()
-            number = strongs_match.group(2)
+        # A Strong's number, or an original-language word that names exactly one entry
+        strongs_match = re.match(r'^([GH])(\d+)$', query, re.IGNORECASE)
+        lex = [] if strongs_match else _lexicon_lookup(conn, query)
+        original_typed = bool(_ORIGINAL_SCRIPT.search(query))
+        if strongs_match or (original_typed and lex):
+            if strongs_match:
+                prefix, number = strongs_match.group(1).upper(), strongs_match.group(2)
+            else:
+                prefix, number = lex[0][0], lex[0][1:].lstrip("0") or "0"
             strongs_num = f"{prefix}{number}"
-
-            # Get the lexicon entry for this Strong's number
-            lex_cursor = conn.execute("""
-                SELECT original, transliteration, definition
-                FROM lexicon
-                WHERE strong_number = ?
-            """, (strongs_num,))
-            lex_row = lex_cursor.fetchone()
-            word_info = None
-            if lex_row:
-                word_info = {
-                    "strong_number": strongs_num,
-                    "original": lex_row["original"],
-                    "transliteration": lex_row["transliteration"],
-                    "definition": lex_row["definition"]
-                }
+            word_info = _word_info(conn, strongs_num)
 
             # word_alignments stores zero-padded Strong's numbers (H430 -> H0430)
             padded_strong = f"{prefix}{number.zfill(4)}"
 
-            # Search for verses with this Strong's number, including the original word
+            # Verses with this Strong's number, with the original word
             cursor = conn.execute("""
                 SELECT 'verse' as type, v.book, v.chapter, v.verse,
                        v.text as snippet, wa.hebrew_text as original_word,
@@ -231,37 +329,39 @@ def search(
                 JOIN verses v ON v.book = wa.book
                     AND v.chapter = wa.chapter
                     AND v.verse = wa.verse
-                    AND v.translation_id = 'WEB'
+                    AND v.translation_id = ?
                 WHERE wa.strong_number IN (?, ?)
                 GROUP BY v.book, v.chapter, v.verse
                 ORDER BY v.book_order, v.chapter, v.verse
                 LIMIT 50
-            """, (strongs_num, padded_strong))
+            """, (translation, strongs_num, padded_strong))
 
             for row in cursor.fetchall():
                 result = dict(row)
+                result["translation"] = translation
+                snippet = html.escape(result["snippet"], quote=False)
                 # Highlight the translated word in the snippet if we have a gloss
                 if result.get("gloss"):
-                    gloss = result["gloss"]
-                    snippet = result["snippet"]
-                    # Try to highlight the gloss word in the verse text
-                    pattern = re.compile(r'\b(' + re.escape(gloss) + r')\b', re.IGNORECASE)
-                    result["snippet"] = pattern.sub(r'<mark>\1</mark>', snippet, count=1)
+                    pattern = re.compile(r'\b(' + re.escape(html.escape(result["gloss"], quote=False)) + r')\b', re.IGNORECASE)
+                    snippet = pattern.sub(r'<mark>\1</mark>', snippet, count=1)
+                result["snippet"] = snippet
                 results.append(result)
 
-            return {"query": q, "scope": scope, "results": results, "word_info": word_info}
+            out = {"query": q, "scope": scope, "results": results, "word_info": word_info}
+            if len(lex) > 1:
+                out["word_suggestions"] = [w for w in (_word_info(conn, s) for s in lex[1:6]) if w]
+            return out
 
         # Check if searching within a specific book
-        book_filter = None
-        testament_filter = None
+        books = None
         if scope.startswith("book:"):
-            book_filter = scope[5:]
+            books = [scope[5:]]
             scope = "bible"
         elif scope == "ot":
-            testament_filter = OT_BOOKS
+            books = OT_BOOKS
             scope = "bible"
         elif scope == "nt":
-            testament_filter = NT_BOOKS
+            books = NT_BOOKS
             scope = "bible"
 
         fts_query = _fts_query(q)
@@ -275,35 +375,7 @@ def search(
 
         try:
             if scope in ("all", "bible"):
-                if book_filter:
-                    cursor = conn.execute("""
-                        SELECT 'verse' as type, book, chapter, verse,
-                               snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
-                        FROM verses_fts
-                        WHERE verses_fts MATCH ? AND book = ?
-                        ORDER BY rank
-                        LIMIT 50
-                    """, (verses_query, book_filter))
-                elif testament_filter:
-                    placeholders = ','.join('?' * len(testament_filter))
-                    cursor = conn.execute(f"""
-                        SELECT 'verse' as type, book, chapter, verse,
-                               snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
-                        FROM verses_fts
-                        WHERE verses_fts MATCH ? AND book IN ({placeholders})
-                        ORDER BY rank
-                        LIMIT 50
-                    """, (verses_query, *testament_filter))
-                else:
-                    cursor = conn.execute("""
-                        SELECT 'verse' as type, book, chapter, verse,
-                               snippet(verses_fts, 0, '<mark>', '</mark>', '...', 32) as snippet
-                        FROM verses_fts
-                        WHERE verses_fts MATCH ?
-                        ORDER BY rank
-                        LIMIT 50
-                    """, (verses_query,))
-                results.extend([dict(r) for r in cursor.fetchall()])
+                results.extend(_verse_hits(conn, verses_query, books, translation))
 
             if scope in ("all", "commentary"):
                 cursor = conn.execute("""
@@ -319,7 +391,10 @@ def search(
             # Malformed FTS query - return empty results rather than 500
             logger.warning("FTS query error for %r: %s", q, e)
 
-        return {"query": q, "scope": scope, "results": results}
+        out = {"query": q, "scope": scope, "results": results}
+        if lex:   # a transliteration ("agape"): offer the word study beside the English hits
+            out["word_suggestions"] = [w for w in (_word_info(conn, s) for s in lex[:5]) if w]
+        return out
     finally:
         conn.close()
 
