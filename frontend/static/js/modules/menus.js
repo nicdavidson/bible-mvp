@@ -40,7 +40,6 @@ window.BibleModules.menus = {
             this.planReadingSections = [];
             this.planReadingChapters = [];
             this.combinedCrossRefs = [];
-            this.combinedCommentary = [];
             this.combinedNotes = [];
             // Keep the current reference if we have one, otherwise go to welcome view
             if (!this.currentBook) {

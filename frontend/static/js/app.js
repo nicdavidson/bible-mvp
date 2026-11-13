@@ -273,7 +273,6 @@ function bibleApp() {
         currentChapter: 0,
         verses: [],
         highlightedVerses: [],
-        commentary: [],
         crossRefs: [],
         crossRefSort: 'biblical',  // 'biblical' or 'relevance'
         crossRefFilter: '',        // book name filter
@@ -291,7 +290,6 @@ function bibleApp() {
         selectedWord: null,
         showAllOccurrences: false,
         loading: false,
-        loadingCommentary: false,
         error: null,
         darkMode: false,
         currentTheme: 'light',
@@ -481,13 +479,7 @@ function bibleApp() {
         planReadingChapters: [],  // Chapters being read in combined mode: [{book, chapter}]
         wasInPlanReading: false,  // True when user navigated away from plan reading (for "return" button)
         combinedCrossRefs: [],  // Store all cross-refs for combined reading (to restore after verse deselect)
-        combinedCommentary: [],  // Store all commentary for combined reading (to restore after verse deselect)
         combinedNotes: [],  // Store notes for combined reading chapters
-
-        // Commentary grouping state
-        activeCommentarySource: 'All',  // Currently selected commentary source tab
-        expandedCommentarySources: {},  // { source: boolean }
-        expandedCommentaryChapters: {},  // { chapterRef: boolean } for combined plan reading
 
         // Offline state
         isOnline: navigator.onLine,
@@ -639,7 +631,10 @@ function bibleApp() {
                 const pathRef = this.parsePathReference();
                 if (pathRef) {
                     this.referenceInput = pathRef;
+                    const studySource = new URLSearchParams(window.location.search).get('study');
                     await this.loadPassage({ history: 'replace' });
+                    // Deep link to the study view: /John/3/16-18?study=john-gill
+                    if (studySource !== null) this.openStudy(pathRef, { source: studySource, history: 'replace' });
                 } else {
                     const urlParams = new URLSearchParams(window.location.search);
                     const ref = urlParams.get('ref');
@@ -651,7 +646,8 @@ function bibleApp() {
             }
 
             // Handle browser back/forward
-            window.addEventListener('popstate', () => {
+            window.addEventListener('popstate', (e) => {
+                if (this.studyHandlePop(e)) return;  // study view entries (modules/study.js)
                 const planURL = this.parsePlanURL();
                 if (planURL) {
                     this.restorePlanFromURL(planURL.planId, planURL.day, 'replace');
@@ -670,6 +666,9 @@ function bibleApp() {
                     }
                 }
             });
+
+            // Study view: dialog Esc/back handling + selection availability hint
+            this.studyInit();
 
             // Setup keyboard shortcuts
             this.setupKeyboardShortcuts();
@@ -708,13 +707,6 @@ function bibleApp() {
                         const verseNum = parseInt(bestEntry.target.id.replace('verse-', ''), 10);
                         if (verseNum && verseNum !== this.scrollActiveVerse) {
                             this.scrollActiveVerse = verseNum;
-                            // Auto-scroll commentary when freely scrolling (no verse explicitly selected)
-                            clearTimeout(this._commentaryScrollTimeout);
-                            this._commentaryScrollTimeout = setTimeout(() => {
-                                if (this.activeTab === 'commentary' && this.highlightedVerses.length === 0) {
-                                    this.scrollCommentaryToVerse(verseNum);
-                                }
-                            }, 300);
                         }
                     }
                 },
@@ -808,6 +800,8 @@ function bibleApp() {
 
         setupKeyboardShortcuts() {
             document.addEventListener('keydown', (e) => {
+                // The study view is a modal <dialog>: it owns its keys (Esc = back)
+                if (this.study?.open) return;
                 // Ignore if typing in an input
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     // But allow Escape to blur inputs
@@ -1255,8 +1249,7 @@ function bibleApp() {
                             });
                         }
 
-                        // Load cached commentary/interlinear/cross-refs
-                        await this.loadCommentary();
+                        // Load cached interlinear/cross-refs
                         await this.loadInterlinearData();
                         try {
                             const cachedRefs = await window.offlineStorage.getChapterCrossRefs(inputBook, inputChapter);
@@ -1307,9 +1300,6 @@ function bibleApp() {
 
                 // Update URL with clean path format (new chapter = new history entry)
                 this.updateURL(this._historyMode === 'push');
-
-                // Load commentary
-                await this.loadCommentary();
 
                 // Load interlinear data if available. Lazy by default (P3): the
                 // payload is ~50KB/chapter and the feature is off by default.
@@ -1387,9 +1377,7 @@ function bibleApp() {
                         if (cachedRefs?.length > 0) this.crossRefs = cachedRefs;
                     } catch (e) { /* silent */ }
 
-                    // Load cached commentary and interlinear (interlinear lazy
-                    // unless shown or auto-cache wants it — P3)
-                    await this.loadCommentary();
+                    // Load cached interlinear (lazy unless shown or auto-cache wants it — P3)
                     if (this.showInterlinear || this.autoCacheEnabled) {
                         await this.loadInterlinearData();
                     } else {
@@ -1560,35 +1548,6 @@ function bibleApp() {
             }
         },
 
-        // Load commentary for current chapter (always full chapter for browsing)
-        async loadCommentary() {
-            if (!this.currentBook || !this.currentChapter) {
-                this.commentary = [];
-                return;
-            }
-
-            const gen = this._loadGeneration;
-            this.loadingCommentary = true;
-            const chapterRef = `${this.currentBook} ${this.currentChapter}`;
-            const result = await this._fetchOrCache(
-                `/api/passage/${encodeURIComponent(chapterRef)}/commentary`,
-                () => window.offlineStorage.getChapterCommentary(this.currentBook, this.currentChapter)
-            );
-            if (gen !== this._loadGeneration) {
-                // Stale response after navigation — leave state alone (B4)
-                this.loadingCommentary = false;
-                return;
-            }
-            if (result.fromCache) {
-                this.commentary = result.data;
-            } else if (result.ok) {
-                this.commentary = result.data.entries || [];
-            } else {
-                this.commentary = [];
-            }
-            this.loadingCommentary = false;
-        },
-
         // Get sorted and filtered cross-references
         getFilteredCrossRefs() {
             let refs = [...this.crossRefs];
@@ -1741,43 +1700,6 @@ function bibleApp() {
             this.loadReference(refStr);
         },
 
-        // Check if a commentary entry applies to the active verse
-        commentaryMatchesActiveVerse(entry) {
-            const activeVerse = this.getActiveVerse();
-            if (!activeVerse) return true;  // If no active verse, all match
-            const start = entry.reference_start || 1;
-            const end = entry.reference_end || start;
-            return activeVerse >= start && activeVerse <= end;
-        },
-
-        // Auto-scroll commentary panel to the entry matching a verse number
-        scrollCommentaryToVerse(verseNum) {
-            if (!verseNum) return;
-            const entries = document.querySelectorAll('.commentary-entry[data-verse-start]');
-            let targetEntry = null;
-            let bestPreceding = null;
-            for (const el of entries) {
-                const start = parseInt(el.dataset.verseStart) || 0;
-                const end = parseInt(el.dataset.verseEnd) || start;
-                if (verseNum >= start && verseNum <= end) {
-                    targetEntry = el;
-                    break;
-                }
-                // Track closest preceding entry as fallback
-                if (start <= verseNum) {
-                    bestPreceding = el;
-                }
-            }
-            const scrollTarget = targetEntry || bestPreceding;
-            if (scrollTarget) {
-                const panelBody = scrollTarget.closest('.panel-body');
-                if (panelBody) {
-                    const entryTop = scrollTarget.offsetTop - panelBody.offsetTop;
-                    panelBody.scrollTo({ top: entryTop - 10, behavior: 'smooth' });
-                }
-            }
-        },
-
         // Select a verse from a verse reference (e.g., clicking "v. 3" in commentary)
         selectVerseFromRef(verseNum) {
             this.highlightedVerses = [verseNum];
@@ -1885,9 +1807,6 @@ function bibleApp() {
             // Load cross-refs for the new verse
             this.loadCrossRefs(null, verseNum);
 
-            // Commentary already loaded for full chapter - just update active verse display
-            // (no reload needed since we have all chapter commentary)
-
             // Scroll to verse
             this.$nextTick(() => {
                 const verseEl = document.getElementById(`verse-${verseNum}`);
@@ -1940,69 +1859,14 @@ function bibleApp() {
             await this.selectVerse(verseNum, verseIdx);
         },
 
-        // Handle clicks on Bible reference links in commentary
-        handleCommentaryClick(event) {
-            const link = event.target.closest('.commentary-ref');
-            if (link) {
-                event.preventDefault();
-                const ref = link.dataset.ref;
-                if (ref) {
-                    this.loadReference(ref);
-                }
-            }
-        },
-
-        // Get ordered list of unique commentary sources
-        getCommentarySources() {
-            const sources = [];
-            const seen = new Set();
-            for (const entry of this.commentary) {
-                const source = entry.source || 'Unknown';
-                if (!seen.has(source)) {
-                    seen.add(source);
-                    sources.push(source);
-                }
-            }
-            return sources;
-        },
-
-        getCommentarySourceTabs() {
-            const sources = this.getCommentarySources();
-            return sources.length > 1 ? ['All', ...sources] : sources;
-        },
-
-        // Commentary grouped by source for the active verse/study panel.
-        getStudyCommentaryGroups() {
-            const activeVerse = this.getActiveVerse();
-            const bySource = {};
-            for (const entry of this.commentary) {
-                const start = entry.reference_start || 1;
-                const end = entry.reference_end || start;
-                if (activeVerse && !(activeVerse >= start && activeVerse <= end)) {
-                    continue;
-                }
-                const source = entry.source || 'Unknown';
-                if (!bySource[source]) bySource[source] = [];
-                bySource[source].push(entry);
-            }
-
-            // If a verse has no exact match, fall back to the first entries from each source
-            // so the Study tab still exposes available commentators for the chapter.
-            if (Object.keys(bySource).length === 0) {
-                for (const source of this.getCommentarySources()) {
-                    bySource[source] = this.commentary
-                        .filter(entry => (entry.source || 'Unknown') === source)
-                        .slice(0, 2);
-                }
-            }
-            return this.getCommentarySources()
-                .filter(source => bySource[source]?.length > 0)
-                .map(source => ({ source, entries: bySource[source] }));
-        },
-
         getStudyReferenceLabel() {
-            const activeVerse = this.getActiveVerse();
             if (!this.currentBook || !this.currentChapter) return 'Study';
+            const vv = [...this.highlightedVerses].sort((a, b) => a - b);
+            if (vv.length) {
+                const [s, e] = [vv[0], vv[vv.length - 1]];
+                return `${this.currentBook} ${this.currentChapter}:${s}${e > s ? '–' + e : ''}`;
+            }
+            const activeVerse = this.getActiveVerse();
             return activeVerse
                 ? `${this.currentBook} ${this.currentChapter}:${activeVerse}`
                 : `${this.currentBook} ${this.currentChapter}`;
@@ -2015,128 +1879,6 @@ function bibleApp() {
         openStudySection(tab) {
             this.activeTab = tab;
             if (tab === 'topics') this.initTopicSections();
-        },
-
-        // Get the currently active commentary source (defaults to first)
-        getActiveCommentarySource() {
-            const sources = this.getCommentarySources();
-            if (sources.length === 0) return null;
-            if (this.activeCommentarySource === 'All' && sources.length > 1) {
-                return 'All';
-            }
-            if (this.activeCommentarySource && sources.includes(this.activeCommentarySource)) {
-                return this.activeCommentarySource;
-            }
-            return sources.length > 1 ? 'All' : sources[0];
-        },
-
-        // Get commentary entries for the active source tab
-        getActiveSourceEntries() {
-            const activeSource = this.getActiveCommentarySource();
-            if (!activeSource) return [];
-            if (activeSource === 'All') return this.commentary;
-            return this.commentary.filter(e => (e.source || 'Unknown') === activeSource);
-        },
-
-        // Switch active commentary source tab
-        switchCommentarySource(source) {
-            this.activeCommentarySource = source;
-            const activeVerse = this.getActiveVerse();
-            if (activeVerse) {
-                this.$nextTick(() => this.scrollCommentaryToVerse(activeVerse));
-            }
-        },
-
-        // Group commentary by chapter first, then by source (for combined plan reading)
-        getGroupedCommentaryByChapter() {
-            const byChapter = {};
-            for (const entry of this.commentary) {
-                const chapterKey = entry._sourceRef || 'Unknown';
-                if (!byChapter[chapterKey]) {
-                    byChapter[chapterKey] = {};
-                }
-                const source = entry.source || 'Unknown';
-                if (!byChapter[chapterKey][source]) {
-                    byChapter[chapterKey][source] = [];
-                }
-                byChapter[chapterKey][source].push(entry);
-            }
-            return byChapter;
-        },
-
-        // Get list of chapter keys in order they appear in the reading
-        getCommentaryChapterKeys() {
-            const seen = new Set();
-            const keys = [];
-            for (const entry of this.commentary) {
-                const key = entry._sourceRef || 'Unknown';
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    keys.push(key);
-                }
-            }
-            return keys;
-        },
-
-        // Check if a commentary chapter is expanded (in combined mode)
-        isCommentaryChapterExpanded(chapterKey) {
-            // If explicitly set, use that value
-            if (this.expandedCommentaryChapters && this.expandedCommentaryChapters[chapterKey] !== undefined) {
-                return this.expandedCommentaryChapters[chapterKey];
-            }
-            // By default, only expand first chapter
-            return this.getCommentaryChapterKeys()[0] === chapterKey;
-        },
-
-        // Toggle a commentary chapter's expanded state
-        toggleCommentaryChapter(chapterKey) {
-            if (!this.expandedCommentaryChapters) {
-                this.expandedCommentaryChapters = {};
-            }
-            // If not set, get current default state and toggle
-            const current = this.isCommentaryChapterExpanded(chapterKey);
-            this.expandedCommentaryChapters[chapterKey] = !current;
-        },
-
-        // Check if a commentary source is expanded
-        isCommentarySourceExpanded(source) {
-            return this.expandedCommentarySources[source] === true;
-        },
-
-        // Toggle a commentary source's expanded state
-        toggleCommentarySource(source) {
-            this.expandedCommentarySources[source] = !this.expandedCommentarySources[source];
-        },
-
-        // Check if a commentary entry is expanded (active entries auto-expand)
-        isCommentaryEntryExpanded(entry, idx) {
-            // Active verse entries are always expanded
-            if (this.commentaryMatchesActiveVerse(entry)) return true;
-            // Check manual expansion state
-            const key = (entry.source || '') + '-' + idx;
-            return this._expandedCommentaryEntries?.[key] === true;
-        },
-
-        // Toggle a commentary entry's expanded state
-        toggleCommentaryEntry(entry, idx) {
-            if (!this._expandedCommentaryEntries) this._expandedCommentaryEntries = {};
-            const key = (entry.source || '') + '-' + idx;
-            // If it's the active verse, clicking should navigate to that verse
-            if (this.commentaryMatchesActiveVerse(entry)) {
-                if (entry.reference_start) this.selectVerseFromRef(entry.reference_start);
-                return;
-            }
-            this._expandedCommentaryEntries[key] = !this._expandedCommentaryEntries[key];
-        },
-
-        // Get preview text for a single commentary entry
-        getCommentaryEntryPreview(entry) {
-            const content = entry.content || '';
-            const plainText = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            if (plainText.length <= 100) return plainText;
-            const truncated = plainText.substring(0, 100);
-            const lastSpace = truncated.lastIndexOf(' ');
-            return truncated.substring(0, lastSpace > 60 ? lastSpace : 100).trim() + '...';
         },
 
         // Clear verse selection (dismiss action bar)
@@ -2153,7 +1895,6 @@ function bibleApp() {
                 this.currentChapter = null;
                 this.currentReference = null;
                 this.crossRefs = this.combinedCrossRefs;
-                this.commentary = this.combinedCommentary;
             } else if (this.currentBook && this.currentChapter) {
                 this.currentReference = `${this.currentBook} ${this.currentChapter}`;
                 this.referenceInput = this.currentReference;
@@ -2190,16 +1931,6 @@ function bibleApp() {
                 const ta = document.querySelector('.note-textarea');
                 if (ta) ta.focus();
             });
-        },
-
-        // Add all selected verses to memory
-        openStudyForSelected() {
-            this.activeTab = 'study';
-            this.resourcesPanelExpanded = true;
-            this.sheetExpand();
-            if (this.sidebarCollapsed) this.toggleSidebar();
-            const v = this.highlightedVerses[0];
-            if (v) this.$nextTick(() => this.scrollCommentaryToVerse(v));
         },
 
         memorizeSelected() {
@@ -2277,6 +2008,14 @@ function bibleApp() {
                 return;
             }
 
+            if (sameScope && this.highlightedVerses.length === 1) {
+                // Second tap makes a range: tap the first verse, then the last
+                const a = this.highlightedVerses[0];
+                const [s, e] = a < verseNum ? [a, verseNum] : [verseNum, a];
+                this.highlightedVerses = Array.from({ length: e - s + 1 }, (_, i) => s + i);
+                return;
+            }
+
             if (sameScope && this.highlightedVerses.length > 0) {
                 // Add to selection
                 this.highlightedVerses = [...this.highlightedVerses, verseNum];
@@ -2304,14 +2043,11 @@ function bibleApp() {
                     this.currentReference = `${verse._book} ${verse._chapter}:${verseNum}`;
                     this.referenceInput = this.currentReference;
 
-                    // Load cross-refs, commentary, and topics for just this verse
-                    // (independent requests — run concurrently)
+                    // Load cross-refs and topics for just this verse (concurrently)
                     await Promise.all([
                         this.loadCrossRefs(),
-                        this.loadCommentary(),
                         this.loadTopicsForVerse(verseNum)
                     ]);
-                    this.$nextTick(() => this.scrollCommentaryToVerse(verseNum));
                 }
                 return;
             }
@@ -2324,12 +2060,11 @@ function bibleApp() {
             this.updateURL();
 
             // Reload cross-references and topics for the selected verse, concurrently.
-            // Commentary is chapter-scoped and already loaded by loadPassage — no refetch (P2).
+            // Commentary lives in the study view (modules/study.js), loaded on open.
             await Promise.all([
                 this.loadCrossRefs(),
                 this.loadTopicsForVerse(verseNum)
             ]);
-            this.$nextTick(() => this.scrollCommentaryToVerse(verseNum));
         },
 
         // Load cross-references. No args: current reference (chapter-scoped cache

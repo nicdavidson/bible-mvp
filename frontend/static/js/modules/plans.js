@@ -476,8 +476,7 @@ window.BibleModules.plans = {
             // We'll load verses into the main this.verses array
             let allVerses = [];
             let allCrossRefs = [];
-            let allCommentary = [];
-            let chaptersToLoadCommentary = [];
+            let chaptersToLoad = [];
 
             // Parse and load each reading
             const readingTypes = ['chronological', 'psalms', 'proverbs'];
@@ -530,7 +529,7 @@ window.BibleModules.plans = {
                                 allCrossRefs = allCrossRefs.concat(crossRefsWithContext);
                             }
 
-                            // Track chapters for commentary loading and notes filtering
+                            // Track chapters for interlinear loading and notes filtering
                             const bookMatch = data.reference.match(/^(.+?)\s+(\d+)/);
                             if (bookMatch) {
                                 const chapterInfo = {
@@ -538,7 +537,7 @@ window.BibleModules.plans = {
                                     chapter: parseInt(bookMatch[2]),
                                     ref: `${bookMatch[1]} ${bookMatch[2]}`
                                 };
-                                chaptersToLoadCommentary.push(chapterInfo);
+                                chaptersToLoad.push(chapterInfo);
                                 // Also track for notes panel (deduplicated later)
                                 this.planReadingChapters.push({
                                     book: chapterInfo.book,
@@ -599,7 +598,6 @@ window.BibleModules.plans = {
             this.highlightedVerses = [];
             this.crossRefs = allCrossRefs;
             this.combinedCrossRefs = allCrossRefs;  // Store for restoration after verse deselect
-            this.commentary = [];
             this.loading = false;
             this.rebuildVerseColorMap();
 
@@ -607,28 +605,9 @@ window.BibleModules.plans = {
             this.currentBook = null;
             this.currentChapter = null;
 
-            // P4: load commentary and interlinear for all chapters (deduplicated)
-            // concurrently — one round-trip of wall clock instead of 2×chapters.
-            const uniqueChapters = [...new Map(chaptersToLoadCommentary.map(c => [c.ref, c])).values()];
-
-            const commentaryPromise = Promise.all(uniqueChapters.map(chapterInfo =>
-                fetch(`/api/passage/${encodeURIComponent(chapterInfo.ref)}/commentary`)
-                    .then(resp => resp.ok ? resp.json() : null)
-                    .then(commentaryData => {
-                        if (!commentaryData?.entries?.length) return [];
-                        // Add book/chapter context to each entry
-                        return commentaryData.entries.map(entry => ({
-                            ...entry,
-                            _sourceBook: chapterInfo.book,
-                            _sourceChapter: chapterInfo.chapter,
-                            _sourceRef: chapterInfo.ref
-                        }));
-                    })
-                    .catch(err => {
-                        console.error(`Failed to load commentary for ${chapterInfo.ref}:`, err);
-                        return [];
-                    })
-            ));
+            // P4: load interlinear for all chapters (deduplicated) concurrently.
+            // Commentary loads per selection in the study view (modules/study.js).
+            const uniqueChapters = [...new Map(chaptersToLoad.map(c => [c.ref, c])).values()];
 
             const interlinearPromise = Promise.all(uniqueChapters.map(chapterInfo =>
                 fetch(`/api/passage/${encodeURIComponent(chapterInfo.ref)}/interlinear?translation=${this.translation}`)
@@ -641,16 +620,10 @@ window.BibleModules.plans = {
             ));
 
             this.interlinearData = {};
-            const [commentaryGroups, interlinearResults] = await Promise.all([commentaryPromise, interlinearPromise]);
+            const interlinearResults = await interlinearPromise;
 
             // User navigated away mid-load — do not clobber their state (B4)
             if (gen !== this._loadGeneration) return;
-
-            for (const entries of commentaryGroups) {
-                allCommentary = allCommentary.concat(entries);
-            }
-            this.commentary = allCommentary;
-            this.combinedCommentary = allCommentary;  // Store for restoration after verse deselect
 
             const interlinearMap = {};
             for (const { chapterInfo, data } of interlinearResults) {

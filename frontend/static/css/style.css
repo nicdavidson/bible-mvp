@@ -1471,13 +1471,6 @@ textarea:focus:not(:focus-visible) {
     color: var(--color-text);
 }
 
-.study-heading-meta {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    white-space: nowrap;
-}
-
 .study-section {
     display: flex;
     flex-direction: column;
@@ -1515,48 +1508,12 @@ textarea:focus:not(:focus-visible) {
     border-color: var(--color-primary);
 }
 
-.study-commentary-compare {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-}
 
-.study-commentary-card,
 .study-note-card {
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     background: var(--color-surface);
     padding: 0.875rem;
-}
-
-.study-source-title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.625rem;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: var(--color-primary);
-}
-
-.study-source-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.4rem;
-    height: 1.4rem;
-    padding: 0 0.35rem;
-    border-radius: 999px;
-    background: var(--color-primary-bg);
-    color: var(--color-primary);
-    font-size: 0.7rem;
-}
-
-.study-commentary-entry + .study-commentary-entry {
-    margin-top: 0.875rem;
-    padding-top: 0.875rem;
-    border-top: 1px solid var(--color-border);
 }
 
 .study-ref-grid {
@@ -1584,292 +1541,6 @@ textarea:focus:not(:focus-visible) {
 
 .study-topic-list {
     margin-top: 0.25rem;
-}
-
-/* Commentary Source Tabs */
-.commentary-source-tabs {
-    display: flex;
-    border-bottom: 2px solid var(--color-border);
-    margin-bottom: 0.75rem;
-    gap: 0;
-}
-
-.commentary-source-tab {
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    transition: color 0.15s, border-color 0.15s;
-    text-align: center;
-}
-
-.commentary-source-tab:hover {
-    color: var(--color-text);
-}
-
-.commentary-source-tab.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
-}
-
-.commentary-tab-entries {
-    padding: 0.5rem 0;
-}
-
-.commentary-single-source {
-    padding: 0.5rem 0;
-    margin-bottom: 0.5rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-primary);
-}
-
-/* Commentary - Collapsible Groups (used in combined plan reading mode) */
-.commentary-group {
-    margin-bottom: 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.commentary-group:hover {
-    border-color: var(--color-text-muted);
-}
-
-.commentary-group-header {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    padding: 0.75rem 1rem;
-    background: var(--color-surface);
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    transition: background-color 0.15s;
-}
-
-.commentary-group-header:hover {
-    background: var(--color-surface-hover, #e5e7eb);
-}
-
-.dark .commentary-group-header:hover {
-    background: var(--color-surface-hover, #374151);
-}
-
-.commentary-group-header.expanded {
-    border-bottom: 1px solid var(--color-border);
-}
-
-.commentary-source-name {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: var(--color-primary);
-    flex: 1;
-}
-
-.commentary-entry-count {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-    margin-right: 0.75rem;
-}
-
-.commentary-toggle-icon {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    transition: transform 0.15s;
-}
-
-/* Chapter group for combined plan reading mode */
-.commentary-chapter-group {
-    margin-bottom: 0.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    overflow: hidden;
-}
-
-.commentary-chapter-header {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-    transition: background 0.15s;
-}
-
-.commentary-chapter-header:hover {
-    background: var(--color-primary-hover);
-}
-
-.commentary-chapter-header.expanded {
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.commentary-chapter-name {
-    flex: 1;
-    text-align: left;
-}
-
-.commentary-chapter-content {
-    background: var(--color-surface);
-}
-
-.commentary-chapter-content .commentary-group {
-    border: none;
-    border-radius: 0;
-    margin-bottom: 0;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.commentary-chapter-content .commentary-group:last-child {
-    border-bottom: none;
-}
-
-.commentary-chapter-content .commentary-group-header {
-    border-radius: 0;
-}
-
-.commentary-entries {
-    padding: 1rem;
-    background: var(--color-bg);
-}
-
-.commentary-entry {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--color-border);
-    padding-left: 0.75rem;
-    border-left: 3px solid transparent;
-    opacity: 0.6;
-    transition: opacity 0.2s, border-color 0.2s;
-}
-
-.commentary-entry.commentary-active {
-    opacity: 1;
-    border-left-color: var(--color-primary);
-}
-
-.commentary-entry:last-child {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
-}
-
-/* Collapsible commentary entry header */
-.commentary-entry-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.375rem 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    color: var(--color-text);
-    font-size: 0.8125rem;
-}
-
-.commentary-entry-header:hover {
-    color: var(--color-primary);
-}
-
-.commentary-verse-ref-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--color-primary);
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.commentary-entry-source-label {
-    padding: 0.125rem 0.375rem;
-    border-radius: 999px;
-    background: var(--color-primary-bg);
-    color: var(--color-primary);
-    font-size: 0.6875rem;
-    font-weight: 700;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.commentary-entry-preview {
-    color: var(--color-text-secondary);
-    font-size: 0.8rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    min-width: 0;
-}
-
-.commentary-entry-toggle {
-    font-size: 0.625rem;
-    color: var(--color-text-secondary);
-    flex-shrink: 0;
-}
-
-.commentary-entry.commentary-expanded {
-    opacity: 1;
-}
-
-.commentary-verse-ref {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-primary);
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: none;
-    border: none;
-    padding: 0.25rem 0.5rem;
-    margin-left: -0.5rem;
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.commentary-verse-ref:hover {
-    background: var(--color-primary-bg);
-}
-
-.commentary-source {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--color-primary);
-    margin-bottom: 0.5rem;
-}
-
-.commentary-content {
-    font-size: 0.9375rem;
-    line-height: 1.7;
-}
-
-/* Clickable Bible reference links in commentary */
-.commentary-ref {
-    color: var(--color-primary);
-    text-decoration: none;
-    border-bottom: 1px dotted var(--color-primary);
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
-}
-
-.commentary-ref:hover {
-    color: var(--color-primary-dark, #1d4ed8);
-    border-bottom-style: solid;
 }
 
 /* Clickable Bible reference links in notes */
@@ -3196,24 +2867,6 @@ textarea:focus:not(:focus-visible) {
     /* Commentary panel: better reading */
     .panel-resources .panel-body {
         padding: 0.75rem;
-    }
-
-    .commentary-content {
-        font-size: 0.9375rem;
-        line-height: 1.7;
-    }
-
-    .commentary-group-header {
-        padding: 0.625rem 0.75rem;
-    }
-
-    .commentary-source-name {
-        font-size: 0.875rem;
-    }
-
-    /* Study tab: tighter cards */
-    .study-commentary-card {
-        padding: 0.625rem;
     }
 
     .study-section-header h3 {
@@ -7517,11 +7170,6 @@ svg.action-bar-icon {
     border-bottom-color: var(--color-primary);
 }
 
-/* Parchment: Commentary styling */
-.parchment .commentary-content {
-    font-family: var(--font-verse);
-}
-
 /* Parchment: interlinear word styling */
 .parchment .interlinear-row {
     background: #efe6c8;
@@ -8848,10 +8496,6 @@ svg.action-bar-icon {
 
     /* Expanded sheet gets real study height + readable resource text */
     .panel-resources.expanded { max-height: 62dvh; }
-    .commentary-content {
-        font-size: 0.9375rem;
-        line-height: 1.65;
-    }
 }
 
 /* Auto-hiding header while reading (mobile) — see setupHeaderAutoHide() */

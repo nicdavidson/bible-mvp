@@ -13,6 +13,7 @@
     <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
     <link rel="apple-touch-icon" href="/static/icons/icon.svg">
     <link rel="stylesheet" href="/static/css/style.css?v=__SW_VERSION__">
+    <link rel="stylesheet" href="/static/css/study.css?v=__SW_VERSION__">
     <script src="/static/vendor/supabase-2.117.2.min.js"></script>
     <script src="/config.js"></script>
     <script src="/static/js/supabase-client.js?v=__SW_VERSION__"></script>
@@ -557,8 +558,9 @@
                         <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg>
                         <span class="action-bar-text">Note</span>
                     </button>
-                    <!-- Study: open commentary/cross-refs for selected verse -->
-                    <button class="action-bar-btn" @click.stop="openStudyForSelected()" title="Study">
+                    <!-- Study: open the study view (commentary) for the selected verses -->
+                    <button class="action-bar-btn action-bar-study" @click.stop="openStudy()" title="Study with commentary">
+                        <span class="action-bar-count" x-show="studyHint?.withComment.length" x-text="studyHint?.withComment.length" aria-hidden="true"></span>
                         <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
                         <span class="action-bar-text">Study</span>
                     </button>
@@ -582,7 +584,7 @@
         </section>
 
         <!-- Resources Panel -->
-        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed, 'peeking': !resourcesPanelExpanded && highlightedVerses.length > 0 && (commentary.length > 0 || crossRefs.length > 0 || verseTopics.length > 0 || getRelevantNotes().length > 0) }" :style="sheetDragStyle" x-ref="resourcesPanel">
+        <section class="panel panel-resources" :class="{ 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed, 'peeking': !resourcesPanelExpanded && highlightedVerses.length > 0 && (studyHint?.withComment.length > 0 || crossRefs.length > 0 || verseTopics.length > 0 || getRelevantNotes().length > 0) }" :style="sheetDragStyle" x-ref="resourcesPanel">
             <!-- Sidebar toggle button (tablet/desktop only) -->
             <button
                 class="btn-sidebar-toggle"
@@ -594,8 +596,8 @@
             </button>
             <div class="study-peek" x-show="!resourcesPanelExpanded && highlightedVerses.length > 0">
                 <span class="study-peek-label">Study</span>
-                <button class="peek-chip" x-show="commentary.length > 0" @click="activeTab = 'commentary'; resourcesPanelExpanded = true; sheetExpand()">
-                    Commentary <span class="peek-count" x-text="commentary.length"></span>
+                <button class="peek-chip" x-show="studyHint?.withComment.length > 0" @click="openStudy()">
+                    Commentary <span class="peek-count" x-text="studyHint?.withComment.length"></span>
                 </button>
                 <button class="peek-chip" x-show="crossRefs.length > 0" @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true; sheetExpand()">
                     Cross-refs <span class="peek-count" x-text="crossRefs.length"></span>
@@ -623,14 +625,9 @@
                 >×</button>
                 <button
                     @click="activeTab = 'study'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
-                    :class="{ 'active': activeTab === 'study', 'has-content': commentary.length > 0 || crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0 }"
+                    :class="{ 'active': activeTab === 'study', 'has-content': crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0 }"
                     class="tab-btn"
-                >Study<span x-show="commentary.length > 0 || crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0" class="tab-indicator">&#x25CF;</span></button>
-                <button
-                    @click="activeTab = 'commentary'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
-                    :class="{ 'active': activeTab === 'commentary', 'has-content': commentary.length > 0 }"
-                    class="tab-btn"
-                >Commentary<span x-show="commentary.length > 0" class="tab-indicator">&#x25CF;</span></button>
+                >Study<span x-show="crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0" class="tab-indicator">&#x25CF;</span></button>
                 <button
                     @click="activeTab = 'notes'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
                     :class="{ 'active': activeTab === 'notes', 'has-content': getRelevantNotes().length > 0 }"
@@ -651,11 +648,7 @@
             <div class="sidebar-collapsed-icons">
                 <button @click="activeTab = 'study'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'study' }" title="Study">
                     <span class="collapsed-icon-label">S</span>
-                    <span class="collapsed-icon-dot" x-show="commentary.length > 0 || crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0"></span>
-                </button>
-                <button @click="activeTab = 'commentary'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'commentary' }" title="Commentary">
-                    <span class="collapsed-icon-label">C</span>
-                    <span class="collapsed-icon-dot" x-show="commentary.length > 0"></span>
+                    <span class="collapsed-icon-dot" x-show="crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0"></span>
                 </button>
                 <button @click="activeTab = 'notes'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'notes' }" title="Notes">
                     <span class="collapsed-icon-label">N</span>
@@ -685,35 +678,17 @@
                         <div class="study-stack">
                             <div class="study-heading">
                                 <span class="study-heading-label" x-text="getStudyReferenceLabel()"></span>
-                                <span class="study-heading-meta" x-text="getCommentarySources().length + ' commentators'"></span>
                             </div>
 
-                            <section class="study-section" x-show="commentary.length > 0">
+                            <section class="study-section study-commentary-open">
                                 <div class="study-section-header">
                                     <h3>Commentary</h3>
-                                    <button class="study-link-btn" @click="openStudySection('commentary')">Full</button>
                                 </div>
-                                <div class="study-commentary-compare">
-                                    <template x-for="group in getStudyCommentaryGroups()" :key="'study-comm-' + group.source">
-                                        <article class="study-commentary-card">
-                                            <div class="study-source-title">
-                                                <span x-text="group.source"></span>
-                                                <span class="study-source-count" x-text="group.entries.length"></span>
-                                            </div>
-                                            <template x-for="(entry, idx) in group.entries.slice(0, 2)" :key="'study-entry-' + group.source + '-' + idx">
-                                                <div class="study-commentary-entry">
-                                                    <button
-                                                        class="commentary-verse-ref"
-                                                        x-show="entry.reference_start"
-                                                        @click="selectVerseFromRef(entry.reference_start)"
-                                                        x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
-                                                    ></button>
-                                                    <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
-                                                </div>
-                                            </template>
-                                        </article>
-                                    </template>
-                                </div>
+                                <p class="study-commentary-hint" x-show="studyHint">
+                                    <span x-text="studyHint?.withComment.length ? studyHint.withComment.length + ' of ' + studyHint.total + ' sources comment on ' + getStudyReferenceLabel() : 'No commentary on ' + getStudyReferenceLabel() + ' yet'"></span>
+                                </p>
+                                <p class="study-commentary-hint" x-show="!studyHint">Select verses to see which commentaries cover them.</p>
+                                <button class="study-open-btn" @click="openStudy()" x-show="highlightedVerses.length > 0">Read commentary on <span x-text="getStudyReferenceLabel()"></span></button>
                             </section>
 
                             <section class="study-section" x-show="getRelevantNotes().length > 0">
@@ -748,124 +723,9 @@
                                 </div>
                             </section>
 
-                            <div class="empty-state" x-show="!loadingCommentary && commentary.length === 0 && crossRefs.length === 0 && getRelevantNotes().length === 0 && verseTopics.length === 0">
+                            <div class="empty-state" x-show="crossRefs.length === 0 && getRelevantNotes().length === 0 && verseTopics.length === 0">
                                 <span class="empty-state-hint">No linked study resources for this selection yet</span>
                             </div>
-                        </div>
-                    </template>
-                </div>
-
-                <!-- Commentary Tab -->
-                <div x-show="activeTab === 'commentary'" class="tab-content">
-                    <template x-if="loadingCommentary">
-                        <div class="panel-loading">
-                            <div class="loading-spinner"></div>
-                        </div>
-                    </template>
-                    <template x-if="!loadingCommentary && !currentReference">
-                        <div class="empty-state">
-                            <span class="empty-state-icon">📖</span>
-                            <span class="empty-state-title">Select a passage</span>
-                            <span class="empty-state-hint">Commentary will appear here</span>
-                        </div>
-                    </template>
-                    <template x-if="!loadingCommentary && commentary.length === 0 && currentReference">
-                        <div class="empty-state">
-                            <span class="empty-state-icon">📝</span>
-                            <span class="empty-state-title">No commentary available</span>
-                            <span class="empty-state-hint">Try another passage or check back later</span>
-                        </div>
-                    </template>
-                    <!-- Normal mode OR verse selected in combined mode: Tabbed by source -->
-                    <template x-if="!combinedPlanReading || highlightedVerses.length > 0">
-                        <div>
-                            <!-- Source tabs (only when multiple sources available) -->
-                            <div class="commentary-source-tabs" x-show="getCommentarySources().length > 1">
-                                <template x-for="source in getCommentarySourceTabs()" :key="'comm-tab-' + source">
-                                    <button
-                                        class="commentary-source-tab"
-                                        :class="{ 'active': getActiveCommentarySource() === source }"
-                                        @click="switchCommentarySource(source)"
-                                        x-text="source"
-                                    ></button>
-                                </template>
-                            </div>
-                            <!-- Single source header -->
-                            <div class="commentary-single-source" x-show="getCommentarySources().length === 1">
-                                <span x-text="getCommentarySources()[0]"></span>
-                            </div>
-                            <!-- Entries for active source -->
-                            <div class="commentary-entries commentary-tab-entries">
-                                <template x-for="(entry, idx) in getActiveSourceEntries()" :key="'comm-' + idx">
-                                    <div class="commentary-entry"
-                                         :class="{ 'commentary-active': commentaryMatchesActiveVerse(entry), 'commentary-expanded': isCommentaryEntryExpanded(entry, idx) }"
-                                         :data-verse-start="entry.reference_start"
-                                         :data-verse-end="entry.reference_end || entry.reference_start">
-                                        <button
-                                            class="commentary-entry-header"
-                                            @click="toggleCommentaryEntry(entry, idx)"
-                                        >
-                                            <span class="commentary-verse-ref-label"
-                                                x-show="entry.reference_start"
-                                                x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
-                                            ></span>
-                                            <span class="commentary-entry-source-label"
-                                                x-show="getActiveCommentarySource() === 'All'"
-                                                x-text="entry.source || 'Unknown'"
-                                            ></span>
-                                            <span class="commentary-entry-preview" x-show="!isCommentaryEntryExpanded(entry, idx)" x-text="getCommentaryEntryPreview(entry)"></span>
-                                            <span class="commentary-entry-toggle" x-text="isCommentaryEntryExpanded(entry, idx) ? '▼' : '▶'"></span>
-                                        </button>
-                                        <div class="commentary-content" x-show="isCommentaryEntryExpanded(entry, idx)" x-transition x-html="entry.content" @click="handleCommentaryClick($event)"></div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
-
-                    <!-- Combined plan reading mode (no verse selected): Grouped by chapter, then by source -->
-                    <template x-if="combinedPlanReading && highlightedVerses.length === 0">
-                        <div>
-                            <template x-for="chapterKey in getCommentaryChapterKeys()" :key="'ch-' + chapterKey">
-                                <div class="commentary-chapter-group">
-                                    <button
-                                        class="commentary-chapter-header"
-                                        @click="toggleCommentaryChapter(chapterKey)"
-                                        :class="{ 'expanded': isCommentaryChapterExpanded(chapterKey) }"
-                                    >
-                                        <span class="commentary-chapter-name" x-text="chapterKey"></span>
-                                        <span class="commentary-toggle-icon" x-text="isCommentaryChapterExpanded(chapterKey) ? '▼' : '▶'"></span>
-                                    </button>
-                                    <div class="commentary-chapter-content" x-show="isCommentaryChapterExpanded(chapterKey)" x-transition>
-                                        <template x-for="(entries, source) in getGroupedCommentaryByChapter()[chapterKey]" :key="'ch-src-' + chapterKey + '-' + source">
-                                            <div class="commentary-group">
-                                                <button
-                                                    class="commentary-group-header"
-                                                    @click="toggleCommentarySource(chapterKey + '-' + source)"
-                                                    :class="{ 'expanded': isCommentarySourceExpanded(chapterKey + '-' + source) }"
-                                                >
-                                                    <span class="commentary-source-name" x-text="source"></span>
-                                                    <span class="commentary-entry-count" x-text="'(' + entries.length + ')'"></span>
-                                                    <span class="commentary-toggle-icon" x-text="isCommentarySourceExpanded(chapterKey + '-' + source) ? '▼' : '▶'"></span>
-                                                </button>
-                                                <div class="commentary-entries" x-show="isCommentarySourceExpanded(chapterKey + '-' + source)" x-transition>
-                                                    <template x-for="(entry, idx) in entries" :key="'ch-comm-' + chapterKey + '-' + source + '-' + idx">
-                                                        <div class="commentary-entry">
-                                                            <button
-                                                                class="commentary-verse-ref"
-                                                                x-show="entry.reference_start"
-                                                                @click="selectVerseFromRef(entry.reference_start)"
-                                                                x-text="'v. ' + entry.reference_start + (entry.reference_end && entry.reference_end !== entry.reference_start ? '-' + entry.reference_end : '')"
-                                                            ></button>
-                                                            <div class="commentary-content" x-html="entry.content" @click="handleCommentaryClick($event)"></div>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
                         </div>
                     </template>
                 </div>
@@ -1941,7 +1801,7 @@
                 <div class="guide-section">
                     <h4>Tips</h4>
                     <ul class="tips-list">
-                        <li>Click any verse to see commentary and cross-references</li>
+                        <li>Tap a verse (or the first and last of a passage), then Study to read commentary beside it</li>
                         <li>Click any word (in BSB) to see Hebrew/Greek details</li>
                         <li>Enable "Original Language" in settings to see interlinear text</li>
                         <li>Red letter mode highlights words of God (OT) and Jesus (NT)</li>
@@ -2720,6 +2580,231 @@
         </div>
     </div>
 
+    <!-- Study view: a verse or range with commentary (modules/study.js, css/study.css) -->
+    <dialog id="study-view" class="study-view" aria-labelledby="study-title"
+            :class="{ 'is-strip-collapsed': study.stripCollapsed, 'is-single': studyTrack().length < 2 }">
+        <div class="study-shell" x-show="study.open">
+            <header class="study-bar">
+                <button type="button" class="study-icon-btn" @click="studyClose()" aria-label="Close study and return to reading">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+                <div class="study-bar-title">
+                    <h2 id="study-title" tabindex="-1" x-text="studyRefLabel()"></h2>
+                    <button type="button" class="study-back" x-show="study.prevLabel" @click="studyBack()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                        <span>Back to <span x-text="study.prevLabel"></span></span>
+                    </button>
+                </div>
+                <div class="study-steps">
+                    <button type="button" class="study-icon-btn" @click="studyStep(-1)" :disabled="study.loading || study.vs <= 1"
+                            :aria-label="study.vs === study.ve ? 'Previous verse' : 'Previous verses'">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <button type="button" class="study-icon-btn" @click="studyStep(1)" :disabled="study.loading || study.ve >= study.chapterVerses"
+                            :aria-label="study.vs === study.ve ? 'Next verse' : 'Next verses'">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                </div>
+            </header>
+
+            <section class="study-text" aria-label="Scripture">
+                <button type="button" class="study-text-peek" x-show="study.stripCollapsed" @click="study.stripCollapsed = false"
+                        aria-label="Show the verses">
+                    <span class="study-text-peek-line" x-text="study.verses.map(v => v.verse + ' ' + v.text).join(' ')"></span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="study-text-body" x-show="!study.stripCollapsed">
+                    <button type="button" class="study-extend" x-show="study.vs > 1 && !study.loading" @click="studyExtend(-1)">
+                        <span>Add verse <span x-text="study.vs - 1"></span></span>
+                    </button>
+                    <p class="study-verses">
+                        <template x-for="v in study.verses" :key="'sv-' + v.verse">
+                            <span class="study-verse"><sup x-text="v.verse"></sup><span x-text="v.text"></span> </span>
+                        </template>
+                    </p>
+                    <div class="study-text-foot">
+                        <button type="button" class="study-extend" x-show="study.ve < study.chapterVerses && !study.loading" @click="studyExtend(1)">
+                            <span>Add verse <span x-text="study.ve + 1"></span></span>
+                        </button>
+                        <button type="button" class="study-collapse" x-show="study.verses.length" @click="study.stripCollapsed = true">Hide verses</button>
+                    </div>
+                </div>
+            </section>
+
+            <nav class="study-rail" aria-label="Commentary sources">
+                <button type="button" class="study-swap" x-show="study.previous && studySourceBySlug(study.previous)?.selection_entries > 0"
+                        @click="studySwap()" :aria-label="'Switch back to ' + (studySourceBySlug(study.previous)?.source || '')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg>
+                    <span x-text="studySourceBySlug(study.previous)?.short_name"></span>
+                </button>
+                <div class="study-chips">
+                    <template x-for="src in studyTrack()" :key="'chip-' + src.slug">
+                        <button type="button" class="study-chip" :data-slug="src.slug" :aria-pressed="study.active === src.slug ? 'true' : 'false'"
+                                :aria-label="studyChipLabel(src)" @click="study.active === src.slug ? studyShowInfo(src.slug) : studySelect(src.slug)">
+                            <span class="study-chip-name" x-text="src.short_name"></span>
+                            <span class="study-chip-scope" x-text="studyChipScope(src)"></span>
+                        </button>
+                    </template>
+                    <template x-if="studyEmpty().length && !study.loading">
+                        <span class="study-chips-gap">Nothing on <span x-text="study.vs === study.ve ? 'v' + study.vs : 'these verses'"></span></span>
+                    </template>
+                    <template x-for="src in studyEmpty()" :key="'chip-e-' + src.slug">
+                        <button type="button" class="study-chip is-empty" :data-slug="src.slug" :aria-label="studyChipLabel(src)" @click="studyShowInfo(src.slug)">
+                            <span class="study-chip-name" x-text="src.short_name"></span>
+                        </button>
+                    </template>
+                </div>
+                <button type="button" class="study-icon-btn study-manage-btn" @click="studyOpenManage()" aria-label="Choose and order sources">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+                </button>
+            </nav>
+
+            <div class="study-track" @keydown.left.prevent="studySelect(studyTrack()[Math.max(0, studyTrack().findIndex(s => s.slug === study.active) - 1)]?.slug)"
+                 @keydown.right.prevent="studySelect(studyTrack()[Math.min(studyTrack().length - 1, studyTrack().findIndex(s => s.slug === study.active) + 1)]?.slug)">
+                <template x-for="src in studyTrack()" :key="'pane-' + src.slug">
+                    <section class="study-pane" :data-slug="src.slug" :aria-label="src.source" :class="{ 'is-active': study.active === src.slug }">
+                        <div class="study-pane-scroll" tabindex="0" @scroll.passive="studyPaneScrolled($event)">
+                            <div class="study-pane-head">
+                                <button type="button" class="study-who" @click="studyShowInfo(src.slug)" :aria-label="'About ' + src.source">
+                                    <span class="study-who-name" x-text="src.source"></span>
+                                    <span class="study-who-meta">
+                                        <span x-show="src.author && src.author !== src.source" x-text="src.author"></span>
+                                        <span x-show="src.year" x-text="src.year"></span>
+                                        <span x-show="src.tradition" x-text="src.tradition"></span>
+                                    </span>
+                                    <svg class="study-who-i" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+                                </button>
+                                <p class="study-note" x-show="studyPanes[src.slug]?.note">
+                                    <span x-text="studyPanes[src.slug]?.note"></span>
+                                    <button type="button" class="study-note-btn" x-show="studyPanes[src.slug]?.focusCount" @click="studyRevealFocus(src.slug)">
+                                        <span x-text="studyPanes[src.slug]?.focusCount > 1 ? 'Next marked paragraph' : 'Go to marked paragraph'"></span>
+                                    </button>
+                                </p>
+                            </div>
+                            <div class="study-pane-body" x-html="studyPanes[src.slug]?.html || ''" @click="studyContentClick($event)"></div>
+                            <div class="study-pane-state" x-show="!studyPanes[src.slug] || studyPanes[src.slug].status === 'loading'">
+                                <div class="loading-spinner"></div>
+                            </div>
+                            <div class="study-pane-state" x-show="studyPanes[src.slug]?.status === 'error'">
+                                <p x-text="studyPanes[src.slug]?.note"></p>
+                                <button type="button" class="study-text-btn" @click="studyPanes[src.slug] = null; studyLoadPane(src.slug)">Try again</button>
+                            </div>
+                            <p class="study-attribution" x-show="src.attribution && studyPanes[src.slug]?.status === 'ready'" x-text="src.attribution"></p>
+                        </div>
+                    </section>
+                </template>
+                <div class="study-empty" x-show="!study.loading && !study.error && studyTrack().length === 0">
+                    <p class="study-empty-title">No commentary on <span x-text="studyRefLabel()"></span> yet</p>
+                    <p x-show="studyEmpty().length">Tap a source below to see where it comments nearby, or try a wider range of verses.</p>
+                </div>
+                <div class="study-empty" x-show="study.loading"><div class="loading-spinner"></div></div>
+                <div class="study-empty" x-show="study.error">
+                    <p class="study-empty-title" x-text="study.error"></p>
+                    <button type="button" class="study-text-btn" @click="studyClose()">Back to reading</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Who a source is -->
+        <dialog id="study-info" class="study-sheet" aria-labelledby="study-info-title" @close="study.info = null" @click.self="studyCloseInfo()">
+            <template x-if="study.info">
+                <div class="study-sheet-inner">
+                    <div class="study-sheet-head">
+                        <h3 id="study-info-title" x-text="study.info.source"></h3>
+                        <button type="button" class="study-icon-btn" @click="studyCloseInfo()" aria-label="Close">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <p class="study-info-who">
+                        <span x-text="study.info.author"></span><span x-show="study.info.year" x-text="', ' + study.info.year"></span>
+                        <template x-if="study.info.tradition"><span class="study-info-trad" x-text="study.info.tradition"></span></template>
+                    </p>
+                    <p x-show="study.info.description" x-text="study.info.description"></p>
+                    <dl class="study-info-facts">
+                        <dt>How it comments</dt><dd x-text="studyKindLabel(study.info.kind)"></dd>
+                        <template x-if="study.info.coverage"><div><dt>Covers</dt><dd x-text="study.info.coverage"></dd></div></template>
+                        <template x-if="study.info.license"><div><dt>License</dt><dd x-text="study.info.license"></dd></div></template>
+                        <template x-if="study.info.attribution"><div><dt>Credit</dt><dd x-text="study.info.attribution"></dd></div></template>
+                    </dl>
+                    <a x-show="study.info.source_url" :href="study.info.source_url" target="_blank" rel="noopener" class="study-text-btn">Where this text comes from</a>
+                    <div class="study-info-here" x-show="!(study.info.selection_entries > 0)">
+                        <p x-show="study.info.not_saved"><span x-text="study.info.short_name"></span> isn't saved for offline use on this chapter.</p>
+                        <p x-show="!study.info.not_saved && !study.info.nearest"><span x-text="study.info.short_name"></span> has nothing on <span x-text="study.book + ' ' + study.chapter"></span>.</p>
+                        <template x-if="study.info.nearest">
+                            <div>
+                                <p><span x-text="study.info.short_name"></span> has nothing on <span x-text="studyRefLabel()"></span>. Its nearest comment is on <span x-text="study.info.nearest.start === study.info.nearest.end ? 'verse ' + study.info.nearest.start : 'verses ' + study.info.nearest.start + '–' + study.info.nearest.end"></span>.</p>
+                                <button type="button" class="study-primary-btn" @click="studyStudyNearest(study.info)">
+                                    Study <span x-text="study.info.nearest.start === study.info.nearest.end ? 'verse ' + study.info.nearest.start : 'verses ' + study.info.nearest.start + '–' + study.info.nearest.end"></span>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </dialog>
+
+        <!-- A reference tapped inside commentary -->
+        <dialog id="study-peek" class="study-sheet" aria-labelledby="study-peek-title" @close="study.peek = null" @click.self="studyClosePeek()">
+            <template x-if="study.peek">
+                <div class="study-sheet-inner">
+                    <div class="study-sheet-head">
+                        <h3 id="study-peek-title" x-text="study.peek.ref"></h3>
+                        <button type="button" class="study-icon-btn" @click="studyClosePeek()" aria-label="Close">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div x-show="study.peek.loading" class="study-pane-state"><div class="loading-spinner"></div></div>
+                    <p class="study-peek-error" x-show="study.peek.error" x-text="study.peek.error"></p>
+                    <p class="study-verses" x-show="study.peek.text.length">
+                        <template x-for="v in study.peek.text" :key="'pv-' + v.verse">
+                            <span class="study-verse"><sup x-text="v.verse"></sup><span x-text="v.text"></span> </span>
+                        </template>
+                    </p>
+                    <div class="study-sheet-actions" x-show="!study.peek.loading && !study.peek.error">
+                        <button type="button" class="study-primary-btn" @click="studyPeekStudy()">Study <span x-text="study.peek.ref"></span></button>
+                        <button type="button" class="study-text-btn" @click="studyPeekRead()">Read the chapter</button>
+                    </div>
+                </div>
+            </template>
+        </dialog>
+
+        <!-- Choose and order sources -->
+        <dialog id="study-manage" class="study-sheet" aria-labelledby="study-manage-title" @close="study.manage = false" @click.self="studyCloseManage()">
+            <div class="study-sheet-inner" x-show="study.manage">
+                <div class="study-sheet-head">
+                    <h3 id="study-manage-title">Your sources</h3>
+                    <button type="button" class="study-icon-btn" @click="studyCloseManage()" aria-label="Done">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <p class="study-sheet-hint">Sources show in this order. Turn off the ones you don't read.</p>
+                <ol class="study-manage-list">
+                    <template x-for="(src, i) in studyOrdered()" :key="'m-' + src.slug">
+                        <li :class="{ 'is-hidden': studyIsHidden(src.slug) }">
+                            <label class="study-manage-name">
+                                <input type="checkbox" :checked="!studyIsHidden(src.slug)" @change="studyToggleHidden(src.slug)">
+                                <span>
+                                    <span x-text="src.source"></span>
+                                    <small x-text="studyKindLabel(src.kind)"></small>
+                                </span>
+                            </label>
+                            <button type="button" class="study-icon-btn" :data-move="src.slug + ':-1'" @click="studyMove(src.slug, -1)" :disabled="i === 0" :aria-label="'Move ' + src.source + ' up'">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+                            </button>
+                            <button type="button" class="study-icon-btn" :data-move="src.slug + ':1'" @click="studyMove(src.slug, 1)" :disabled="i === studyOrdered().length - 1" :aria-label="'Move ' + src.source + ' down'">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                            </button>
+                        </li>
+                    </template>
+                </ol>
+                <div class="study-sheet-actions">
+                    <button type="button" class="study-primary-btn" @click="studyCloseManage()">Done</button>
+                    <button type="button" class="study-text-btn" @click="studyResetOrder()">Reset to default order</button>
+                </div>
+            </div>
+        </dialog>
+    </dialog>
+
     <!-- Toast Container -->
     <div class="toast-container">
         <template x-for="toast in toasts" :key="toast.id">
@@ -2739,6 +2824,7 @@
     <script src="/static/js/modules/offline.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/plans.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study_extras.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/study.js?v=__SW_VERSION__"></script>
     <script src="/static/js/app.js?v=__SW_VERSION__"></script>
     <script>
         // Show cache toast notification
