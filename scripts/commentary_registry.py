@@ -2,8 +2,14 @@
 Registry of commentary sources: metadata for the `commentary_sources` table plus the
 loader configuration used by scripts/import_commentary.py.
 
-`source` must equal commentary_entries.source. Existing names ("Matthew Henry",
-"John Gill") are kept so saved user state keeps working.
+`source` must equal commentary_entries.source; the study view's slugs and deep links
+(?study=john-gill) are derived from it, so don't rename a source.
+
+The library is these five sources, chosen by the site owner for doctrinal fit. Eight others
+(Matthew Henry, Keil & Delitzsch, Albert Barnes, John Calvin, John Wesley, Adam Clarke,
+People's New Testament, Catena Aurea) were removed on 2026-11-13 at the owner's decision;
+don't re-add them. A build drops rows of any source not listed here
+(scripts/migrate_commentary_search.py, prune_sources).
 
 License reasoning for every entry is in docs/COMMENTARY_LIBRARY_2026-11.md; keep the two
 in sync when adding a source.
@@ -15,29 +21,6 @@ HELLOAO = "https://bible.helloao.org/api/c/{id}"
 PD = "Public domain"
 
 COMMENTARIES = {
-    "matthew-henry": {
-        "source": "Matthew Henry",
-        "short_name": "Henry",
-        "author": "Matthew Henry (1662-1714)",
-        "year": 1708,
-        "tradition": "Presbyterian (English Nonconformist)",
-        "kind": "passage",
-        "coverage": "66 books",
-        "license": PD,
-        "attribution": "Matthew Henry, An Exposition of the Old and New Testaments (1708-1710). "
-                       "CrossWire MHC module, prepared from the CCEL text.",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=MHC",
-        "description": "The complete devotional commentary by the English Nonconformist minister, "
-                       "written passage by passage with practical application; Romans to "
-                       "Revelation were finished from his notes by other ministers after his death.",
-        # HelloAO's Henry is cut off at 32,767 bytes per entry (36 entries, incl. John 3);
-        # CrossWire MHC is complete (99.8% of CCEL) and carries real verse ranges.
-        "loader": "sword",
-        "module": "MHC",
-        "drop_verse_text": True,
-        "strip_book_intros": "mhc",
-        "chapter_intros": True,
-    },
     "john-gill": {
         "source": "John Gill",
         "short_name": "Gill",
@@ -73,131 +56,6 @@ COMMENTARIES = {
                        "meaning.",
         "loader": "helloao",
         "helloao_id": "jamieson-fausset-brown",
-    },
-    "keil-delitzsch": {
-        "source": "Keil & Delitzsch",
-        "short_name": "K&D",
-        "author": "C. F. Keil (1807-1888), Franz Delitzsch (1813-1890)",
-        "year": 1861,
-        "tradition": "Lutheran",
-        "kind": "passage",
-        "coverage": "OT only",
-        "license": PD,
-        "attribution": "Keil and Delitzsch, Biblical Commentary on the Old Testament "
-                       "(English translation, T. & T. Clark, 1864-1878). Text from the HelloAO "
-                       "Free Use Bible API; 1 Chronicles and Song of Solomon from the CrossWire KD "
-                       "module (Wikisource transcription).",
-        "source_url": "https://bible.helloao.org/api/c/keil-delitzsch/books.json",
-        "description": "A detailed scholarly commentary on the Hebrew text of the Old Testament "
-                       "by two German Lutheran professors; strong on language, history and "
-                       "structure, usually by section rather than single verse.",
-        "loader": "helloao",
-        "helloao_id": "keil-delitzsch",
-        "infer_ranges": True,
-        # HelloAO cuts 24 long K&D entries at 32,767 characters; complete them from the
-        # full text of the CrossWire KD module (Wikisource), referenced or not.
-        "repair_truncated_from": "KD",
-        # HelloAO lists Song of Solomon with 0 chapters, and its "K&D" 1 Chronicles is
-        # actually John Gill's text. Both books come from CrossWire KD (Wikisource), reading
-        # the text its verse index skips as well (recover_orphans).
-        "supplement": {"module": "KD", "books": ["1 Chronicles", "Song of Solomon"],
-                       "replace": True, "strip_book_intros": True, "recover_orphans": True},
-    },
-    "john-calvin": {
-        "source": "John Calvin",
-        "short_name": "Calvin",
-        "author": "John Calvin (1509-1564)",
-        "year": 1540,
-        "tradition": "Reformed",
-        "kind": "passage",
-        "coverage": "48 books",
-        "license": PD,
-        "attribution": "John Calvin, Commentaries (Latin/French 1540-1565; English translation, "
-                       "Calvin Translation Society, 1843-1855). Text from the HelloAO Free Use "
-                       "Bible API (CCEL edition); inline verse text and translator footnotes removed.",
-        "source_url": "https://bible.helloao.org/api/c/john-calvin/books.json",
-        "description": "The Geneva Reformer's own commentaries, explaining the plain sense of the "
-                       "text with doctrinal and pastoral application. Calvin wrote none on Judges "
-                       "to Song of Solomon (except Psalms), 2-3 John or Revelation.",
-        "loader": "helloao",
-        "helloao_id": "john-calvin",
-        "clean": "calvin",
-        "infer_ranges": True,
-    },
-    "adam-clarke": {
-        "source": "Adam Clarke",
-        "short_name": "Clarke",
-        "author": "Adam Clarke (1762-1832)",
-        "year": 1810,
-        "tradition": "Methodist",
-        "kind": "verse",
-        "coverage": "66 books",
-        "license": PD,
-        "attribution": "Adam Clarke, The Holy Bible ... with a Commentary and Critical Notes "
-                       "(1810-1826). CrossWire Clarke module, from the Wikisource transcription.",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Clarke",
-        "description": "A Methodist scholar's verse-by-verse commentary, written over forty years, "
-                       "with much on languages, customs and natural history alongside "
-                       "Wesleyan theology.",
-        "loader": "sword",
-        "module": "Clarke",
-        "strip_book_intros": True,
-    },
-    "albert-barnes": {
-        "source": "Barnes' Notes",
-        "short_name": "Barnes",
-        "author": "Albert Barnes (1798-1870)",
-        "year": 1832,
-        "tradition": "Presbyterian",
-        "kind": "verse",
-        "coverage": "NT only",
-        "license": PD,
-        "attribution": "Albert Barnes, Notes, Explanatory and Practical, on the New Testament "
-                       "(1832-1851). CrossWire Barnes module.",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Barnes",
-        "description": "Notes by a Philadelphia Presbyterian pastor written for Sunday-school "
-                       "teachers and families: clear, verse-by-verse explanation of words, "
-                       "background and meaning.",
-        "loader": "sword",
-        "module": "Barnes",
-        "strip_book_intros": True,
-        "fixup": "barnes",
-    },
-    "john-wesley": {
-        "source": "John Wesley",
-        "short_name": "Wesley",
-        "author": "John Wesley (1703-1791)",
-        "year": 1755,
-        "tradition": "Methodist",
-        "kind": "verse",
-        "coverage": "64 books",
-        "license": PD,
-        "attribution": "John Wesley, Explanatory Notes upon the New Testament (1755) and upon "
-                       "the Old Testament (1765). CrossWire Wesley module (electronic edition by "
-                       "Sulu Kelley and Bill Brown).",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Wesley",
-        "description": "Short, plain notes by the founder of Methodism, written for ordinary "
-                       "readers; often a sentence or two per verse.",
-        "loader": "sword",
-        "module": "Wesley",
-        "fixup": "wesley",
-    },
-    "peoples-nt": {
-        "source": "People's New Testament",
-        "short_name": "PNT",
-        "author": "B. W. Johnson (1833-1894)",
-        "year": 1889,
-        "tradition": "Restoration Movement",
-        "kind": "verse",
-        "coverage": "NT only",
-        "license": PD,
-        "attribution": "B. W. Johnson, The People's New Testament with Explanatory Notes "
-                       "(1889-1891). CrossWire PNT module.",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=PNT",
-        "description": "Brief popular notes on the New Testament by a teacher in the Disciples of "
-                       "Christ (Stone-Campbell) movement.",
-        "loader": "sword",
-        "module": "PNT",
     },
     "scofield": {
         "source": "Scofield Notes (1917)",
@@ -235,26 +93,6 @@ COMMENTARIES = {
         "loader": "tdavid",
         "module": "TDavid",
     },
-    "catena-aurea": {
-        "source": "Catena Aurea",
-        "short_name": "Catena",
-        "author": "Thomas Aquinas (compiler, c. 1225-1274)",
-        "year": 1264,
-        "tradition": "Church Fathers (Catholic)",
-        "kind": "passage",
-        "coverage": "Gospels",
-        "license": PD,
-        "attribution": "Thomas Aquinas, Catena Aurea, English translation edited by J. H. Newman "
-                       "(Oxford, 1841-1845). CrossWire Catena module, from github.com/lemtom/catena "
-                       "(CC0).",
-        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Catena",
-        "description": "A 'golden chain' of quotations from the Church Fathers (Augustine, "
-                       "Chrysostom, Jerome and others) arranged passage by passage through the "
-                       "four Gospels.",
-        "loader": "sword",
-        "module": "Catena",
-        "infer_ranges": True,
-    },
     "tyndale": {
         "source": "Tyndale Study Notes",
         "short_name": "Tyndale",
@@ -287,12 +125,11 @@ SOURCE_COLUMNS = ["source", "short_name", "author", "year", "tradition", "kind",
                   "license", "attribution", "source_url", "sort_order", "description",
                   "attribution_short", "size_bytes", "requires_attribution"]
 
-# Default order for a first-time reader (agreed with the study-view agent): short modern
-# notes, the best-loved devotional work, brief verse notes, then longer and more technical
-# works, the sparsest last.
-DEFAULT_ORDER = ["tyndale", "matthew-henry", "jamieson-fausset-brown", "treasury-of-david",
-                 "john-calvin", "albert-barnes", "john-wesley", "adam-clarke", "john-gill",
-                 "peoples-nt", "keil-delitzsch", "catena-aurea", "scofield"]
+# Display order, set by the site owner (2026-11-13). The study view opens on the first
+# source in this order that has something on the selection, so sparse Scofield first is
+# fine. Keep frontend/static/js/modules/study.js DEFAULT_ORDER (slugs) in step.
+DEFAULT_ORDER = ["scofield", "john-gill", "jamieson-fausset-brown", "tyndale",
+                 "treasury-of-david"]
 assert sorted(DEFAULT_ORDER) == sorted(COMMENTARIES)
 for _i, _key in enumerate(DEFAULT_ORDER):
     _c = COMMENTARIES[_key]

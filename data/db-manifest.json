@@ -1,8 +1,8 @@
 {
-  "version": "2026.11.13",
-  "sha256": "912149caa373abd7e0f229fb7fcd2d73b3818ab9c0d6296a40a2d6e6319722d1",
-  "size": 535650304,
-  "built": "2026-11-13T11:37:51.057870",
+  "version": "2026.11.13.1",
+  "sha256": "a5a5d43552152df90a02474cc61d859e19ca1f4b4bcc0206246daa9bd5315194",
+  "size": 286441472,
+  "built": "2026-11-13T13:09:35.820713",
   "imports": {
     "schema": {
       "version": "1.0",
@@ -44,11 +44,6 @@
       "row_count": 41649,
       "completed_at": "2026-11-13T05:58:52.971715"
     },
-    "commentary_mh": {
-      "version": "3.0",
-      "row_count": 4252,
-      "completed_at": "2026-11-13T05:59:09.427396"
-    },
     "commentary_jg": {
       "version": "2.1",
       "row_count": 29699,
@@ -58,36 +53,6 @@
       "version": "1.1",
       "row_count": 18214,
       "completed_at": "2026-11-13T06:00:01.024995"
-    },
-    "commentary_kd": {
-      "version": "1.1",
-      "row_count": 6644,
-      "completed_at": "2026-11-13T06:00:36.787630"
-    },
-    "commentary_calvin": {
-      "version": "1.1",
-      "row_count": 7327,
-      "completed_at": "2026-11-13T06:01:05.663312"
-    },
-    "commentary_clarke": {
-      "version": "1.1",
-      "row_count": 21051,
-      "completed_at": "2026-11-13T06:01:27.876229"
-    },
-    "commentary_barnes": {
-      "version": "1.1",
-      "row_count": 7322,
-      "completed_at": "2026-11-13T06:01:46.862341"
-    },
-    "commentary_wesley": {
-      "version": "1.1",
-      "row_count": 16927,
-      "completed_at": "2026-11-13T06:02:02.600960"
-    },
-    "commentary_pnt": {
-      "version": "1.1",
-      "row_count": 6068,
-      "completed_at": "2026-11-13T06:02:15.794959"
     },
     "commentary_scofield": {
       "version": "1.1",
@@ -99,20 +64,10 @@
       "row_count": 2547,
       "completed_at": "2026-11-13T06:02:43.325503"
     },
-    "commentary_catena": {
-      "version": "1.1",
-      "row_count": 821,
-      "completed_at": "2026-11-13T06:02:58.197331"
-    },
     "commentary_tyndale": {
       "version": "1.1",
       "row_count": 17301,
       "completed_at": "2026-11-13T06:03:16.112767"
-    },
-    "commentary_search": {
-      "version": "1.0",
-      "row_count": 141380,
-      "completed_at": "2026-11-13T06:03:16.393467"
     },
     "speakers": {
       "version": "1.0",
@@ -158,6 +113,11 @@
       "version": "1.0",
       "row_count": 0,
       "completed_at": "2026-11-13T06:55:29.440635"
+    },
+    "commentary_search": {
+      "version": "1.1",
+      "row_count": 70968,
+      "completed_at": "2026-11-13T13:09:06.726621"
     }
   }
 }

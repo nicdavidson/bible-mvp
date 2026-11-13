@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Stop storing commentary text twice (build step `commentary_search`). Idempotent.
+"""Commentary search storage and library pruning (build step `commentary_search`). Idempotent.
+
+1. prune_sources: drop every commentary_entries / commentary_sources row whose source is
+   not in scripts/commentary_registry.py (the FTS delete trigger keeps commentary_fts in
+   step), and rewrite the kept sources' commentary_sources rows from the registry
+   (sort_order, metadata; size_bytes re-measured). This is how a DB built with the
+   13-source library converges on the five kept on 2026-11-13 without a rebuild.
+
+2. migrate: stop storing commentary text twice (below).
 
 Before: commentary_entries.searchable_text (plain copy of content, ~208 MB) feeds an
 external-content FTS5 table. After: FTS5 reads the text through the view
@@ -61,6 +69,40 @@ def migrate(conn) -> dict:
             "seconds": round(time.time() - t0)}
 
 
+def prune_sources(conn) -> dict:
+    """Remove sources that are not in the registry; refresh the kept sources' metadata."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from commentary_registry import COMMENTARIES
+    from import_commentary import write_source_row
+
+    cs.register(conn)   # the delete trigger derives the text it removes from the index
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "commentary_entries" not in tables:
+        return {"status": "no commentary_entries table"}
+    kept = {c["source"]: c for c in COMMENTARIES.values()}
+    present = {r[0] for r in conn.execute("SELECT DISTINCT source FROM commentary_entries")}
+    if "commentary_sources" in tables:
+        present |= {r[0] for r in conn.execute("SELECT source FROM commentary_sources")}
+    removed = sorted(present - set(kept))
+    rows = 0
+    conn.execute("BEGIN")
+    for name in removed:
+        rows += conn.execute("DELETE FROM commentary_entries WHERE source = ?", (name,)).rowcount
+        if "commentary_sources" in tables:
+            conn.execute("DELETE FROM commentary_sources WHERE source = ?", (name,))
+    refreshed = []
+    if "commentary_sources" in tables:
+        for name, cfg in kept.items():
+            if name in present:   # only sources that were imported; never invent a row
+                write_source_row(conn, cfg)
+                refreshed.append(name)
+    conn.execute("COMMIT")
+    if rows:
+        conn.execute("INSERT INTO commentary_fts(commentary_fts) VALUES('optimize')")
+        conn.execute("INSERT INTO commentary_fts(commentary_fts, rank) VALUES('integrity-check', 1)")
+    return {"removed_sources": removed, "removed_entries": rows, "refreshed": refreshed}
+
+
 def _statements(sql: str):
     """Split the trigger script into CREATE TRIGGER ... END statements."""
     out, cur = [], []
@@ -75,3 +117,4 @@ def _statements(sql: str):
 if __name__ == "__main__":
     conn = sqlite3.connect(DB_PATH, isolation_level=None)
     print(migrate(conn))
+    print(prune_sources(conn))

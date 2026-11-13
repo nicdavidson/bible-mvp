@@ -29,6 +29,23 @@ def test_columns(conn):
     assert cols == SOURCE_COLUMNS
 
 
+def test_library_is_exactly_the_five_sources_in_order(conn):
+    """The owner's library (2026-11-13). Matthew Henry, Keil & Delitzsch, Barnes, Calvin,
+    Wesley, Clarke, People's New Testament and Catena Aurea were removed and must not
+    come back through a build. Registry, commentary_sources and entries all agree."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    from commentary_registry import COMMENTARIES, DEFAULT_ORDER
+
+    five = ["Scofield Notes (1917)", "John Gill", "Jamieson-Fausset-Brown",
+            "Tyndale Study Notes", "Treasury of David"]
+    assert [COMMENTARIES[k]["source"] for k in DEFAULT_ORDER] == five
+    assert [r[0] for r in conn.execute(
+        "SELECT source FROM commentary_sources ORDER BY sort_order")] == five
+    assert {r[0] for r in conn.execute("SELECT DISTINCT source FROM commentary_entries")} == set(five)
+
+
 def test_every_source_described(conn):
     entries = {r[0] for r in conn.execute("SELECT DISTINCT source FROM commentary_entries")}
     described = {r[0] for r in conn.execute("SELECT source FROM commentary_sources")}

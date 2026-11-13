@@ -59,10 +59,10 @@ def run():
                 ready(page, page.evaluate("Alpine.$data(document.body).study.active"))
                 shot(page, tag, "01-john3-open")
 
-                # Calvin: passage note 13-18, verse markers find 16-18
-                tap('.study-chip[data-slug="john-calvin"]')
-                ready(page, "john-calvin")
-                shot(page, tag, "02-calvin-markers")
+                # Tyndale: verse notes first, its note on 16-21 as a section below
+                tap('.study-chip[data-slug="tyndale-study-notes"]')
+                ready(page, "tyndale-study-notes")
+                shot(page, tag, "02-tyndale-notes")
 
                 # Who a source is (Gill: no repeated name)
                 tap('.study-chip[data-slug="john-gill"]')
@@ -74,17 +74,12 @@ def run():
                 shot(page, tag, "04-source-info")
                 page.keyboard.press("Escape")
 
-                # Henry: long passage note with its outline
-                tap('.study-chip[data-slug="matthew-henry"]')
-                ready(page, "matthew-henry")
-                toc = page.locator('.study-pane[data-slug="matthew-henry"] .study-toc summary').first
-                if toc.count():
-                    toc.scroll_into_view_if_needed()
-                    toc.click()
-                    page.wait_for_timeout(300)
-                shot(page, tag, "05-henry-outline")
+                # Scofield: occasional notes, first in the owner's order
+                tap('.study-chip[data-slug="scofield-notes-1917"]')
+                ready(page, "scofield-notes-1917")
+                shot(page, tag, "05-scofield")
 
-                # Your sources (13)
+                # Your sources (5)
                 tap(".study-manage-btn")
                 page.wait_for_selector("#study-manage[open]")
                 page.wait_for_timeout(300)

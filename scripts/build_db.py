@@ -124,13 +124,9 @@ IMPORT_STEPS = [
         "script": "import_cross_refs.py",
         "requires_data": "cross_references.txt",
     },
-    {
-        "name": "commentary_mh",
-        "description": "Matthew Henry Complete (CrossWire MHC, from CCEL)",
-        "version": "3.0",
-        "script": "import_commentary.py",
-        "args": ["matthew-henry"],
-    },
+    # The commentary library: five sources (scripts/commentary_registry.py,
+    # docs/COMMENTARY_LIBRARY_2026-11.md). Eight others were removed on 2026-11-13 at the
+    # owner's decision; the commentary_search step drops their rows from an older DB.
     {
         "name": "commentary_jg",
         "description": "John Gill Exposition (HelloAO, 66 books)",
@@ -138,7 +134,6 @@ IMPORT_STEPS = [
         "script": "import_commentary.py",
         "args": ["john-gill"],
     },
-    # More commentaries (see scripts/commentary_registry.py, docs/COMMENTARY_LIBRARY_2026-11.md)
     *[
         {
             "name": step,
@@ -149,24 +144,19 @@ IMPORT_STEPS = [
         }
         for step, key, desc in [
             ("commentary_jfb", "jamieson-fausset-brown", "Jamieson-Fausset-Brown (HelloAO)"),
-            ("commentary_kd", "keil-delitzsch", "Keil & Delitzsch OT (HelloAO)"),
-            ("commentary_calvin", "john-calvin", "Calvin (HelloAO)"),
-            ("commentary_clarke", "adam-clarke", "Adam Clarke (CrossWire)"),
-            ("commentary_barnes", "albert-barnes", "Barnes' Notes NT (CrossWire)"),
-            ("commentary_wesley", "john-wesley", "Wesley's Notes (CrossWire)"),
-            ("commentary_pnt", "peoples-nt", "People's New Testament (CrossWire)"),
             ("commentary_scofield", "scofield", "Scofield 1917 notes (CrossWire)"),
             ("commentary_tdavid", "treasury-of-david", "Treasury of David exposition (CrossWire)"),
-            ("commentary_catena", "catena-aurea", "Catena Aurea, Gospels (CrossWire)"),
             ("commentary_tyndale", "tyndale", "Tyndale Open Study Notes (CC BY-SA)"),
         ]
     ],
     {
         # Commentary search text derived from content through a view instead of a stored
         # copy (backend/commentary_search.py); converts an older DB, no-op on a new one.
+        # 1.1: also drops sources no longer in the registry and refreshes the kept sources'
+        # commentary_sources rows (sort_order, size_bytes), then rechecks the FTS index.
         "name": "commentary_search",
-        "description": "Commentary FTS over a view (drop the stored searchable_text copy)",
-        "version": "1.0",
+        "description": "Commentary FTS over a view; drop sources not in the registry",
+        "version": "1.1",
         "script": "migrate_commentary_search.py",
     },
     {
@@ -259,6 +249,21 @@ def ensure_build_meta_table(conn):
         )
     """)
     conn.commit()
+
+
+def forget_removed_steps(conn):
+    """Drop _build_meta records of steps no longer in IMPORT_STEPS (e.g. the commentary
+    sources removed on 2026-11-13), so the manifest lists only what the DB contains. The
+    data itself is removed by the step that owns it (commentary_search for commentary)."""
+    names = [s["name"] for s in IMPORT_STEPS]
+    stale = [r[0] for r in conn.execute(
+        "SELECT import_name FROM _build_meta WHERE import_name NOT IN "
+        f"({','.join('?' * len(names))})", names)]
+    if stale:
+        conn.executemany("DELETE FROM _build_meta WHERE import_name = ?", [(n,) for n in stale])
+        conn.commit()
+        print(f"Forgot removed build steps: {', '.join(sorted(stale))}")
+    return stale
 
 
 def get_step_status(conn, step_name):
@@ -467,6 +472,21 @@ def count_rows(conn, step_name):
         return 0
 
 
+def manifest_version(previous: dict | None, sha256: str, today: str) -> str:
+    """Release version for a DB with this sha256: the date, with a ".N" suffix when that
+    date's version was already stamped for a different file (releases are immutable).
+    The same file keeps its version."""
+    if not previous:
+        return today
+    old = str(previous.get("version", ""))
+    if previous.get("sha256") == sha256 and old:
+        return old
+    if old == today or old.startswith(today + "."):
+        n = int(old[len(today) + 1:]) if old != today else 0
+        return f"{today}.{n + 1}"
+    return today
+
+
 def generate_manifest(conn):
     """Generate the db-manifest.json file."""
     # Hash the database
@@ -487,19 +507,25 @@ def generate_manifest(conn):
             "completed_at": row["completed_at"],
         }
 
+    manifest_path = DATA_DIR / "db-manifest.json"
+    try:
+        previous = json.loads(manifest_path.read_text())
+    except (OSError, ValueError):
+        previous = None
     manifest = {
-        "version": datetime.now().strftime("%Y.%m.%d"),
+        "version": manifest_version(previous, sha256.hexdigest(),
+                                    datetime.now().strftime("%Y.%m.%d")),
         "sha256": sha256.hexdigest(),
         "size": DB_PATH.stat().st_size,
         "built": datetime.now().isoformat(),
         "imports": imports,
     }
 
-    manifest_path = DATA_DIR / "db-manifest.json"
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
 
     print(f"\nManifest written to {manifest_path}")
+    print(f"  Version: {manifest['version']}")
     print(f"  SHA256: {manifest['sha256'][:16]}...")
     print(f"  Size: {manifest['size'] / 1024 / 1024:.1f} MB")
 
@@ -589,6 +615,7 @@ def main():
 
     conn = get_db_connection()
     ensure_build_meta_table(conn)
+    forget_removed_steps(conn)
 
     # List mode
     if args.list:
@@ -615,7 +642,7 @@ def main():
     # Network steps
     NETWORK_STEPS = {"full_bibles", "web", "strongs", "lexicons", "alignments", "spurgeon",
                      "hymns"} | {
-        s["name"] for s in IMPORT_STEPS if s["name"].startswith("commentary_")
+        s["name"] for s in IMPORT_STEPS if s.get("script") == "import_commentary.py"
     }
 
     # Run each step

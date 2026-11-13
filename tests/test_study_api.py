@@ -29,8 +29,8 @@ def _make_db(path, with_sources: bool):
     for v in range(1, 22):
         conn.execute("INSERT INTO verses (translation_id, book, book_order, chapter, verse, text)"
                      " VALUES ('BSB', 'Jude', 65, 1, ?, ?)", (v, f"Jude {v}"))
-    # Henry-style passage rows stored with start only; Gill-style verse rows
-    rows = [("Matthew Henry", 1, None, "henry one"), ("Matthew Henry", 22, None, "henry two")]
+    # Passage rows stored with start only (as old imports did); Gill-style verse rows
+    rows = [("Hale's Exposition", 1, None, "hale one"), ("Hale's Exposition", 22, None, "hale two")]
     rows += [("John Gill", v, v, f"gill {v}") for v in range(1, 37)]
     for src, s, e, c in rows:
         conn.execute("INSERT INTO commentary_entries (source, book, chapter, reference_start,"
@@ -39,6 +39,8 @@ def _make_db(path, with_sources: bool):
                  " reference_end, content) VALUES ('John Gill', 'Jude', 1, 3, 3, 'gill jude 3')")
     if with_sources:
         study_seed.seed(conn, chapters=(("John", 3),))
+        conn.execute("INSERT INTO commentary_sources (source, sort_order) VALUES (?, 20)",
+                     ("Hale's Exposition",))
     conn.commit()
     conn.close()
 
@@ -76,17 +78,17 @@ class TestStudyEndpoint:
 
     def test_passage_entry_stored_with_start_only_covers_its_passage(self, tmp_client):
         client, _ = tmp_client
-        henry = _by_name(client.get("/api/passage/John 3:16/study").json())["Matthew Henry"]
-        assert henry["kind"] == "passage"
-        assert henry["selection_entries"] == 1
-        assert henry["ranges"] == [{"start": 1, "end": 21}]
-        assert henry["short_name"] == "Henry"
-        assert henry["author"] == "Matthew Henry"
+        hale = _by_name(client.get("/api/passage/John 3:16/study").json())["Hale's Exposition"]
+        assert hale["kind"] == "passage"
+        assert hale["selection_entries"] == 1
+        assert hale["ranges"] == [{"start": 1, "end": 21}]
 
     def test_verse_source_counts_each_selected_verse(self, tmp_client):
         client, _ = tmp_client
         gill = _by_name(client.get("/api/passage/John 3:16-18/study").json())["John Gill"]
         assert gill["kind"] == "verse"
+        assert gill["short_name"] == "Gill"          # fallback metadata (_KNOWN)
+        assert gill["author"] == "John Gill"
         assert gill["selection_entries"] == 3
         assert gill["chapter_entries"] == 36
 
@@ -94,7 +96,7 @@ class TestStudyEndpoint:
         client, with_sources = tmp_client
         srcs = _by_name(client.get("/api/passage/John 3:16/study").json())
         if not with_sources:
-            assert set(srcs) == {"John Gill", "Matthew Henry"}
+            assert set(srcs) == {"John Gill", "Hale's Exposition"}
             return
         assert len(srcs) >= 11
         pell = srcs["Pell's Expositor"]           # passage that stops at v12
@@ -110,7 +112,7 @@ class TestStudyEndpoint:
         client, with_sources = tmp_client
         names = [s["source"] for s in client.get("/api/passage/John 3:16/study").json()["sources"]]
         if with_sources:
-            assert names[:3] == ["John Gill", "Matthew Henry", "Whitcombe's Verse Notes"]
+            assert names[:3] == ["John Gill", "Hale's Exposition", "Whitcombe's Verse Notes"]
         else:
             assert names == sorted(names, key=str.lower)
 
@@ -119,7 +121,7 @@ class TestStudyEndpoint:
         d = client.get("/api/passage/John 3/study").json()
         assert d["reference"] == "John 3"
         assert (d["verse_start"], d["verse_end"]) == (1, 36)
-        assert _by_name(d)["Matthew Henry"]["selection_entries"] == 2
+        assert _by_name(d)["Hale's Exposition"]["selection_entries"] == 2
 
     def test_range_past_chapter_end_is_clamped(self, tmp_client):
         client, _ = tmp_client
@@ -141,11 +143,11 @@ class TestStudyEndpoint:
 class TestCommentaryEntries:
     def test_source_filter_by_slug_and_effective_range(self, tmp_client):
         client, _ = tmp_client
-        d = client.get("/api/passage/John 3:16/commentary?source=matthew-henry").json()
+        d = client.get("/api/passage/John 3:16/commentary?source=hale-s-exposition").json()
         assert len(d["entries"]) == 1
         e = d["entries"][0]
-        assert (e["source"], e["range_start"], e["range_end"]) == ("Matthew Henry", 1, 21)
-        assert e["content"] == "henry one"
+        assert (e["source"], e["range_start"], e["range_end"]) == ("Hale's Exposition", 1, 21)
+        assert e["content"] == "hale one"
 
     def test_source_filter_by_name(self, tmp_client):
         client, _ = tmp_client
@@ -156,7 +158,7 @@ class TestCommentaryEntries:
         client, _ = tmp_client
         d = client.get("/api/passage/John 3/commentary").json()
         srcs = {e["source"] for e in d["entries"]}
-        assert {"John Gill", "Matthew Henry"} <= srcs
+        assert {"John Gill", "Hale's Exposition"} <= srcs
         assert all("range_start" in e and "range_end" in e for e in d["entries"])
 
     def test_unknown_source_is_empty_not_error(self, tmp_client):
@@ -172,7 +174,7 @@ class TestSourcesEndpoint:
         assert r.status_code == 200
         srcs = {s["slug"]: s for s in r.json()["sources"]}
         assert srcs["john-gill"]["kind"] == "verse"
-        assert srcs["matthew-henry"]["kind"] == "passage"
+        assert srcs["hale-s-exposition"]["kind"] == "passage"
         if with_sources:
             assert srcs["lindqvist-chapter-studies"]["kind"] == "chapter"
             assert srcs["okafor-study-notes"]["kind"] == "notes"
@@ -190,12 +192,24 @@ def test_effective_ranges_rules():
     assert study.effective_ranges(rows, "chapter", 20) == [(1, 20)] * 4
 
 
-def test_real_db_henry_reaches_john_3_16():
-    """Against the real DB: Henry's John 3 passage entry now matches v16."""
+# The owner's library (2026-11-13): these five, in this order. The other eight were removed.
+LIBRARY = [("scofield-notes-1917", "Scofield Notes (1917)"), ("john-gill", "John Gill"),
+           ("jamieson-fausset-brown", "Jamieson-Fausset-Brown"),
+           ("tyndale-study-notes", "Tyndale Study Notes"), ("treasury-of-david", "Treasury of David")]
+REMOVED = ["matthew-henry", "keil-delitzsch", "barnes-notes", "john-calvin", "john-wesley",
+           "adam-clarke", "people-s-new-testament", "catena-aurea"]
+
+
+def test_real_db_has_exactly_the_five_sources_in_order():
     study._cache.update(key=None, sources=None)
-    d = TestClient(app).get("/api/passage/John 3:16/study").json()
-    henry = _by_name(d)["Matthew Henry"]
-    assert henry["selection_entries"] == 1 and henry["ranges"][0]["start"] == 1
+    client = TestClient(app)
+    srcs = client.get("/api/commentary/sources").json()["sources"]
+    assert [(s["slug"], s["source"]) for s in srcs] == LIBRARY
+    study_srcs = client.get("/api/passage/John 3:16/study").json()["sources"]
+    assert [s["slug"] for s in study_srcs] == [slug for slug, _ in LIBRARY]
+    for slug in REMOVED:   # old deep links ask for these: nothing, not an error
+        r = client.get(f"/api/passage/John 3:16/commentary?source={slug}")
+        assert r.status_code == 200 and r.json()["entries"] == []
 
 
 # ---------- round two: real library (items 1, 6, 7) ----------
@@ -230,7 +244,7 @@ def test_real_overview_and_verse_entries_both_listed_tightest_first():
     """Treasury of David on Ps 23:1-3: verse entries 1, 2, 3 plus the whole-psalm overview."""
     client = _real_client()
     if not _real_has_library(client):
-        pytest.skip("DB without the 13-source commentary library")
+        pytest.skip("DB without the commentary library")
     td = _by_name(client.get("/api/passage/Psalms 23:1-3/study").json())["Treasury of David"]
     spans = sorted((r["start"], r["end"]) for r in td["ranges"])
     assert {(1, 1), (2, 2), (3, 3), (1, 6)} <= set(spans)
@@ -255,11 +269,13 @@ class TestOfflineSources:
 
     def test_book_commentary_sources_by_name_or_slug(self):
         client = _real_client()
-        r = client.get("/api/offline/commentary", params={"book": "Jude", "sources": "Matthew Henry,john-gill"})
+        r = client.get("/api/offline/commentary", params={"book": "Jude", "sources": "Jamieson-Fausset-Brown,john-gill"})
         assert r.status_code == 200
-        assert {e["source"] for e in r.json()["entries"]} == {"Matthew Henry", "John Gill"}
+        assert {e["source"] for e in r.json()["entries"]} == {"Jamieson-Fausset-Brown", "John Gill"}
         unknown = client.get("/api/offline/commentary?book=Jude&sources=nobody").json()["entries"]
         assert unknown == []
+        removed = client.get("/api/offline/commentary?book=Jude&sources=matthew-henry").json()["entries"]
+        assert removed == []
         old = client.get("/api/offline/commentary?book=Jude").json()["entries"]   # old callers: all
         assert len({e["source"] for e in old}) >= 2
 
@@ -272,7 +288,7 @@ class TestOfflineSources:
     def test_sources_with_sizes_and_defaults(self):
         client = _real_client()
         if not _real_has_library(client):
-            pytest.skip("DB without the 13-source commentary library")
+            pytest.skip("DB without the commentary library")
         srcs = client.get("/api/offline/commentary/sources").json()["sources"]
         by = {s["slug"]: s for s in srcs}
         assert by["john-gill"]["bytes"] > 1_000_000

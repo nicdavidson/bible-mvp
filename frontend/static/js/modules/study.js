@@ -15,13 +15,14 @@ window.BibleModules = window.BibleModules || {};
         chapter: 'Comments on the whole chapter',
         notes: 'Short notes on selected verses',
     };
-    // First-time order: a short modern note first, then the classic devotional commentary,
-    // then brief verse notes, then the long and technical works. Sources not listed follow
-    // in commentary_sources.sort_order. The reader's own order (Your sources) replaces this.
+    // First-time order, set by the site owner (same as scripts/commentary_registry.py
+    // DEFAULT_ORDER). Sources not listed follow in commentary_sources.sort_order. The
+    // reader's own order (Your sources) replaces this. The view opens on the first source
+    // in the order that has something on the selection (openStudy), so a sparse source
+    // first (Scofield) never opens as an empty pane.
     const DEFAULT_ORDER = [
-        'tyndale-study-notes', 'matthew-henry', 'jamieson-fausset-brown', 'treasury-of-david',
-        'john-calvin', 'barnes-notes', 'john-wesley', 'adam-clarke', 'john-gill',
-        'people-s-new-testament', 'keil-delitzsch', 'catena-aurea', 'scofield-notes-1917',
+        'scofield-notes-1917', 'john-gill', 'jamieson-fausset-brown', 'tyndale-study-notes',
+        'treasury-of-david',
     ];
     const chapterCache = new Map();         // "Book|ch|slug" -> entries (whole chapter)
     let paneObserver = null;
@@ -403,7 +404,10 @@ window.BibleModules = window.BibleModules || {};
             const prefs = this.studyPrefs();
             const want = [keepSource, prefs.last].map(x => x && slugify(x));
             // Cross-references and Notes open by name (deep link, the reader's Refs/Note
-            // buttons); otherwise the remembered or first commentary source
+            // buttons); otherwise the asked-for or remembered source if it has something on
+            // the selection, else the first source in the track that does. A deep link to a
+            // source that no longer exists (?study=matthew-henry, removed 2026-11-13) lands
+            // there too, and the URL is rewritten to the source shown.
             const active = (this.studyIsTool(want[0]) && want[0])
                 || want.find(w => w && track.some(t => t.slug === w)) || track[0]?.slug || null;
             if (active !== this.study.active) this.study.previous = this.study.active || this.study.previous;
@@ -522,7 +526,10 @@ window.BibleModules = window.BibleModules || {};
                 const end = Math.min(ve || last, last);
                 const cached = await os.getChapterCommentary(book, chapter);
                 const meta = readJSON(META_KEY, []);
-                const names = new Set([...meta.map(m => m.source), ...cached.map(c => c.source)]);
+                // The library as last seen online decides which sources exist: commentary a
+                // device saved from a source since removed (Matthew Henry etc., 2026-11-13)
+                // is not shown. With no metadata yet, show whatever was saved.
+                const names = new Set(meta.length ? meta.map(m => m.source) : cached.map(c => c.source));
                 const sources = [...names].map(name => {
                     const m = meta.find(x => x.source === name) || { source: name, slug: slugify(name), short_name: name, author: name, kind: 'verse', sort_order: 1000 };
                     const rows = dedupeRows(cached.filter(c => c.source === name));

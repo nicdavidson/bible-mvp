@@ -31,7 +31,7 @@ uvicorn backend.main:app --reload
 - `english_word_alignments` (724,050) — BSB word→original language mappings
 - `lexicon` — Strong's definitions
 - `words` — STEPBible interlinear data (304,400 Hebrew + 122,286 Greek)
-- `commentary_entries` — Matthew Henry (65/66 books), John Gill (28,300 verses)
+- `commentary_entries` — five sources: Scofield 1917, John Gill, Jamieson-Fausset-Brown, Tyndale Open Study Notes, Treasury of David (`scripts/commentary_registry.py`; eight others removed 2026-11-13, don't re-add)
 - `cross_references` (41,649) — Treasury of Scripture Knowledge
 - `devotionals` (730) — Spurgeon Morning & Evening
 - `speaker_verses` (6,896) — Red letter (divine speech) markers

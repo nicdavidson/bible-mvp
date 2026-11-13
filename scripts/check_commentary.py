@@ -4,6 +4,7 @@ Quality checks for commentary data. Prints a per-source report and exits non-zer
 invariant fails.
 
 Checks:
+  - the library is exactly the sources in scripts/commentary_registry.py (no removed ones)
   - every commentary_entries.source has a commentary_sources row and vice versa
   - book names match the books table; chapter/verse ranges exist (KJV versification)
   - every data-ref link target exists
@@ -24,6 +25,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+from commentary_registry import COMMENTARIES  # noqa: E402
 from sword_reader import kjv_versification  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend import commentary_search  # noqa: E402
@@ -40,26 +42,16 @@ FTS_PROBES = ["god", "lord", "faith", "christ", "israel", "grace"]
 # "marker": the entry prints its own verse number ("Verse 16.", "3:16", "16.").
 SHIFT_CHECKS = {
     "John Gill": ("lemma", r"\s*(.{6,80}?),\.\.\.\."),
-    "John Wesley": ("lemma", r"\s*([^-\n]{4,60}?)\s+-\s"),
     "Jamieson-Fausset-Brown": ("lemma", r"\s*(?:[A-Z][A-Z ,.;'()\d:-]+\n+)?(?:\d+(?:-\d+)?\.\s*)?([^\n]{4,60}?)--"),
-    "People's New Testament": ("lemma", r"\s*([^.\n]{6,60}?)\.\s"),
-    "Adam Clarke": ("marker", r"\s*Verses?\s+(\d+)"),
-    "Barnes' Notes": ("marker", r"(?:[^\n]*\n+)?\s*Ver(?:se)?s?\.?\s+(\d+)"),
     "Treasury of David": ("marker", r"\s*Verses?\s+(\d+)"),
-    "Catena Aurea": ("marker", r"\s*Ver\.\s*(\d+)"),
     "Tyndale Study Notes": ("marker", r"\s*\d+:(\d+)"),
-    "John Calvin": ("marker", r"\s*(\d+)\.\s"),
-    # HelloAO K&D entries often open with a "Gen 7:1-12" heading. (Self-references are a weak
-    # signal for K&D: it often opens by referring to the neighbouring verse.)
-    "Keil & Delitzsch": ("marker", r"\s*(?:[1-3] )?[A-Z][a-z]+\.? \d+:(\d+)"),
-    "Matthew Henry": ("selfref", None),
     "Scofield Notes (1917)": ("lemma1", r"\s*([A-Za-z][^\n]{2,40})\n"),
 }
 WORD = re.compile(r"[a-z]+")
 
 # Truncation. Every source ends >97% of entries with . ! ? ) " ' etc. An entry that ends on a
 # lowercase letter or a comma stopped mid-sentence; when it is also near 32K characters it
-# was cut by a length cap (HelloAO cut Henry and K&D at 32,767). Entries we could not
+# was cut by a length cap (HelloAO cuts long entries at 32,767). Entries we could not
 # complete end with a visible " […]" and are reported, not failed.
 INCOMPLETE_MARK = "[\u2026]"
 CAP_SIGNATURE = 30000
@@ -143,6 +135,11 @@ def main():
     for s in meta:
         if s not in sources:
             failures.append(f"{s}: commentary_sources row without entries")
+    registry = {c["source"] for c in COMMENTARIES.values()}
+    for s in sorted((set(sources) | set(meta)) - registry):
+        failures.append(f"{s}: not in scripts/commentary_registry.py (removed source left in the DB)")
+    for s in sorted(registry - set(sources)):
+        failures.append(f"{s}: in the registry but has no entries")
 
     # DB bytes used by commentary tables (needs dbstat; fall back to payload only)
     try:

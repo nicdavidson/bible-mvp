@@ -62,7 +62,7 @@ SYNTHETIC = [
 ]
 
 REAL = [
-    ("John Gill", 10), ("Matthew Henry", 20),
+    ("John Gill", 10),
 ]
 
 SENTENCES = [

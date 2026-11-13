@@ -91,7 +91,7 @@ def _migrate_word_alignment_variants(conn):
 COMMENTARY_SOURCES_DDL = """
 CREATE TABLE IF NOT EXISTS commentary_sources (
     source TEXT PRIMARY KEY,      -- equals commentary_entries.source
-    short_name TEXT,              -- <= ~12 chars, for a phone chip ("Henry", "JFB", "K&D")
+    short_name TEXT,              -- <= ~12 chars, for a phone chip ("Gill", "JFB", "Scofield")
     author TEXT,
     year INTEGER,                 -- first publication
     tradition TEXT,               -- short factual label ("Reformed", "Methodist", ...)

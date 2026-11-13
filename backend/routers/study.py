@@ -1,9 +1,9 @@
 """Commentary study view API: sources with per-selection availability, and entries.
 
 Commentary comes at different granularities. Some sources comment verse by verse,
-some on a passage, some on a whole chapter. Older imports also store passage-level
-entries with only a start verse (Matthew Henry's John 3 is two rows, v1 and v22),
-which made the passage invisible for any verse except its first. Every entry here
+some on a passage, some on a whole chapter. Older imports also stored passage-level
+entries with only a start verse (one chapter could be two rows, v1 and v22), which
+made the passage invisible for any verse except its first. Every entry here
 gets an *effective* range (`range_start`..`range_end`) so overlap with a selection
 is answered the same way for every source.
 
@@ -24,12 +24,6 @@ KINDS = ("verse", "passage", "chapter", "notes")
 
 # Fallback metadata for sources imported before `commentary_sources` existed.
 _KNOWN = {
-    "Matthew Henry": {
-        "short_name": "Henry", "author": "Matthew Henry", "year": "1708–10",
-        "tradition": "English Presbyterian",
-        "description": "Devotional, practical exposition that works through each passage as a sermon outline. Romans to Revelation were finished by other ministers after his death.",
-        "license": "Public domain",
-    },
     "John Gill": {
         "short_name": "Gill", "author": "John Gill", "year": "1746–63",
         "tradition": "Particular Baptist",

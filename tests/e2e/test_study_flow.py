@@ -37,10 +37,10 @@ def test_select_range_study_switch_follow_ref_and_back(server, page):
     assert "/John/3/16-18?study=" in _path(page)
     assert len(page.locator(".study-verse").all()) == 3
 
-    # Henry's passage-level note reaches v16-18; Gill is verse by verse
+    # Every source in the library has something on John 3:16-18
     chips = page.locator(".study-chip:not(.is-empty)")
     slugs = [chips.nth(i).get_attribute("data-slug") for i in range(chips.count())]
-    assert {"john-gill", "matthew-henry"} <= set(slugs)
+    assert {"scofield-notes-1917", "john-gill", "tyndale-study-notes"} <= set(slugs)
 
     if page.get_attribute('.study-chip[data-slug="john-gill"]', "aria-pressed") != "true":
         page.tap('.study-chip[data-slug="john-gill"]')
@@ -57,12 +57,12 @@ def test_select_range_study_switch_follow_ref_and_back(server, page):
     gill.evaluate("el => el.scrollTo(0, 600)")
     page.wait_for_timeout(200)
 
-    # Switch to Henry, then back with the swap button: Gill keeps its place
-    page.tap('.study-chip[data-slug="matthew-henry"]')
-    page.wait_for_selector('.study-pane[data-slug="matthew-henry"] .study-pane-body p')
-    page.wait_for_function("document.querySelector('.study-pane[data-slug=\"matthew-henry\"] .study-note').offsetParent")
-    assert "1–21" in page.inner_text('.study-pane[data-slug="matthew-henry"] .study-note')
-    assert _path(page).endswith("study=matthew-henry")
+    # Switch to Tyndale (verse notes, then its note on 16-21), then back with the swap
+    # button: Gill keeps its place
+    page.tap('.study-chip[data-slug="tyndale-study-notes"]')
+    page.wait_for_selector('.study-pane[data-slug="tyndale-study-notes"] .study-pane-body p')
+    assert "verses 16–21" in page.inner_text('.study-pane[data-slug="tyndale-study-notes"] details.study-more summary')
+    assert _path(page).endswith("study=tyndale-study-notes")
     page.tap(".study-swap")
     page.wait_for_function("location.search.endsWith('john-gill')")
     page.wait_for_timeout(500)
@@ -94,14 +94,32 @@ def test_select_range_study_switch_follow_ref_and_back(server, page):
 
 
 def test_deep_link_opens_same_view_and_escape_closes(server, page):
-    page.goto(f"{server}/John/3/16-18?study=matthew-henry")
+    page.goto(f"{server}/John/3/16-18?study=jamieson-fausset-brown")
     page.wait_for_selector("#study-view[open] .study-pane-body p")
     assert page.inner_text("#study-title") == "John 3:16–18"
-    assert page.get_attribute('.study-chip[aria-pressed="true"]', "data-slug") == "matthew-henry"
+    assert page.get_attribute('.study-chip[aria-pressed="true"]', "data-slug") == "jamieson-fausset-brown"
     page.keyboard.press("Escape")
     page.wait_for_function("!document.getElementById('study-view').open")
     assert page.evaluate("location.search") == ""
     assert page.is_visible("#verse-16")
+
+
+@pytest.mark.parametrize("path,first", [
+    # Scofield (first in the order) has a note on John 3:16: the view opens on it
+    ("/John/3/16-18", "scofield-notes-1917"),
+    # Scofield has nothing on Romans 8:28: the first source that does, not an empty pane
+    ("/Romans/8/28", "john-gill"),
+])
+def test_deep_link_to_a_removed_source_opens_the_first_available(server, page, path, first):
+    """Matthew Henry was removed on 2026-11-13; links shared before then still work."""
+    page.goto(f"{server}{path}?study=matthew-henry")
+    page.wait_for_selector(f'.study-pane[data-slug="{first}"] .study-pane-body p', timeout=15000)
+    assert page.get_attribute('.study-chip[aria-pressed="true"]', "data-slug") == first
+    assert not page.locator('.study-chip[data-slug="matthew-henry"]').count()
+    assert _path(page) == f"{path}?study={first}"   # the link is rewritten to what is shown
+    assert page.evaluate("Alpine.$data(document.body).study.error") is None
+    if first == "john-gill":
+        assert page.locator('.study-chip.is-empty[data-slug="scofield-notes-1917"]').count() == 1
 
 
 def test_offline_study_from_cache(server, browser):
@@ -126,7 +144,7 @@ def _needs_library(page, server):
     has = page.evaluate("""async () => (await (await fetch('/api/commentary/sources')).json())
         .sources.some(s => s.slug === 'treasury-of-david')""")
     if not has:
-        pytest.skip("DB without the 13-source commentary library")
+        pytest.skip("DB without the commentary library")
 
 
 def _open(page, server, path, slug):
@@ -154,24 +172,20 @@ def test_verse_entries_lead_and_overview_is_a_section(server, page):
     assert not page.is_visible(f"{tp} .study-note")
 
 
-# selection -> (source, expected start of the first marked paragraph, or None for "can't tell")
+# selection -> (source, expected start of the first marked paragraph, or None for "can't tell").
+# The sources whose passage notes carried verse markers (Calvin "16.", K&D "Gen 1:3", Catena
+# "Ver. 1.", Henry's outline) were removed on 2026-11-13. The kept sources' wide notes (a
+# Tyndale note on 16-21, Spurgeon's whole-psalm overview) don't single out a verse, and
+# nothing may be marked in them.
 FIND_CASES = [
-    ("John 3:16-18", "john-calvin", "For God so loved the world"),
-    ("Romans 8:28", "john-calvin", "And we know"),
-    ("Psalms 23:3", "john-calvin", "He restoreth my soul"),
-    ("Matthew 5:9", "john-calvin", "Happy are the peacemakers"),
-    ("Genesis 1:3", "keil-delitzsch", "The word of God then went forth"),
-    ("Romans 8:28", "matthew-henry", "II. The concurrence of all providences"),
-    ("Psalms 23:4", "matthew-henry", "II. From his performing the office"),
-    # Henry was cut at 32K upstream until the CrossWire re-import; his section on v. 16-18 is now there.
-    ("John 3:16", "matthew-henry", "3. Christ here discourses of the great design"),
-    ("Matthew 5:2", "catena-aurea", None),         # one "Ver. 1." above a quotation of 1-3
+    ("John 3:16", "tyndale-study-notes", None),
+    ("Psalms 23:3", "treasury-of-david", None),
 ]
 
 
 @pytest.mark.parametrize("ref,slug,expected", FIND_CASES)
 def test_find_my_verses_in_passage_entries(server, page, ref, slug, expected):
-    """Item 2: verse markers (Calvin "16.", K&D "Gen 1:3", Catena "Ver. 1.") and narrow mentions."""
+    """Item 2: verse markers and narrow mentions; nothing is marked when nothing fits."""
     page.goto(f"{server}/")
     _needs_library(page, server)
     page.wait_for_function("window.BibleStudyText")
@@ -192,19 +206,6 @@ def test_find_my_verses_in_passage_entries(server, page, ref, slug, expected):
         assert first and first.startswith(expected), first
 
 
-def test_calvin_banner_names_the_marked_part(server, page):
-    page.goto(f"{server}/")
-    _needs_library(page, server)
-    _open(page, server, "/John/3/16-18?study=john-calvin", "john-calvin")
-    pane = '.study-pane[data-slug="john-calvin"]'
-    page.wait_for_function(f"document.querySelector('{pane} .study-note').offsetParent")
-    note = page.inner_text(f"{pane} .study-note")
-    assert "13–18" in note and "part on verses 16–18 is marked" in note
-    assert page.inner_text(f"{pane} p.is-focus .study-vmark") == "16"
-    # Found for you: the pane opened at the marked part, and the verses stay shown
-    assert page.locator(f"{pane} .study-pane-scroll").evaluate("el => el.scrollTop") > 1000
-
-
 def test_license_credit_shown_with_the_text(server, page):
     """Item 6: a CC BY-SA source shows its credit in the pane; public-domain ones do not."""
     page.goto(f"{server}/")
@@ -222,7 +223,7 @@ def test_license_credit_shown_with_the_text(server, page):
 
 @pytest.mark.parametrize("path,slug", [
     ("/John/3/16-18?study=john-gill", "john-gill"),
-    ("/John/3/16-18?study=john-calvin", "john-calvin"),
+    ("/John/3/16-18?study=tyndale-study-notes", "tyndale-study-notes"),
     ("/Psalms/23/1-3?study=treasury-of-david", "treasury-of-david"),
 ])
 def test_verses_shown_on_open(server, page, path, slug):
@@ -235,7 +236,8 @@ def test_verses_shown_on_open(server, page, path, slug):
 
 
 def test_old_format_offline_chapter_still_opens(server, browser):
-    """Item 7: commentary saved by the previous app version (old keys, start-only Henry rows)."""
+    """Item 7: commentary saved by the previous app version (old keys, start-only passage
+    rows). Saved commentary from a source no longer in the library is not shown."""
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
     skip_tour(ctx)
     pg = ctx.new_page()
@@ -243,22 +245,33 @@ def test_old_format_offline_chapter_still_opens(server, browser):
     pg.wait_for_selector("#verse-16")
     pg.wait_for_function("(JSON.parse(localStorage.getItem('studySourceMeta') || '[]')).length > 0")
     pg.wait_for_timeout(500)   # auto-cache of the chapter's verses
+    # A passage source as an older library described it (fictional; start-only rows)
+    pg.evaluate("""() => {
+        const meta = JSON.parse(localStorage.getItem('studySourceMeta'));
+        meta.push({ source: "Hale's Exposition", slug: 'hale-s-exposition', short_name: 'Hale',
+                    author: 'Hale', kind: 'passage', sort_order: 60 });
+        localStorage.setItem('studySourceMeta', JSON.stringify(meta));
+    }""")
     pg.evaluate("""() => new Promise((resolve, reject) => {
         const req = indexedDB.open('BibleMVP');
         req.onsuccess = () => {
             const tx = req.result.transaction('commentary', 'readwrite');
             const st = tx.objectStore('commentary');
+            st.put({ id: "Hale's Exposition:John:3:1", book: 'John', chapter: 3, source: "Hale's Exposition",
+                     reference_start: 1, reference_end: 1, content: 'Old Hale on Nicodemus.' });
+            st.put({ id: "Hale's Exposition:John:3:22", book: 'John', chapter: 3, source: "Hale's Exposition",
+                     reference_start: 22, reference_end: 22, content: 'Old Hale on the Baptist.' });
+            // Saved before Matthew Henry was removed from the library (2026-11-13)
             st.put({ id: 'Matthew Henry:John:3:1', book: 'John', chapter: 3, source: 'Matthew Henry',
                      reference_start: 1, reference_end: 1, content: 'Old Henry on Nicodemus.' });
-            st.put({ id: 'Matthew Henry:John:3:22', book: 'John', chapter: 3, source: 'Matthew Henry',
-                     reference_start: 22, reference_end: 22, content: 'Old Henry on the Baptist.' });
             tx.oncomplete = resolve; tx.onerror = reject;
         };
         req.onerror = reject;
     })""")
     ctx.set_offline(True)
-    pg.evaluate("Alpine.$data(document.body).openStudy('John 3:16', { source: 'matthew-henry' })")
-    pg.wait_for_selector('.study-pane[data-slug="matthew-henry"] .study-pane-body p', timeout=10000)
-    body = pg.inner_text('.study-pane[data-slug="matthew-henry"] .study-pane-body')
-    assert "Old Henry on Nicodemus." in body and "Verses 1–21" in body
+    pg.evaluate("Alpine.$data(document.body).openStudy('John 3:16', { source: 'hale-s-exposition' })")
+    pg.wait_for_selector('.study-pane[data-slug="hale-s-exposition"] .study-pane-body p', timeout=10000)
+    body = pg.inner_text('.study-pane[data-slug="hale-s-exposition"] .study-pane-body')
+    assert "Old Hale on Nicodemus." in body and "Verses 1–21" in body
+    assert not pg.locator('.study-chip[data-slug="matthew-henry"]').count()
     ctx.close()

@@ -180,13 +180,13 @@ def test_deep_links_to_the_panes(server, phone, slug, ready):
 def test_saved_source_order_and_hidden_sources_still_respected(server, phone):
     phone.goto(f"{server}/")
     phone.evaluate("""localStorage.setItem('studySourcePrefs', JSON.stringify(
-        { order: ['john-gill', 'matthew-henry'], hidden: ['matthew-henry'], last: null }))""")
+        { order: ['john-gill', 'jamieson-fausset-brown'], hidden: ['jamieson-fausset-brown'], last: null }))""")
     phone.goto(f"{server}/John/3/16")
     phone.wait_for_selector("#verse-16")
     phone.evaluate("Alpine.$data(document.body).openStudy('John 3:16')")
     _study_ready(phone)
     slugs = [c.get_attribute("data-slug") for c in phone.locator(".study-chip:not(.is-empty)").all()]
-    assert slugs[0] == "john-gill" and "matthew-henry" not in slugs
+    assert slugs[0] == "john-gill" and "jamieson-fausset-brown" not in slugs
     panes = [p.get_attribute("data-slug") for p in phone.locator(".study-track > .study-pane").all()]
     # The tools follow the sources (Hymns only shows where there are hymns: modules/hymns.js)
     assert panes[0] == "john-gill" and panes[-3:] == ["cross-references", "hymns", "notes"]
@@ -194,7 +194,7 @@ def test_saved_source_order_and_hidden_sources_still_respected(server, phone):
     phone.tap('.study-tool[data-slug="cross-references"]')
     phone.wait_for_function("Alpine.$data(document.body).study.active === 'cross-references'")
     prefs = json.loads(phone.evaluate("localStorage.getItem('studySourcePrefs')"))
-    assert prefs["order"] == ["john-gill", "matthew-henry"] and prefs["hidden"] == ["matthew-henry"]
+    assert prefs["order"] == ["john-gill", "jamieson-fausset-brown"] and prefs["hidden"] == ["jamieson-fausset-brown"]
     assert prefs.get("last") in (None, "john-gill")
     phone.tap(".study-manage-btn")
     phone.wait_for_selector("#study-manage[open]")

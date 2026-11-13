@@ -8,7 +8,7 @@ A free, open-source Bible study platform with cross-resource linking and word-le
 - **Word-Level Alignment**: Click any word in BSB to see the original Hebrew/Greek with Strong's definitions (724,000+ alignments)
 - **Interlinear Display**: Toggle to show Hebrew (OT) and Greek (NT) text with glosses
 - **Cross-References**: 41,000+ entries from Treasury of Scripture Knowledge
-- **Commentary**: Matthew Henry's Concise Commentary (65/66 books)
+- **Commentary**: Scofield Reference Notes (1917), John Gill, Jamieson-Fausset-Brown, Tyndale Open Study Notes and Treasury of David (see docs/COMMENTARY_LIBRARY_2026-11.md)
 - **Notes**: Personal notes saved locally
 - **Search**: Full-text search with Strong's number support (e.g., G26 for agape)
 - **Dark Mode**: Easy on the eyes for evening study
@@ -56,7 +56,8 @@ Note: The SQLite database (~200MB) is too large for GitHub. It's stored on Fly.i
 | [Open Bibles](https://github.com/seven1m/open-bibles) | Public Domain | WEB and KJV translations |
 | [STEPBible](https://github.com/STEPBible/STEPBible-Data) | CC-BY 4.0 | Hebrew/Greek interlinear data with Strong's |
 | [OpenBible.info](https://www.openbible.info/labs/cross-references/) | CC-BY | Cross-references |
-| Matthew Henry's Commentary | Public Domain | Commentary (1706) |
+| Commentaries: Scofield (1917), Gill, Jamieson-Fausset-Brown, Treasury of David | Public Domain | Commentary |
+| [Tyndale Open Study Notes](https://tyndaleopenresources.com/) | CC BY-SA 4.0 | Study notes |
 
 ## License
 
