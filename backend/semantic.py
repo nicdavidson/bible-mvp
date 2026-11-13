@@ -79,6 +79,21 @@ CANDIDATES: dict[str, ModelSpec] = {s.key: s for s in [
               "6fc8051fab2a1e0ee76689cf08c853792ac285e7", "", "static", 512, "MIT"),
 ]}
 
+def get_spec(key: str) -> ModelSpec:
+    """A registered candidate, or a locally trained model described by
+    data/models/<key>@<sha12>/spec.json (written by scripts/finetune_semantic.py)."""
+    if key in CANDIDATES:
+        return CANDIDATES[key]
+    for d in sorted(MODELS_DIR.glob(f"{key}@*")):
+        f = d / "spec.json"
+        if f.exists():
+            j = json.loads(f.read_text())
+            return ModelSpec(key, "local", d.name.split("@", 1)[1], j["onnx_file"], j["pooling"],
+                             int(j["dim"]), j.get("license", ""), j.get("query_prefix", ""),
+                             j.get("doc_prefix", ""))
+    raise KeyError(f"unknown model {key!r}: not in CANDIDATES and no {MODELS_DIR}/{key}@*/spec.json")
+
+
 # The model the build step embeds with and the API loads. Chosen in
 # docs/SEMANTIC_SEARCH_2026-11.md; changing it means re-running the `embeddings` build step.
 SHIPPED_MODEL = os.environ.get("SEMANTIC_MODEL", "gte-small")
@@ -331,7 +346,7 @@ def get_index(db_path: Path | None = None):
                 index = VectorIndex.load(conn)
             finally:
                 conn.close()
-            spec = CANDIDATES[index.meta["model_key"]]
+            spec = get_spec(index.meta["model_key"])
             directory = model_dir(spec)
             if index.meta.get("model_sha256") != model_fingerprint(spec, directory):
                 raise ValueError(f"model files in {directory} do not match the stored vectors")
@@ -346,7 +361,10 @@ def get_index(db_path: Path | None = None):
 
 
 def reset_for_tests():
-    _state.update(loaded=False, index=None, encoder=None, error=None)
+    # Take the lock so an in-flight load (the router's startup warm-up thread) cannot
+    # finish after the reset and overwrite it.
+    with _lock:
+        _state.update(loaded=False, index=None, encoder=None, error=None)
 
 
 def status() -> dict:
