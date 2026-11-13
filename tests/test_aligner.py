@@ -262,7 +262,7 @@ def _built():
         return False
     conn = sqlite3.connect(DB)
     try:
-        n = conn.execute("SELECT COUNT(*) FROM english_word_alignments "
+        n = conn.execute("SELECT COUNT(*) FROM english_alignment_verses "
                          "WHERE translation_id IN ('KJV', 'WEB')").fetchone()[0]
         has_index = conn.execute("SELECT 1 FROM sqlite_master WHERE name='lemma_renderings'"
                                  ).fetchone()

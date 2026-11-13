@@ -6,6 +6,7 @@
     python scripts/build_alignments.py web       # WEB: aligner
     python scripts/build_alignments.py index     # lemma_renderings table
     python scripts/build_alignments.py all       # the four above
+    python scripts/build_alignments.py pack      # convert a per-word table from an older build
     python scripts/build_alignments.py evaluate  # held-out scores -> docs/alignment-eval-2026-11.json
 
 Inputs: data/clear-bible (Clear-Bible/Alignments, cloned by build_db.py),
@@ -30,8 +31,8 @@ from aligner.kjv import KJV_CACHE_KEY, KJV_USFM_URL  # noqa: E402
 from aligner.metrics import (calibration, error_classes, score_examples,  # noqa: E402
                              threshold_curve)
 from aligner.pipeline import (ClassCalibrator, Context, Predictor,  # noqa: E402
-                              bsb_rows, fit_calibrator, kjv_rows, model_rows, self_train,
-                              train, train_reranker, write_rows)
+                              bsb_rows, ensure_table, fit_calibrator, kjv_rows, model_rows,
+                              self_train, train, train_reranker, write_rows)
 from aligner.rerank import is_function  # noqa: E402
 from aligner.renderings import build_renderings  # noqa: E402
 from source_cache import cached_fetch_path  # noqa: E402
@@ -39,7 +40,7 @@ from source_cache import cached_fetch_path  # noqa: E402
 DB_PATH = Path(os.environ.get("DATABASE_PATH", SCRIPTS.parent / "data" / "bible.db"))
 EVAL_PATH = SCRIPTS.parent / "docs" / "alignment-eval-2026-11.json"
 
-# Links below this calibrated confidence are kept in english_word_alignments
+# Links below this calibrated confidence are kept in english_alignment_verses
 # (the UI can mark them) but left out of lemma_renderings. See the doc.
 RENDERING_MIN_CONFIDENCE = 0.5
 
@@ -212,8 +213,17 @@ STEPS = {"bsb": step_bsb, "kjv": step_kjv, "web": step_web, "index": step_index,
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("step", choices=[*STEPS, "all"])
+    ap.add_argument("step", choices=[*STEPS, "all", "pack"])
     args = ap.parse_args()
+    if args.step == "pack":
+        # Storage migration only (english_word_alignments -> english_alignment_verses):
+        # no models, no downloads. A no-op on a database already in the packed layout.
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        ensure_table(conn)
+        n = conn.execute("SELECT COALESCE(SUM(n_links), 0) FROM english_alignment_verses").fetchone()[0]
+        print(f"english_alignment_verses: {n} aligned words")
+        return
     ctx = Context(DB_PATH, kjv_zip())
     steps = ["bsb", "kjv", "web", "index"] if args.step == "all" else [args.step]
     for name in steps:

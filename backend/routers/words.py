@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
+from .. import alignment_store
 from ..database import get_db_connection, get_writable_db_connection, DATABASE_PATH
 from ..core import (OT_BOOKS, NT_BOOKS, CANONICAL_BOOKS, limiter,
                     parse_reference, get_cross_references, get_speaker_verses)
@@ -29,25 +30,28 @@ def get_word_alignment(
     """
     conn = get_db_connection()
     try:
-        # Look up the alignment
-        cursor = conn.execute("""
-            SELECT ea.english_word, ea.original_word_position, ea.confidence,
-                   wa.hebrew_text as original_text, wa.transliteration, wa.english_gloss,
-                   wa.grammar as parsing,
-                   CASE WHEN wa.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(wa.strong_number, 2) AS INTEGER) AS TEXT)
-                        WHEN wa.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(wa.strong_number, 2) AS INTEGER) AS TEXT)
-                        ELSE wa.strong_number END as strong_number
-            FROM english_word_alignments ea
-            JOIN word_alignments wa ON (
-                wa.book = ea.book AND wa.chapter = ea.chapter
-                AND wa.verse = ea.verse AND wa.word_position = ea.original_word_position
-            )
-            WHERE ea.translation_id = ?
-              AND ea.book = ? AND ea.chapter = ? AND ea.verse = ?
-              AND ea.english_word_position = ?
-        """, (translation, book, chapter, verse, word_position))
+        # Look up the alignment (packed per verse: backend/alignment_store.py)
+        row = None
+        packed = conn.execute(f"""
+            SELECT p.method, p.links, v.text FROM {alignment_store.TABLE} p
+            JOIN verses v ON v.translation_id = p.translation_id AND v.book = p.book
+                 AND v.chapter = p.chapter AND v.verse = p.verse
+            WHERE p.translation_id = ? AND p.book = ? AND p.chapter = ? AND p.verse = ?
+        """, (translation, book, chapter, verse)).fetchone()
+        link = packed and alignment_store.link_at(packed["method"], packed["links"], word_position)
+        if link:
+            row = conn.execute("""
+                SELECT ? AS english_word, ? AS original_word_position, ? AS confidence,
+                       wa.hebrew_text as original_text, wa.transliteration, wa.english_gloss,
+                       wa.grammar as parsing,
+                       CASE WHEN wa.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(wa.strong_number, 2) AS INTEGER) AS TEXT)
+                            WHEN wa.strong_number LIKE 'G0%' THEN 'G' || CAST(CAST(SUBSTR(wa.strong_number, 2) AS INTEGER) AS TEXT)
+                            ELSE wa.strong_number END as strong_number
+                FROM word_alignments wa
+                WHERE wa.book = ? AND wa.chapter = ? AND wa.verse = ? AND wa.word_position = ?
+            """, (alignment_store.tappable_words(packed["text"])[word_position - 1], link[0],
+                  link[1], book, chapter, verse, link[0])).fetchone()
 
-        row = cursor.fetchone()
         if not row:
             return {"found": False, "message": "No alignment found for this word"}
 
@@ -249,21 +253,30 @@ def get_word_renderings(
 
         if not translation:
             raise HTTPException(status_code=400, detail="`rendering` needs `translation`")
-        cur = conn.execute("""
-            SELECT e.book, e.chapter, e.verse, e.original_word_position AS pos,
-                   e.english_word_position AS epos, e.english_word AS word
+        cur = conn.execute(f"""
+            SELECT w.book, w.chapter, w.verse, w.word_position AS pos,
+                   p.method, p.links, v.text
             FROM word_alignments w
-            JOIN english_word_alignments e ON e.translation_id = ? AND e.book = w.book
-                 AND e.chapter = w.chapter AND e.verse = w.verse
-                 AND e.original_word_position = w.word_position
+            JOIN {alignment_store.TABLE} p ON p.translation_id = ? AND p.book = w.book
+                 AND p.chapter = w.chapter AND p.verse = w.verse
+            JOIN verses v ON v.translation_id = p.translation_id AND v.book = p.book
+                 AND v.chapter = p.chapter AND v.verse = p.verse
             JOIN books b ON b.name = w.book
-            WHERE w.strong_number = ? AND e.confidence >= ?
+            WHERE w.strong_number = ?
             ORDER BY b.book_order, w.chapter, w.verse, w.word_position
-        """, (translation, padded, RENDERING_MIN_CONFIDENCE))
+        """, (translation, padded))
         groups = {}
+        unpacked = {}
         for row in cur:
-            key = (row["book"], row["chapter"], row["verse"], row["pos"])
-            groups.setdefault(key, []).append((row["epos"], row["word"]))
+            vkey = (row["book"], row["chapter"], row["verse"])
+            if vkey not in unpacked:
+                words = alignment_store.tappable_words(row["text"])
+                unpacked = {vkey: [(epos, opos, words[epos - 1]) for epos, opos, conf, _ in
+                                   alignment_store.unpack(row["method"], row["links"])
+                                   if conf >= RENDERING_MIN_CONFIDENCE]}
+            ws = [(epos, word) for epos, opos, word in unpacked[vkey] if opos == row["pos"]]
+            if ws:
+                groups[vkey + (row["pos"],)] = ws
         want = rendering.strip().lower()
         hits = [{"book": k[0], "chapter": k[1], "verse": k[2], "original_word_position": k[3],
                  "english_word_positions": [p for p, _ in sorted(ws)]}
