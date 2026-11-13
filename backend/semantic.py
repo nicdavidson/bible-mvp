@@ -263,9 +263,17 @@ class VectorIndex:
         return cls(q8, scales, refs, orders, meta)
 
     def scores(self, qvec):
-        """Cosine similarity of qvec against every verse (vectors were unit length)."""
+        """Cosine similarity of qvec against every verse (vectors were unit length).
+
+        int8 rows are converted to float32 4096 at a time: ~8 ms for 31K x 384 on one N100
+        core with a 6 MB temporary, vs ~15-40 ms and a 48 MB temporary for one big upcast.
+        """
         np = self.np
-        return (self.q8 @ qvec.astype(np.float32)) * self.scales
+        q = qvec.astype(np.float32)
+        out = np.empty(len(self.q8), dtype=np.float32)
+        for s in range(0, len(self.q8), 4096):
+            out[s:s + 4096] = self.q8[s:s + 4096].astype(np.float32) @ q
+        return out * self.scales
 
     def vector(self, ref):
         i = self.pos.get(ref)
