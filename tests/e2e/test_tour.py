@@ -173,7 +173,7 @@ def test_every_step_then_done_leaves_the_reader_as_it_was(server, fresh):
             pg.wait_for_function(_ring_fits(pg, ".verse-box.verse-highlighted"))
         if title == "Commentaries":
             assert _app(pg, "a.study.open")
-            pg.wait_for_function(_ring_fits(pg, "#study-view .study-chips"))
+            pg.wait_for_function(_ring_fits(pg, "#study-view .study-sources"))
             # Back to the Study button closes the study view the tour opened
             pg.click(".tour-back")
             assert _step(pg)[1] == "Study"

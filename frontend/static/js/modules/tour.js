@@ -83,8 +83,8 @@ const STEPS = [
     },
     {
         id: 'sources', chapter: true, needs: ['selection', 'study'], title: 'Commentaries',
-        text: 'Swipe left or right to move between commentaries, or tap a name at the bottom.',
-        target: () => $('#study-view .study-chips'),
+        text: 'Swipe left or right to move between commentaries, or tap a name at the bottom. All lists every commentary.',
+        target: () => $('#study-view .study-sources'),
     },
     {
         id: 'tools', chapter: true, needs: ['selection', 'study'], title: 'Cross-references and notes',
