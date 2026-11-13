@@ -9,20 +9,28 @@ like this verse". It finds and ranks existing verses. It never writes text.
 Measured 2026-11-13 on `bridge` (N100, 4 cores, shared with other agents; load average 4-16
 during runs). Test splits only. Cells are **nDCG@10 / hit@10**.
 
-| Method | Natural questions (64, hand-written) | Nave's topic names (334) | Nave's sub-topics (184) | Verse to cross-refs (317) |
-|---|---:|---:|---:|---:|
-| `/api/search` today (`fts_today`) | 0.024 / 0.05 | 0.299 / 0.74 | 0.012 / 0.03 | 0.000 / 0.00 |
-| Keyword, stop-worded OR + BM25 (`fts_or`) | 0.154 / 0.52 | 0.311 / 0.76 | 0.220 / 0.52 | 0.164 / 0.54 |
-| potion-base-8M (static, model2vec) | 0.172 / 0.56 | 0.270 / 0.73 | 0.174 / 0.46 | 0.121 / 0.45 |
-| all-MiniLM-L6-v2 | 0.275 / 0.73 | 0.236 / 0.69 | 0.208 / 0.54 | 0.131 / 0.47 |
-| bge-small-en-v1.5 | 0.257 / 0.69 | 0.214 / 0.70 | 0.174 / 0.48 | 0.131 / 0.49 |
-| e5-small-v2 | 0.270 / 0.77 | 0.246 / 0.73 | 0.199 / 0.53 | 0.145 / 0.53 |
-| snowflake-arctic-embed-xs | 0.279 / 0.70 | 0.277 / 0.74 | 0.230 / 0.57 | 0.128 / 0.44 |
-| mxbai-embed-xsmall-v1 | 0.287 / 0.77 | 0.241 / 0.71 | 0.218 / 0.54 | 0.135 / 0.48 |
-| **gte-small (shipped), meaning only** | **0.328 / 0.78** | 0.271 / 0.75 | 0.225 / 0.55 | 0.149 / 0.51 |
-| gte-small hybrid (RRF with `fts_or`) | 0.242 / 0.69 | **0.333 / 0.78** | **0.247 / 0.58** | **0.179 / 0.58** |
-| gte-small `auto` (API default: hybrid if <= 2 content words) | 0.297 / 0.77 | 0.333 / 0.78 | 0.226 / 0.55 | 0.149 / 0.51 |
-| *ceiling: qwen3-embedding 0.6B (Ollama, not shippable)* | *0.413 / 0.92* | *0.246 / 0.69* | *0.231 / 0.54* | *0.198 / 0.64* |
+Questions are scored twice:
+- **listed**: the 351 verses I wrote down beforehand;
+- **pooled**: those plus 631 verses judged relevant out of every method's top 10 (see
+  "Pooled judging").
+
+| Method | Questions, listed (64) | Questions, pooled (64) | Nave's topic names (334) | Nave's sub-topics (184) | Verse to cross-refs (317) |
+|---|---:|---:|---:|---:|---:|
+| `/api/search` today (`fts_today`) | 0.024 / 0.05 | 0.028 / 0.06 | 0.299 / 0.74 | 0.012 / 0.03 | 0.000 / 0.00 |
+| Keyword, stop-worded OR + BM25 (`fts_or`) | 0.154 / 0.52 | 0.258 / 0.77 | 0.311 / 0.76 | 0.220 / 0.52 | 0.164 / 0.54 |
+| potion-base-8M (static, model2vec) | 0.172 / 0.56 | 0.295 / 0.86 | 0.270 / 0.73 | 0.174 / 0.46 | 0.121 / 0.45 |
+| all-MiniLM-L6-v2 | 0.275 / 0.73 | 0.391 / 0.97 | 0.236 / 0.69 | 0.208 / 0.54 | 0.131 / 0.47 |
+| bge-small-en-v1.5 | 0.257 / 0.69 | 0.389 / 0.98 | 0.214 / 0.70 | 0.174 / 0.48 | 0.131 / 0.49 |
+| e5-small-v2 | 0.270 / 0.77 | 0.389 / 0.98 | 0.246 / 0.73 | 0.199 / 0.53 | 0.145 / 0.53 |
+| snowflake-arctic-embed-xs | 0.279 / 0.70 | 0.390 / 0.98 | 0.277 / 0.74 | 0.230 / 0.57 | 0.128 / 0.44 |
+| mxbai-embed-xsmall-v1 | 0.287 / 0.77 | 0.416 / 0.97 | 0.241 / 0.71 | 0.218 / 0.54 | 0.135 / 0.48 |
+| **gte-small (shipped), meaning only** | **0.328 / 0.78** | **0.465 / 0.98** | 0.271 / 0.75 | 0.225 / 0.55 | 0.149 / 0.51 |
+| gte-small hybrid (RRF with `fts_or`) | 0.242 / 0.69 | 0.388 / 0.89 | **0.333 / 0.78** | **0.247 / 0.58** | **0.179 / 0.58** |
+| gte-small `auto` (API default: hybrid if <= 2 content words) | 0.297 / 0.77 | 0.436 / 0.94 | 0.333 / 0.78 | 0.226 / 0.55 | 0.149 / 0.51 |
+| gte-small control (same model through our export) | 0.332 / 0.78 | 0.469 / 0.97 | 0.271 / 0.75 | 0.219 / 0.53 | 0.148 / 0.51 |
+| **gte-small fine-tuned (round two), meaning only** | 0.342 / 0.80 | 0.487 / 1.00 | 0.279 / 0.73 | 0.247 / 0.58 | 0.208 / 0.66 |
+| gte-small fine-tuned, `auto` | 0.326 / 0.80 | 0.469 / 0.98 | 0.320 / 0.78 | 0.248 / 0.58 | 0.208 / 0.66 |
+| *ceiling: qwen3-embedding 0.6B (Ollama, not shippable)* | *0.413 / 0.92* | *0.611 / 1.00* | *0.246 / 0.69* | *0.231 / 0.54* | *0.198 / 0.64* |
 
 All rows (every model x vec/hybrid/boost/auto) are in `docs/semantic-eval-2026-11.json`;
 `python scripts/eval_semantic.py --table docs/semantic-eval-2026-11.json` prints them.
@@ -52,7 +60,12 @@ What this says, plainly:
   (0.179), so `/api/search/similar` fuses them.
 - **The quality ceiling is well above what ships.** qwen3-embedding 0.6B reaches 0.413 /
   0.92 on questions. It is 17x the parameters and cannot run per request on a shared-cpu-1x
-  machine; see "Closing the gap" below.
+  machine. The round-two fine-tune of gte-small did not close the gap on questions; see
+  "Fine-tune" below.
+- **Pooled labels raise every method and keep the order.** gte-small stays the best small
+  model (0.465), and meaning beats keyword by +0.207 nDCG@10 (95% bootstrap interval
+  +0.148 to +0.265). With pooled labels, hit@10 saturates near 1.0 for every embedding
+  model, so nDCG@10 is the number to read there.
 
 ### Chosen: gte-small (thenlper/gte-small, int8 ONNX export by Xenova)
 
@@ -163,24 +176,107 @@ answers my list lacks; others are real failures. Top results, verbatim refs:
   afflicted") for loneliness, Romans 13:6 for taxes, Matthew 21:22 for answered prayer,
   2 Corinthians 1:20 for "God keeps his promises".
 
-### Closing the gap (needs GPU time; not run)
+### Fine-tune (round two): run, and not shipped
 
-The qwen3 ceiling shows ~+0.09 nDCG@10 / +0.14 hit@10 on questions is available. A small
-fine-tune of gte-small keeps the shipped size and latency:
+**Verdict: keep stock gte-small.**
+- **Questions (the judge):** the fine-tune does not improve them by more than noise, on
+  either label set or in either mode.
+- **Nave's topics:** no clear change.
+- **Cross-references:** clearly better (+0.060 nDCG@10, +0.15 hit@10). Using the fine-tuned
+  vectors only for `/api/search/similar` would cost a second 16 MB vector table and ~40 MB
+  more RAM; that is a separate decision.
 
-- Data, no generated text: (Nave's sub-topic label, verse) pairs and (topic name, verse)
-  pairs from the **train/dev split only** (~25K pairs after the filters in
-  `scripts/eval_semantic.py`), plus (verse, cross-reference) pairs from dev sources
-  (~20K with votes >= 10). Hard negatives: qwen3-embedding top-50 verses that are not
-  labelled (qwen3 as teacher, run on crucible).
-- Training: sentence-transformers `MultipleNegativesRankingLoss` (+ optional
-  `MarginMSELoss` against qwen3 scores), batch 128, lr 2e-5, 2 epochs, max length 128,
-  from `thenlper/gte-small` @ `17e1f347d17f`; one consumer GPU, under an hour.
-- Export: ONNX + dynamic int8 quantization (`optimum-cli export onnx`, then
-  `onnxruntime.quantization.quantize_dynamic`), add a `ModelSpec`, rerun this harness. The
-  hand-written questions and every test split stay untouched, so the comparison stays
-  honest. Watch for over-fitting to Nave's 1890s vocabulary.
+Paired bootstrap, fine-tuned minus control (the same base through the same export), 10,000
+resamples, 95% intervals:
 
+| Set | nDCG@10 | hit@10 |
+|---|---|---|
+| Questions, listed, meaning only | +0.010 [-0.032, +0.053] | +0.016 [-0.094, +0.125] |
+| Questions, pooled, meaning only | +0.018 [-0.033, +0.068] | +0.031 [+0.000, +0.078] |
+| Questions, listed, `auto` (vs stock) | +0.029 [-0.004, +0.060] | +0.031 [-0.078, +0.141] |
+| Nave's topics, meaning only | +0.007 [-0.010, +0.025] | -0.021 [-0.063, +0.021] |
+| Nave's topics, `auto` | -0.009 [-0.025, +0.007] | -0.009 [-0.042, +0.027] |
+| Nave's sub-topics | +0.028 [+0.004, +0.053] | +0.049 [+0.000, +0.098] |
+| Cross-references | **+0.060 [+0.044, +0.076]** | **+0.151 [+0.101, +0.202]** |
+
+Same failure queries, top 5 before (stock) and after (fine-tuned). `*` = a listed answer,
+`+` = judged relevant in pooling:
+
+| Query | Stock gte-small | Fine-tuned |
+|---|---|---|
+| what does the Bible say about anxiety | Exodus 20:20; Isaiah 35:4+; Jeremiah 30:5; Proverbs 19:23; Jeremiah 20:4 | **1 Peter 5:7\*; Isaiah 35:4+; Psalms 94:19\*; Proverbs 12:25+**; Job 15:4 |
+| God's promises when afraid | Exodus 20:20; Psalms 147:11; Psalms 56:11+; Matthew 28:10; Psalms 128:4 | Haggai 2:5+; Deuteronomy 1:29; Psalms 56:3\*; Romans 4:21; 2 Chronicles 26:5 |
+| be careful what you say | Lamentations 3:57; Ecclesiastes 7:21; Jeremiah 22:21; Deuteronomy 1:29; Genesis 31:29 | Mark 13:11; Genesis 31:29; Ezekiel 3:6; Proverbs 4:24+; Job 13:7 |
+| how can I be saved | Luke 18:26; Isaiah 64:5; John 5:34; Psalms 55:16; Isaiah 45:22+ | Luke 18:26; Mark 10:26; Acts 15:11+; Matthew 19:25; Hebrews 7:25+ |
+| helping the poor and needy | Proverbs 31:20+; Psalms 113:7; Proverbs 31:9+; Psalms 40:17; Psalms 70:5 | Psalms 107:41; Psalms 113:7; Proverbs 31:20+; Psalms 72:12; Psalms 70:5 |
+| what does God want from me | Song of Solomon 7:10; John 11:22; Job 6:8; Psalms 63:1; Philippians 4:19 | Mark 5:7; Job 6:8; Song of Solomon 7:10; Mark 10:36; John 11:22 |
+| waiting on God: rank of Isaiah 40:31 | 26 | 39 |
+
+- **Anxiety improved sharply:** the classic answers appear.
+- **"Promises when afraid" and "be careful what you say":** a little better.
+- **"How can I be saved":** the same failure in a new form; it now returns three verses that
+  ask the question (Luke 18:26, Mark 10:26, Matthew 19:25).
+- **"Helping the poor" and "what does God want from me":** unchanged failures.
+- **Isaiah 40:31:** falls further.
+The Nave's-style training data teaches the model what Scripture discusses together (hence
+the cross-reference gain), not how modern questions map to answers.
+
+How it was run (all pinned; `scripts/finetune_job.sh`):
+
+- **Data**: `scripts/finetune_data.py`, sha256 `cf80cdacecb8...`, reproduced byte-for-byte by
+  a second run.
+  - 16,146 (query, positive, hard negative) triplets: 8,006 from Nave's topic names and
+    sub-topic lines, 8,140 from cross-references.
+  - Only the **dev** side of the evaluation split is used. Dev is split again, 80% train
+    and 20% select (model selection only, never trained on).
+  - Test queries, test cross-reference sources and all 64 questions are excluded by verse
+    index **and by text**: 423 BSB verse texts occur more than once, and a first run that
+    excluded by index only let 6 identical strings through.
+  - Hard negatives are qwen3-embedding ranks 30-100 that are not positives or within +-2
+    verses of one. No generated text anywhere.
+  - `tests/test_finetune_data.py` checks all of this against the actual files.
+- **Training**: `scripts/finetune_semantic.py`.
+  - Base `thenlper/gte-small` @ `17e1f347d17f`; MultipleNegativesRankingLoss, scale 20, no
+    duplicate anchors per batch; batch 64, 3 epochs, warmup 10%, weight decay 0.01, max
+    length 128, fp32; seed 1234 with deterministic cuDNN.
+  - Learning rate swept over {1e-5, 2e-5, 5e-5} (pre-registered). Select nDCG@10 every 100
+    steps; best was 5e-5 at step 500 (select 0.257, base 0.216).
+  - torch 2.5.1+cu121, sentence-transformers 3.3.1, transformers 4.46.3, onnxruntime 1.20.1.
+  - GTX 1080 via `gpu-job` (tenant `personal`, `--gpu 1080 --mem 7 --max-hours 2`); 11 min
+    of training, 38 min for the whole job.
+- **Export**: `torch.onnx.export` (opset 14) then dynamic int8 (per-channel QInt8). The
+  untouched base through the same path is the control; it matches the published Xenova
+  int8 export within 0.005 nDCG.
+  - Fine-tuned ONNX sha256 `0ada61452b2a...`, control `35d3ffdd8dd7...` (identical in both
+    jobs).
+- **Where the weights would live** (designed, nothing uploaded):
+  - `scripts/release_model.py` publishes to the release bucket under the immutable prefix
+    `models/<key>/<sha12>/`: model, tokenizer, spec, run.json and the training-data tarball.
+  - A `ModelSpec(..., source="bucket:models/<key>/<sha12>", sha256=pins)` makes
+    `fetch_model()` and CI's `scripts/fetch_model.py` fetch it deterministically, verified
+    against the pins.
+- **Reproducibility caveat:** int8 ONNX output differs slightly by CPU instruction set. The
+  control scored 0.323 with query vectors computed on crucible and 0.332 on bridge, with the
+  same files. Vectors and queries are bit-reproducible on one CPU type, not across
+  machines. Quality is unaffected (browser vs server cosine 0.999), but compare
+  `vectors_sha256` only between builds on the same hardware.
+
+### Pooled judging
+
+- **Pool:** for each of the 64 questions, the union of the top 10 from every method in the
+  table: both keyword baselines and vec/hybrid/boost/auto for all twelve embedding models,
+  including both fine-tunes and qwen3. Verses already listed were removed, leaving 3,936
+  candidates (~62 per question).
+- **Judging:**
+  - Candidates were judged against `tests/fixtures/pooled_judging_rubric.md`, blind to which
+    method found them, in canonical order.
+  - 3,861 were split across four sub-agents (the same model as me, so this is consistency,
+    not independence). I judged the 75 that the final runs added.
+  - I audited 48 random sub-agent decisions blind (24 yes, 24 no) and agreed with all 48.
+- **Result:** 631 verses (16%) judged relevant, stored as `pooled_refs` beside the original
+  `refs`.
+- **Caveat:** a verse no method put in its top 10 is still unjudged and counts as a miss.
+  Pooling over a dozen models makes that unlikely, not impossible.
 
 ## How to regenerate
 
@@ -200,6 +296,14 @@ python scripts/bench_semantic.py --models gte-small,minilm-l6,potion-8m --cpu 3
 python scripts/build_embeddings.py --export-browser data/semantic-browser
 python tests/browser/measure_semantic_demo.py [--throttle 4]
 pytest tests/test_semantic.py
+# round two: fine-tune data (needs Ollama qwen3 for negatives), GPU job, comparisons
+python scripts/finetune_data.py                                   # -> data/finetune/cf80cdacecb8
+ssh crucible gpu-job submit --tenant personal --gpu 1080 --mem 7 --max-hours 2 \
+    --name bible-gte-ft --cwd "$PWD" -- scripts/finetune_job.sh cf80cdacecb8
+python scripts/eval_semantic.py --models gte-small,gte-small-ctrl,gte-small-bible --verse-only \
+    --pool pool.json --out eval.json                               # pool = unjudged candidates
+python scripts/eval_semantic.py --compare docs/semantic-eval-2026-11.json \
+    vec:gte-small-ctrl:verse vec:gte-small-bible:verse            # paired bootstrap
 ```
 
 `qwen3` needs `OLLAMA_URL` (default `http://crucible:11434`) with `qwen3-embedding:0.6b`;
@@ -256,8 +360,10 @@ Spec for the frontend agent. Router: `backend/routers/semantic.py`.
 | `translation` | `BSB` | any translation id; text falls back to BSB where that translation lacks the verse. Ranking always uses BSB vectors (one vector per verse reference) |
 | `limit` | 30 | 1-100 |
 
-Rate limit 30/min per IP (same as `/api/search`). Responses are cacheable (the existing
-middleware gives `/api/search*` a 24 h `Cache-Control`).
+Rate limit 30/min per IP (same as `/api/search`). Normal responses carry
+`Cache-Control: public, max-age=3600` and a weak `ETag` tied to the DB release and image, so a
+repeat request with `If-None-Match` gets a 304. A keyword fallback carries `no-store`, so it
+is never cached in place of real results.
 
 Response (same core shape as `/api/search`, so `result-snippet` rendering can be reused):
 
@@ -327,24 +433,26 @@ UI can hide meaning controls when `available` is false.
 
 ## Deployment notes (not done here; nothing was deployed)
 
-- `requirements.txt` gains numpy, onnxruntime, tokenizers (pinned). The Dockerfile copies
-  `data/models/`; `.dockerignore` keeps only `gte-small@5927d1727bb1/`. If the model
-  directory is empty the image still builds and the API falls back to keyword search.
-- The DB grows 12.6 MB (843 MB). **Existing risk, made slightly worse:**
-  `scripts/entrypoint.sh` copies the image DB to `bible.db.tmp` on the volume while the old
-  DB is still there, so a DB-changing deploy needs about 2x the DB size free on the 1 GB
-  volume. At 830 MB that was already impossible; check how prod deploys have been
-  succeeding (or whether the volume was grown) before shipping any DB change.
-- `/api/search*` responses get a 24 h `Cache-Control` from the existing middleware,
-  including a keyword fallback served while the model was missing.
-- Rebuild the step whenever the model, `ALPHA`, or the unit texts change (bump its version
-  in `scripts/build_db.py`). The API refuses vectors whose `model_sha256` does not match
-  the model files on disk.
+- `requirements.txt` gains numpy, onnxruntime and tokenizers (pinned).
+- **Model in the image:** CI now runs `scripts/fetch_model.py` after `fetch_db.py`. It
+  reads which model the DB's vectors were built with (`semantic_meta`) and downloads exactly
+  those files, checked against per-file sha256 pins and the DB's fingerprint. The
+  Dockerfile copies `data/models/`, and `.dockerignore` keeps only the shipped model.
+  Before round two, CI never populated `data/models/`, so a CI-built image would always
+  have served keyword fallbacks.
+- **Volume:** the DB grows 12.6 MB (843 MB). The old entrypoint could not install a DB
+  this size on a 1 GB volume; see `docs/DB_UPDATE_PATH_2026-11.md` for the fix
+  (`scripts/sync_db.py`) and the owner's commands.
+- **Caching:** `/api/search*` responses get `max-age=3600` and an ETag tied to the loaded DB
+  release and image (`backend/release.py`); `If-None-Match` returns 304. Keyword fallbacks
+  from the meaning endpoints are `no-store`. Other immutable paths keep 24 h.
+- Rebuild the `embeddings` step whenever the model, `ALPHA` or the unit texts change (bump
+  its version in `scripts/build_db.py`). The API refuses vectors whose `model_sha256` does
+  not match the model files on disk.
 
-## Found along the way
+## Found along the way (fixed in round two)
 
-- `scripts/import_naves.py` `parse_references` drops same-book continuation refs: `PSA
-  37:5; 55:22` yields only Psalm 37:5, so `naves_topic_refs` silently misses many verses
-  (here Psalm 55:22, "Cast your burden upon the LORD", under CARE, REMEDY FOR). The
-  evaluation uses its own parser (`parse_naves_refs`). Not fixed here (not this branch's
-  file).
+- `scripts/import_naves.py` dropped same-book continuation refs (`PSA 37:5; 55:22` kept only
+  37:5). Fixed: 49,399 -> 75,878 rows in `naves_topic_refs`, none lost (see the round-two
+  report). `/api/topics/for-verse` also matched any single-verse ref at or before the
+  requested verse; fixed in `backend/routers/topics.py`.

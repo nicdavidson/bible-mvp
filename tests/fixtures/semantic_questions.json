@@ -1,5 +1,5 @@
 {
- "_about": "Hand-written natural questions a church reader might type, with verses a knowledgeable reader would expect near the top. Written by the semantic-search agent (2026-11), not by users or a pastor; small and opinionated. A good answer not listed here counts as a miss, so absolute scores understate quality; use the set to compare methods, not as a grade. Round two (2026-11-13): 'pooled_refs' adds verses judged relevant in pooled judging: the union of every evaluated method's top 10 (all models incl. fine-tuned, every fusion mode, keyword baselines; 3,861 unlisted candidates), judged blind to method by four sub-agents of the same model as the author under tests/fixtures/pooled_judging_rubric.md; a 48-item random audit by the author agreed on all 48. 'refs' are unchanged; the evaluation reports both.",
+ "_about": "Hand-written natural questions a church reader might type, with verses a knowledgeable reader would expect near the top. Written by the semantic-search agent (2026-11), not by users or a pastor; small and opinionated. A good answer not listed here counts as a miss, so absolute scores understate quality; use the set to compare methods, not as a grade. Round two (2026-11-13): 'pooled_refs' adds verses judged relevant in pooled judging: the union of every evaluated method's top 10 (all models incl. fine-tuned, every fusion mode, keyword baselines; 3,861 unlisted candidates, judged blind to method by four sub-agents of the same model as the author; 75 more surfaced by the final tuning and the clean fine-tuned model were judged by the author) under tests/fixtures/pooled_judging_rubric.md; a 48-item random audit by the author agreed on all 48. 'refs' are unchanged; the evaluation reports both.",
  "questions": [
   {
    "q": "what does the Bible say about anxiety",
@@ -21,7 +21,8 @@
     "Luke 12:22",
     "John 14:27",
     "2 Timothy 1:7",
-    "Hebrews 13:6"
+    "Hebrews 13:6",
+    "1 Peter 3:14"
    ]
   },
   {
@@ -96,6 +97,7 @@
    "pooled_refs": [
     "Exodus 14:13",
     "Deuteronomy 3:22",
+    "Deuteronomy 7:18",
     "Deuteronomy 31:8",
     "1 Chronicles 28:20",
     "Psalms 34:4",
@@ -107,6 +109,7 @@
     "Isaiah 41:13",
     "Jeremiah 1:8",
     "Haggai 2:5",
+    "John 6:20",
     "Hebrews 13:6"
    ]
   },
@@ -258,6 +261,7 @@
     "1 John 3:16",
     "1 John 4:7",
     "1 John 4:10",
+    "1 John 4:12",
     "1 John 4:18",
     "1 John 4:19",
     "2 John 1:6"
@@ -332,6 +336,7 @@
     "Psalms 89:11",
     "Proverbs 16:4",
     "Isaiah 42:5",
+    "Isaiah 44:24",
     "Isaiah 45:12",
     "Isaiah 45:18",
     "Jeremiah 10:12",
@@ -479,6 +484,7 @@
     "Hebrews 4:9"
    ],
    "pooled_refs": [
+    "Exodus 33:14",
     "Psalms 116:7",
     "Psalms 127:2",
     "Proverbs 3:24",
@@ -660,6 +666,7 @@
     "1 Peter 4:1",
     "1 Peter 4:13",
     "1 Peter 4:16",
+    "1 Peter 4:19",
     "Revelation 2:10"
    ]
   },
@@ -731,6 +738,7 @@
    ],
    "pooled_refs": [
     "Deuteronomy 24:14",
+    "Job 29:12",
     "Psalms 41:1",
     "Psalms 82:3",
     "Psalms 82:4",
@@ -741,6 +749,7 @@
     "Proverbs 31:20",
     "Jeremiah 22:16",
     "Ezekiel 16:49",
+    "Matthew 6:3",
     "Luke 12:33"
    ]
   },
@@ -764,7 +773,8 @@
     "Proverbs 24:28",
     "Ecclesiastes 5:2",
     "Ecclesiastes 5:6",
-    "2 Timothy 2:14"
+    "2 Timothy 2:14",
+    "Titus 2:1"
    ]
   },
   {
@@ -926,6 +936,7 @@
     "Isaiah 49:14",
     "Mark 14:50",
     "John 16:32",
+    "Acts 17:27",
     "2 Timothy 1:15"
    ]
   },
@@ -963,6 +974,7 @@
     "Matthew 25:26",
     "Acts 20:35",
     "1 Corinthians 4:12",
+    "1 Thessalonians 2:9",
     "2 Thessalonians 3:8",
     "2 Thessalonians 3:11",
     "2 Thessalonians 3:12",
@@ -1078,6 +1090,7 @@
    "pooled_refs": [
     "Acts 2:44",
     "Romans 12:10",
+    "Romans 12:18",
     "Romans 15:5",
     "Romans 15:7",
     "2 Corinthians 13:11",
@@ -1351,6 +1364,7 @@
     "Hebrews 10:36"
    ],
    "pooled_refs": [
+    "Deuteronomy 31:6",
     "Deuteronomy 31:8",
     "Joshua 1:9",
     "Joshua 10:25",
@@ -1360,6 +1374,7 @@
     "Matthew 24:13",
     "Luke 11:8",
     "Romans 12:11",
+    "2 Thessalonians 3:13",
     "Hebrews 10:35",
     "James 1:4",
     "Revelation 2:26",
