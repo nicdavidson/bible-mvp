@@ -107,7 +107,9 @@ window.BibleModules = window.BibleModules || {};
         // ---------- lifecycle ----------
         studyInit() {
             const dlg = document.getElementById('study-view');
-            if (dlg) {
+            // init() can run twice (Alpine auto-init + x-init): bind once
+            if (dlg && !dlg.dataset.bound) {
+                dlg.dataset.bound = '1';
                 // Esc / Android back on the open dialog: step back one study location
                 dlg.addEventListener('cancel', (e) => { e.preventDefault(); this.studyBack(); });
             }
@@ -224,7 +226,11 @@ window.BibleModules = window.BibleModules || {};
             this.$nextTick(() => {
                 this.studyObservePanes();
                 this.studyScrollToSource(active, false);
-                if (active) this.studyLoadPane(active);
+                if (active) {
+                    this.studyLoadPane(active);
+                    document.querySelector(`.study-chip[data-slug="${CSS.escape(active)}"]`)
+                        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                }
                 if (!wasOpen) document.getElementById('study-title')?.focus({ preventScroll: true });
             });
         },
@@ -266,6 +272,13 @@ window.BibleModules = window.BibleModules || {};
 
         // Called first by the app's popstate handler. Returns true when handled.
         studyHandlePop(e) {
+            // The app may have more than one popstate listener; answer each event once
+            if (e && '_studyHandled' in e) return e._studyHandled;
+            const result = this._studyHandlePop(e);
+            if (e) e._studyHandled = result;
+            return result;
+        },
+        _studyHandlePop(e) {
             const params = new URLSearchParams(window.location.search);
             if (params.has('study')) {
                 this._studyDepth = e?.state?.studyDepth || 0;
