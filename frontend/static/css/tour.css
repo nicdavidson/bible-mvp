@@ -1,0 +1,108 @@
+/* The walkthrough (modules/tour.js), loaded only while it runs. One top-layer <dialog>
+   covers the screen: .tour-spot rings the control and its huge shadow is the dim layer;
+   with no control (.is-centered) the dialog itself dims. Theme tokens come from body
+   (.dark / .parchment) like everything else. */
+.tour {
+    --tour-dim: rgba(15, 23, 42, 0.6);
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    overflow: hidden;
+}
+.dark .tour { --tour-dim: rgba(0, 0, 0, 0.72); }
+.parchment .tour { --tour-dim: rgba(45, 32, 12, 0.58); }
+.tour::backdrop { background: transparent; }
+.tour.is-centered { background: var(--tour-dim); }
+
+.tour-spot {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    border-radius: 12px;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.92), 0 0 0 200vmax var(--tour-dim);
+    pointer-events: none;
+    transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+.tour.is-centered .tour-spot { display: none; }
+
+.tour-card {
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 14px 16px 12px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    transition: top 0.2s ease, left 0.2s ease;
+}
+.tour-count {
+    margin: 0 0 2px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+.tour-title {
+    margin: 0 0 4px;
+    font: 700 1.05rem/1.3 var(--font-sans);
+    color: var(--color-text);
+}
+.tour-text {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+.tour-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+.tour-actions button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    font: 600 0.92rem var(--font-sans);
+    cursor: pointer;
+}
+.tour-actions .tour-skip {
+    margin-right: auto;
+    margin-left: -10px;
+    padding: 0 10px;
+    border: 0;
+    background: none;
+    color: var(--color-text-secondary);
+}
+.tour-back {
+    border: 1px solid var(--color-border);
+    background: none;
+    color: var(--color-text);
+}
+.tour-back.is-hidden { visibility: hidden; }
+.tour-next {
+    border: 0;
+    background: var(--color-text);
+    color: var(--color-surface);
+}
+.tour-actions button:focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+}
+.tour-card[aria-busy="true"] .tour-actions button { cursor: progress; }
+
+@media (prefers-reduced-motion: reduce) {
+    .tour-spot, .tour-card { transition: none; }
+}
