@@ -192,15 +192,21 @@ def test_effective_ranges_rules():
     assert study.effective_ranges(rows, "chapter", 20) == [(1, 20)] * 4
 
 
-# The owner's library (2026-11-13): these five, in this order. The other eight were removed.
+# The owner's library (2026-11-13), in this order: the five kept after the trim plus the
+# dispensational sources added the same day. The other eight were removed.
 LIBRARY = [("scofield-notes-1917", "Scofield Notes (1917)"), ("john-gill", "John Gill"),
            ("jamieson-fausset-brown", "Jamieson-Fausset-Brown"),
-           ("tyndale-study-notes", "Tyndale Study Notes"), ("treasury-of-david", "Treasury of David")]
+           ("tyndale-study-notes", "Tyndale Study Notes"),
+           ("gaebelein-annotated-bible", "Gaebelein Annotated Bible"),
+           ("ironside-expositions", "Ironside Expositions"), ("darby-synopsis", "Darby Synopsis"),
+           ("brooks-summarized-bible", "Brooks Summarized Bible"),
+           ("mackintosh-notes-on-the-pentateuch", "Mackintosh Notes on the Pentateuch"),
+           ("larkin-on-revelation", "Larkin on Revelation"), ("treasury-of-david", "Treasury of David")]
 REMOVED = ["matthew-henry", "keil-delitzsch", "barnes-notes", "john-calvin", "john-wesley",
            "adam-clarke", "people-s-new-testament", "catena-aurea"]
 
 
-def test_real_db_has_exactly_the_five_sources_in_order():
+def test_real_db_has_exactly_the_library_in_order():
     study._cache.update(key=None, sources=None)
     client = TestClient(app)
     srcs = client.get("/api/commentary/sources").json()["sources"]

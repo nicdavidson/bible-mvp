@@ -264,6 +264,37 @@ def main():
         if debris:
             failures.append(f"{src}: {debris} entries contain page-navigation lines")
 
+    # SermonIndex sources (2026-11): conversion damage repaired at import must stay repaired,
+    # and sources imported by book allow-list must hold no other book.
+    from commentary_repair import GAP_SIGNATURE, is_isaiah_leftovers
+    by_source = {c["source"]: c for c in COMMENTARIES.values()}
+    print("\nSermonIndex repairs: 'Isaiah N' that the is->Isaiah rule would still change (must "
+          "be 0), visible traces of deleted ALL-CAPS words, SermonIndex cut notes (must be 0); "
+          "rows outside a source's book allow-list (must be 0)")
+    for src in sources:
+        cfg = by_source.get(src, {})
+        allow = cfg.get("books")
+        if allow is not None:
+            outside = conn.execute(
+                f"SELECT COUNT(*) FROM commentary_entries WHERE source = ? AND book NOT IN "
+                f"({','.join('?' * len(allow))})", (src, *allow)).fetchone()[0]
+            if outside:
+                failures.append(f"{src}: {outside} rows for books outside its allow-list")
+        if cfg.get("loader") != "sermonindex":
+            continue
+        isa = gaps = notes = 0
+        for (t,) in conn.execute(f"SELECT {SEARCH_TEXT_SQL} FROM commentary_entries "
+                                 "WHERE source = ?", (src,)):
+            isa += is_isaiah_leftovers(t or "")
+            gaps += len(GAP_SIGNATURE.findall(t or ""))
+            notes += "longer than a Bible module" in (t or "")
+        print(f"  {src:26} is->Isaiah left={isa}  deleted-caps traces={gaps}  cut notes={notes}"
+              f"  allow-list={'yes' if allow is not None else 'no'}")
+        if isa:
+            failures.append(f"{src}: {isa} 'Isaiah N' left that should read 'is N'")
+        if notes:
+            failures.append(f"{src}: {notes} SermonIndex 'entry is longer' notes left")
+
     print(f"\ncoverage = share of all 31,102 KJV verses with at least one entry; "
           f"scope = share of verses in the books the source covers")
     if commentary_pages:
