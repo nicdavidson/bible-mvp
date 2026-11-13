@@ -779,60 +779,6 @@ textarea:focus:not(:focus-visible) {
     line-height: 1.6;
 }
 
-/* Word Details Panel Enhancements */
-.word-original {
-    font-size: 2rem;
-    font-weight: 500;
-    display: block;
-    margin-bottom: 0.25rem;
-}
-
-.word-original.hebrew {
-    font-family: "SBL Hebrew", "Ezra SIL", "Times New Roman", serif;
-    direction: rtl;
-    text-align: right;
-    font-size: 2.25rem;
-}
-
-.word-original.greek {
-    font-family: "SBL Greek", "Gentium Plus", "Times New Roman", serif;
-}
-
-.word-transliteration {
-    font-style: italic;
-    color: var(--color-text-secondary);
-    font-size: 1rem;
-}
-
-.strong-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    font-family: var(--font-mono);
-    font-size: 0.8125rem;
-    font-weight: 600;
-}
-
-.strong-badge.hebrew {
-    background: #fef3c7;
-    border-color: #f59e0b;
-    color: #92400e;
-}
-
-.strong-badge.greek {
-    background: #dbeafe;
-    border-color: #3b82f6;
-    color: #1e40af;
-}
-
-.dark .strong-badge.hebrew {
-    background: #451a03;
-    border-color: #d97706;
-    color: #fcd34d;
-}
-
 /* Dark mode interlinear enhancements */
 .dark .interlinear-word {
     background: var(--color-surface);
@@ -840,37 +786,6 @@ textarea:focus:not(:focus-visible) {
 
 .dark .interlinear-word:hover {
     background: var(--color-highlight);
-}
-
-.dark .strong-badge.greek {
-    background: #1e3a5f;
-    border-color: #60a5fa;
-    color: #93c5fd;
-}
-
-.word-lang-label {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    margin-left: 0.5rem;
-}
-
-.word-pronunciation {
-    margin: 0.5rem 0;
-    color: var(--color-text-secondary);
-}
-
-.word-definition p,
-.word-extended p,
-.word-derivation p {
-    margin-top: 0.25rem;
-    line-height: 1.6;
-}
-
-.word-extended,
-.word-derivation {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-border);
 }
 
 /* Resources Panel */
@@ -1205,7 +1120,7 @@ textarea:focus:not(:focus-visible) {
     color: var(--color-text);
 }
 
-/* Word Details Panel */
+/* Word panel (quick look; contents in css/wordstudy.css) */
 .panel-word {
     position: fixed;
     bottom: 0;
@@ -1231,29 +1146,6 @@ textarea:focus:not(:focus-visible) {
     color: var(--color-text-secondary);
 }
 
-.word-header {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
-}
-
-.word-original {
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-
-.word-transliteration {
-    font-style: italic;
-    color: var(--color-text-secondary);
-}
-
-.word-strongs {
-    font-size: 0.875rem;
-    color: var(--color-primary);
-    margin-bottom: 0.25rem;
-}
-
 .word-editions {
     font-size: 0.75rem;
     color: var(--color-text-secondary);
@@ -1272,144 +1164,6 @@ textarea:focus:not(:focus-visible) {
 .dark .word-editions {
     background: rgba(251, 191, 36, 0.08);
     border-left-color: rgba(251, 191, 36, 0.3);
-}
-
-.word-parsing {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-    margin-bottom: 0.75rem;
-}
-
-.word-definition {
-    margin-bottom: 1rem;
-}
-
-/* Word Study Dashboard - Translation Variants */
-.word-glosses {
-    margin-bottom: 1rem;
-}
-
-.word-glosses strong {
-    display: block;
-    margin-bottom: 0.375rem;
-    font-size: 0.8125rem;
-}
-
-.gloss-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-}
-
-.gloss-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.2rem 0.5rem;
-    background: var(--color-surface, #f3f4f6);
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    font-size: 0.75rem;
-}
-
-.gloss-text {
-    color: var(--color-text);
-}
-
-.gloss-count {
-    color: var(--color-text-secondary);
-    font-size: 0.6875rem;
-}
-
-/* Word Study Dashboard - Book Frequency Chart */
-.word-frequency {
-    margin-bottom: 1rem;
-}
-
-.word-frequency strong {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-size: 0.8125rem;
-}
-
-.freq-chart {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.freq-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.freq-book {
-    font-size: 0.7rem;
-    color: var(--color-text-secondary);
-    width: 5.5rem;
-    flex-shrink: 0;
-    text-align: right;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.freq-bar-bg {
-    flex: 1;
-    height: 0.75rem;
-    background: var(--color-surface, #f3f4f6);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.freq-bar {
-    height: 100%;
-    background: var(--color-primary);
-    border-radius: 3px;
-    min-width: 2px;
-    opacity: 0.7;
-    transition: width 0.3s ease;
-}
-
-.freq-count {
-    font-size: 0.7rem;
-    color: var(--color-text-secondary);
-    width: 1.5rem;
-    text-align: right;
-    flex-shrink: 0;
-}
-
-.occurrence-list {
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.occurrence-list li a {
-    color: var(--color-primary);
-    text-decoration: none;
-    font-size: 0.875rem;
-}
-
-.occurrence-list li a:hover {
-    text-decoration: underline;
-}
-
-.more-occurrences {
-    color: var(--color-text-secondary);
-    font-size: 0.875rem;
-}
-
-.show-more-link {
-    color: var(--color-primary);
-    cursor: pointer;
-    text-decoration: none;
-}
-
-.show-more-link:hover {
-    text-decoration: underline;
 }
 
 /* Modal */
@@ -6021,19 +5775,6 @@ svg.action-bar-icon {
 
 .parchment .diff-word {
     background: rgba(184, 134, 11, 0.15);
-}
-
-/* Parchment: Strong's badge */
-.parchment .strong-badge.hebrew {
-    background: #f5e6b8;
-    border-color: #b8860b;
-    color: #6b4f0a;
-}
-
-.parchment .strong-badge.greek {
-    background: #e8dfc8;
-    border-color: #8b7b52;
-    color: #5a4a32;
 }
 
 /* Parchment: Auth form */

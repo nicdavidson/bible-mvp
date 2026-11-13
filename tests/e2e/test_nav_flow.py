@@ -630,9 +630,9 @@ def test_word_link_confidence(server, desktop):
     assert _app(pg, "a.selectedWord.text") == "certainly"
     assert pg.is_visible(".word-unsure")
     assert "We aren't sure which Greek word" in pg.inner_text(".word-unsure")
-    assert not pg.is_visible(".panel-word .word-original")
+    assert not pg.is_visible(".panel-word .qw-original")
     pg.click(".word-reveal")
-    assert pg.inner_text(".panel-word .word-original") == "ἀμὴν"
+    assert pg.inner_text(".panel-word .qw-original") == "ἀμὴν"
     assert "Not certain" in pg.inner_text(".word-unsure-note")
     # Function word at 0.66: shown for content words, but under the 0.7 bar for "the"
     _tap_word(pg, 2, 1)
@@ -643,7 +643,7 @@ def test_word_link_confidence(server, desktop):
     assert _app(pg, "a.selectedWord.text") == "man"
     assert not pg.is_visible(".word-unsure")
     assert not pg.is_visible(".word-unsure-note")
-    assert pg.inner_text(".panel-word .word-original") == "ἄνθρωπος"
+    assert pg.inner_text(".panel-word .qw-original") == "ἄνθρωπος"
     # BSB human alignment always shows, whatever the word
     pg.evaluate("Alpine.$data(document.body).translation = 'BSB'")
     pg.wait_for_function("document.querySelector('#verse-1').textContent.includes('Nicodemus') && !document.querySelector('#verse-3').textContent.includes('certainly')")
