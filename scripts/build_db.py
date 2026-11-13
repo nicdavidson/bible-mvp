@@ -23,6 +23,7 @@ Data sources:
     Network APIs:
         - KJV/WEB translations  (GitHub raw files)
         - Strong's lexicon      (openscriptures GitHub)
+        - KJV Strong's tags     (eBible.org eng-kjv2006 USFM, for the alignments step)
         - Commentary            (HelloAO Bible API)
         - Spurgeon devotionals  (CCEL)
 """
@@ -85,6 +86,15 @@ IMPORT_STEPS = [
         "description": "Strong's Hebrew & Greek lexicon",
         "version": "1.0",
         "script": "import_strongs.py",
+    },
+    {
+        "name": "alignments",
+        "description": "Word alignments for BSB, KJV, WEB + lemma_renderings index",
+        "version": "1.0",
+        "script": "build_alignments.py",
+        "args": ["all"],
+        "requires_data": "clear-bible",
+        "data_source": "https://github.com/Clear-Bible/Alignments",
     },
     {
         "name": "cross_refs",
@@ -296,7 +306,7 @@ def run_import_script(step):
             text=True,
             cwd=str(PROJECT_ROOT),
             env=env,
-            timeout=1800,  # 30 min timeout
+            timeout=3600,  # 60 min timeout (alignments: ~15 min on a small box)
         )
 
         if result.returncode != 0:
@@ -334,6 +344,7 @@ def count_rows(conn, step_name):
         "full_bibles": "verses",
         "web": "verses",
         "interlinear": "word_alignments",
+        "alignments": "english_word_alignments",
         "strongs": "lexicon",
         "cross_refs": "cross_references",
         "commentary_mh": "commentary_entries",
@@ -498,7 +509,8 @@ def main():
             sys.exit(1)
 
     # Network steps
-    NETWORK_STEPS = {"full_bibles", "web", "strongs", "commentary_mh", "commentary_jg", "spurgeon"}
+    NETWORK_STEPS = {"full_bibles", "web", "strongs", "alignments", "commentary_mh",
+                     "commentary_jg", "spurgeon"}
 
     # Run each step
     completed = 0

@@ -59,6 +59,8 @@ The BibleMVP source code is licensed under the **MIT License**.
 |----------|--------|--------|-------|
 | Clear-Bible Alignments | CC BY 4.0 | [Clear-Bible/Alignments](https://github.com/Clear-Bible/Alignments) | BSB word-level Hebrew/Greek alignments |
 | STEPBible Data | CC BY 4.0 | [STEPBible/STEPBible-Data](https://github.com/STEPBible/STEPBible-Data) | Hebrew/Greek interlinear with Strong's |
+| KJV with Strong's numbers (eng-kjv2006) | Public Domain | [eBible.org](https://ebible.org/find/details.php?id=eng-kjv2006) | Strong's tags and italic (supplied) words used to build KJV word alignments; text courtesy of CrossWire and eBible.org |
+| Derived alignments (KJV, WEB, BSB re-keyed) | CC BY 4.0 | this project, `scripts/build_alignments.py` | Derived from Clear-Bible alignments and STEPBible data (both CC BY 4.0); see docs/ALIGNMENT_2026-11.md |
 | OpenGNT | CC BY-SA 4.0 | [OpenGNT](https://github.com/eliranwong/OpenGNT) | Greek NT data |
 | OpenHebrewBible | CC BY 4.0 | [OpenHebrewBible](https://github.com/eliranwong/OpenHebrewBible) | Hebrew OT data |
 
