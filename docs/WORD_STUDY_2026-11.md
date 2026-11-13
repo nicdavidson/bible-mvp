@@ -17,7 +17,9 @@ Tests: `tests/test_word_study.py`.
 
 ### `GET /api/word/{strong}/study`
 
-`strong`: `G26`, `g0026`, `H2617`. 400 if malformed, 404 if the number is in
+`strong`: `G26`, `g0026`, `H2617`. `homograph` (optional): `H2617B`, or `all`;
+default the most frequent homograph (only for the 510 numbers that have more
+than one). 400 if malformed or an unknown homograph, 404 if the number is in
 neither the lexicon nor the text. Cached per process (256 lemmas, invalidated
 when the DB file changes).
 
@@ -50,13 +52,19 @@ when the DB file changes).
     "total": 116, "verses": 106, "by_testament": {"OT": 0, "NT": 116},
     "by_book": [{"book": "Matthew", "count": 1}, ...],     // canonical order
     "by_form": [{"form": "N-NS", "label": "nominative singular", "count": 36}, ...],
-    "by_edition": {"SBL": 116, "TR": 116, "Byz": 116}      // NT only
+    "by_edition": {"SBL": 116, "TR": 116, "Byz": 116},     // NT only
+    "homograph": null,          // e.g. "H2617A": counts are for this homograph
+    "homographs": [],           // [{ext, gloss, occurrences, bdb_aug, selected, url}] when > 1
+    "senses": [],               // [{ext, gloss, occurrences}]: STEPBible senses of one word
+    "note": null                // explains homograph counting when homographs is non-empty
   },
   "renderings": {
-    "source": "alignments", "min_confidence": 0.5,
+    "source": "alignments", "min_confidence": 0.5, "min_confidence_function_words": 0.7,
+    "rule": "<listing rule>",
     "verses_url": "/api/word/G26/renderings?translation={translation}&rendering={rendering}",
     "translations": {"BSB": {"total": 115, "distinct": 7,
-                             "renderings": [{"rendering": "love", "count": 109}, ...]}, // top 12
+                             "renderings": [{"rendering": "love", "count": 109}],  // listed, max 12
+                             "other": {"renderings": 6, "occurrences": 6}},
                      "KJV": {...}, "WEB": {...}}
   },
   "collocates": {
@@ -72,7 +80,7 @@ when the DB file changes).
                          "links": [{"relation": "derived_from", "source": "strongs", "detail": null}]}],
               "note": "Only relations a lexicon states; none are inferred."},
   "topics": {"source": "naves", "method": "...",
-             "items": [{"topic_id": 3094, "topic": "LOVE", "section": "L", "hits": 35,
+             "items": [{"topic_id": 3094, "topic": "LOVE", "section": "L", "hits": 35,  // rule: Method
                         "topic_verses": 260, "g2": 206.4, "url": "/api/topics/3094"}]},   // up to 8
   "cross_references": {"source": "openbible-xrefs", "method": "...",
              "items": [{"from": {"book": "2 Timothy", "chapter": 1, "verse": 7},
@@ -102,7 +110,8 @@ when the DB file changes).
 Occurrences, one row per token, canonical order, 100 per page.
 Query: `book`, `form` (a `by_form` key), `edition` (`SBL` default, `TR`,
 `Byz`; NT only), `with` (another Strong's number: only verses that contain
-both, i.e. the evidence behind a collocate), `offset`.
+both, i.e. the evidence behind a collocate), `homograph` (e.g. `H2617B`),
+`offset`.
 
 ```json
 {"strong_number": "G26", "text": "...", "filters": {...}, "total": 25, "verses": 24,
@@ -186,11 +195,37 @@ lemmas that occur: Greek 5,388 lemmas, Dodson 5,293 (98.2%), Abbott-Smith
 5,293 (98.2%); Hebrew 8,525 lemmas, BDB 8,511 (99.8%). (The Hebrew misses are
 STEPBible-only numbers such as H9033, which no lexicon has.) BDB homographs
 sharing a Strong's number (H2617 I "goodness, kindness", II "shame") are all
-shown; their order is computed (see weaknesses).
+shown, ordered by how often their STEPBible homograph occurs, then by how
+often the lemma's renderings match the entry's glosses, then in BDB's own
+order (H1817: *delet* first, then the two single-use entries by BDB id).
 
-**Renderings** come from `lemma_renderings` (links with calibrated confidence
-≥ 0.5, the alignment doc's cut for content words) and the verses for one
-rendering from the existing `/renderings` endpoint.
+**Renderings** come from `lemma_renderings`. A link counts when the reader
+would show it: content words at calibrated confidence ≥ 0.5, function words
+(the aligner's word classes: articles, prepositions, pronouns, auxiliaries…)
+at ≥ 0.7 (`alignment_store.rendering_link_ok`; the same rule builds
+`lemma_renderings` and lists verses at `/renderings`). The study then lists a
+rendering only with at least min(3, 10% of the translation's total)
+occurrences (and at least 1) and at least 1% of them; renderings made only of
+function words ("a", "me", "himself") are listed only for function-word
+lemmas. Everything else is summed in `other` ({renderings, occurrences}), so
+nothing is lost, only not listed.
+
+**Homographs and senses** (round two). TAHOT tags each word with STEPBible's
+disambiguated lemma ("extended for BDB"): `{H2617A}` ḥesed I "kindness",
+`{H2617B}` ḥesed II "shame"; TAGNT does the same for persons (`G2424G`). The
+build reads these from the source files (`aligner.sources`, the same tokens the
+alignments use) into `lemma_senses`. A letter is a **homograph**, a different
+word, when the OpenScriptures BDB has an entry for that Strong's number with
+the same letter (BDB `aug`): H2617A/B, H3581A "reptile"/B "strength",
+H1817A/B/C (C = *delet*, 86 of 88). Other letters are **senses** of one word
+(H0430G "God" / H0430J "gods"; H7965 "peace" 164, "well-being" 54,
+"greeting" 12) and stay in its counts. **510 Strong's numbers** cover two or
+more homographs that occur; 3,677 tokens belong to a smaller one.
+For those, `occurrences` counts the most frequent homograph by default
+(`homograph`, `homographs` with counts; `?homograph=H2617B` or `all`), and
+each BDB entry carries its homograph's `occurrences`. Renderings, collocates,
+topics, cross-references and samples still cover the whole Strong's number
+(noted in the payload).
 
 **Collocates ("words it travels with").** Unit: the verse, within one
 testament (Hebrew/Aramaic with Hebrew, Greek with Greek); each lemma counted
@@ -207,10 +242,28 @@ frequent words the way G² does. Top 15 stored. 4,524 lemmas have at least one.
 OpenScriptures LexicalIndex (entries under the same root). 44,054 relations
 for 13,009 lemmas.
 
-**Nave's topics.** A topic's verse list (ranges expanded) against the lemma's
-verses over all 31,102 verses: kept when they share ≥ 3 verses, more than
-chance, G² ≥ 15.13; ranked by G² (ranking by the share of the topic's verses
-favoured tiny topics: RAINBOW for nephesh). Top 8. 4,426 lemmas.
+**Nave's topics** (round two). A topic is listed when the lemma's verses and
+the topic's verse list (ranges expanded) share at least 4 verses, **spread
+over at least 3 books** (one story cannot carry it: shalom's JORAM/JEHU from
+2 Kings 9, nephesh's RAINBOW from Genesis 9), the lemma is in **at least 10%
+of the topic's verses**, more than chance with G² ≥ 15.13, and the topic is
+**not a person or place entry**. A topic counts as one when its name is the
+KJV rendering of a proper-noun lemma and at least half its verses contain that
+lemma (JORAM is about Joram; SIN is not about the wilderness of Sin): 2,054
+of 4,662 topics. Ranked by G²; top 8. 2,856 rows for 1,253 lemmas (round one:
+16,706 rows for 4,426).
+
+Checked by hand on the twelve words below and twelve more (pneuma, eirēnē,
+hamartia, nomos, zōē, elpis, metanoia, torah, mishpat, ḥaṭṭaʾt, ʾahab, qodesh).
+Before → after: shalom "PEACE; NATION; JORAM; MICAIAH; JEHU; JEZREEL;
+USURPATION; CUSHI" → "PEACE"; nephesh "ATONEMENT; ENEMY; DEFILEMENT;
+MASSACRE; WAITING; SANITATION; RAINBOW" → "WAITING" (8 of 56 verses, "my soul
+waits", in 3 books). Of about 70 topics kept for the 24 words, 3 look doubtful
+(DEACON for pistis, POLYGAMY for ʾahab, CONVERTS for logos). A 15% share would
+remove those but also LOVE (agapē), FAITH (pistis), LAW (torah) and ATONEMENT
+(ḥaṭṭaʾt). Words with no topic now: ḥesed has TRUTH and MERCY; hamartia,
+metanoia have none (SIN and REPENTANCE are large topics where the lemma is
+under 10% of the verses).
 
 **Cross-references among occurrences.** OpenBible.info pairs whose two
 verses both contain the lemma, positive votes, unordered pairs, by votes; top
@@ -240,7 +293,7 @@ reader would expect; "wrong" lists every problem seen.
 | G4102 pistis | 242 (243) | faith 224; collocates agapē, dikaiosynē, Christos, ergon, epangelia, nomos, dikaioō, Abraham; topics FAITH, JUSTIFICATION, WORKS; xref Heb 11:1 ↔ 2 Cor 5:7 | — |
 | G1343 dikaiosynē | 91 (92) | righteousness 80, justice 2; collocates logizomai, pistis, diōkō, Abraham, hamartia, nomos; Matt 6:33 ↔ Matt 5:6 | — |
 | G5485 charis | 155 (155) | grace/favor/thanks; collocates Christos, eirēnē (greetings), theos, kyrios, dōrea; topics BENEDICTIONS, GRACE OF GOD | topics TIMOTHY, ADAM; collocates reflect letter greetings more than theology |
-| H2617 ḥesed | 247 (BDB 247) | BSB loving devotion 171, KJV mercy 135 / lovingkindness 25, WEB loving kindness 163; collocates ʾemet, ʿolam, yadah, raḥamim, ʾemunah, "slow (to anger)", raḥum, ḥanun; Exod 34:6 ↔ Ps 86:15; BDB I and II both shown | count includes 2 uses of BDB II "shame" (Lev 20:17, Prov 14:34; BSB "disgrace"); topic GOD (33 of 1,588) |
+| H2617 ḥesed | 245 (+2 of ḥesed II; BDB 247) | BSB loving devotion 171, KJV mercy 135 / lovingkindness 25, WEB loving kindness 163; collocates ʾemet, ʿolam, yadah, raḥamim, ʾemunah, "slow (to anger)", raḥum, ḥanun; Exod 34:6 ↔ Ps 86:15; BDB I and II both shown round one counted 2 uses of BDB II "shame" (Lev 20:17, Prov 14:34) and showed topic GOD: both fixed in round two |
 | H7965 shalom | 237 (237) | peace 119/160/163, safely, prosperity, welfare; related shalam root family; Isa 26:3 ↔ Isa 9:6 | collocates are greeting formulas (ask, send, say, come, Jehu); topics JORAM, MICAIAH, JEHU, CUSHI (2 Kgs 9 "Is it peace?"); BSB "have you come in peace" as one rendering (5) |
 | H7307 ruaḥ | 378 (378) | spirit/wind/breath; "side" 4 is right (Ezek 42); collocates east wind, breath, waters, heart, storm; topic HOLY SPIRIT; Isa 44:3 ↔ Joel 2:28 | BSB rendering "a" 4 (alignment noise); topics LYING, MICAIAH (1 Kgs 22) |
 | H3372 yare | 315 | afraid/fear/feared/awesome; collocates ḥatat ("be dismayed"), "very", God, great; Qal jussive 82 = "do not fear"; Isa 41:10 ↔ Isa 43:1 | — |
@@ -250,23 +303,20 @@ reader would expect; "wrong" lists every problem seen.
 
 ## Known weaknesses
 
-- **Nave's topics** are the weakest section: for narrative-heavy words they
-  follow the stories the word occurs in (shalom → JORAM, JEHU), not its
-  meaning. Shown with hits/topic size so a reader can judge; consider hiding
-  topics with fewer than ~5 hits.
+- **Nave's topics** are now sparse (1,253 lemmas) and cover what Nave's
+  indexes; about 3 in 70 still look doubtful. They miss whole-Bible themes where
+  the lemma is a small share of a big topic (SIN, REPENTANCE).
 - **Collocates** reflect formulas (greetings with charis/eirēnē, "Is it
   peace?" with shalom) as much as ideas; for very frequent lemmas the strict cut
   leaves few (logos: 4). They are verse co-occurrence, not syntax.
 - **BDB depth**: of the 8,673 primary BDB entries, 6,165 (71%) are "base" in
   the OpenScriptures edition: the sense outline without the references; 2,123
   ("ref") and 384 ("done") have references. `meta.status` says which.
-- **Homographs**: counts cannot separate BDB homographs (STEPBible's lemma
-  letters are not kept in `word_alignments`), so H2617 counts include ḥesed II.
-  Homograph order uses the renderings, then the printed number, then article
-  length; H1817's three "door" entries tie and the order is not meaningful.
-- **Renderings** inherit alignment errors (function-word fragments such as "a",
-  long phrases such as "have you come in peace"). The 0.5 confidence cut is
-  the alignment doc's content-word rule; function-word lemmas would need 0.7.
+- **Homographs** are separated in counts only; collocates, topics,
+  cross-references and samples are per Strong's number. Greek sense letters
+  have no gloss in TAGNT and are not shown.
+- **Renderings** still show multi-word phrases the alignment grouped ("have you
+  come in peace" 5, WEB "after wind" 9) when they pass the evidence rule.
 - **Strong's numbering** does not always match a lexicon's lemma: the largest
   count disagreements with Abbott-Smith are G3700 (54 here, 1 there), G5552 and
   G3376; Strong's derivation lines sometimes cross languages (Salome G4539
@@ -275,12 +325,17 @@ reader would expect; "wrong" lists every problem seen.
   a few lemmas have none at all (H430 in collocate lists).
 - The study does not cover the LXX (no clean morphology; license review Trap 7).
 
-## Found while building (outside this work)
+## Found while building, and fixed in round two
 
-- `/api/passage/{ref}/interlinear` filters editions with `LIKE '%TR%'`, which
-  SQLite matches case-insensitively against "Treg": the KJV interlinear shows
-  5,194 Tregelles-only tokens in 260 chapters. Fix: the exact test in
-  `backend.word_study.edition_sql`.
-- The aligner's `SourceToken.in_edition` uses exact names, so 482 TR and 507
-  Byzantine tokens marked as displaced (`TR«3`) are not candidates for KJV/WEB
-  links.
+- `/api/passage/{ref}/interlinear` filtered editions with `LIKE '%TR%'`, which
+  SQLite matches case-insensitively against "Treg": the KJV interlinear showed
+  3,784 Tregelles-only Greek words in 260 chapters (e.g. Acts 1:6 ἠρώτων).
+  (Round one said 5,194: that count wrongly included 1,410 TR words marked as
+  displaced, which belong.) Now exact edition names (`edition_sql`); Byz and
+  SBL were never affected. Test: `tests/test_editions.py`.
+- The aligner's `SourceToken.in_edition` compared exact strings, so 482 TR and
+  507 Byzantine words that TAGNT lists as displaced ("TR«3": in the TR, three
+  words earlier, per the TAGNT header: "Editions that have words in a different
+  order are listed with the amount of displacement") could not be linked by KJV
+  or WEB. Fixed; alignments step 1.2 (full rebuild, see
+  docs/ALIGNMENT_2026-11.md).
