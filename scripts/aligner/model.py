@@ -99,6 +99,28 @@ class Aligner:
         out.append(("U", self.weights["U"] / V))
         return out
 
+    def reverse_posteriors(self, english: list, sources: list) -> list[list[float]]:
+        """Reverse direction: for each source word, P(English word j | source), j = 0..J-1
+        plus a last entry for 'no English word'. Uses p(s|e) ~ p(e|s) / p(e) (Bayes on
+        the same lexical table) with the diagonal prior, so frequent English words
+        ('the', 'of') do not win every source word."""
+        I, J = len(sources), len(english)
+        if J == 0:
+            return [[1.0] for _ in sources]
+        lam = self.p.lam
+        ep = getattr(self, "eprob", {})
+        floor = ep.get("\0", 1e-6)
+        out = []
+        for i, s in enumerate(sources):
+            row = []
+            for j, e in enumerate(english):
+                pr = math.exp(-lam * abs((i + 0.5) / I - (j + 0.5) / J))
+                row.append(self.emission(e, s) / ep.get(e, floor) * pr)
+            row.append(sum(row) * 0.05 + 1e-12)
+            z = sum(row)
+            out.append([x / z for x in row])
+        return out
+
     def emission(self, e: str, tok) -> float:
         return sum(p for _, p in self._components(e, tok))
 
@@ -124,6 +146,12 @@ class Aligner:
                 for t in toks:
                     pairs.append((e, t, 1.0 / len(toks)))
         self.vocab_size = len(evocab) + 1
+        efreq = defaultdict(float)
+        for e, _, c in pairs:
+            efreq[e] += c
+        tot = sum(efreq.values()) + self.vocab_size
+        self.eprob = {e: (c + 1) / tot for e, c in efreq.items()}
+        self.eprob["\0"] = 1 / tot
         total_null = sum(null_counts.values())
         self.null = {e: (c + 0.1) / (total_null + 0.1 * self.vocab_size)
                      for e, c in null_counts.items()}

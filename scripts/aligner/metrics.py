@@ -79,7 +79,7 @@ class Score:
         }
 
 
-def score_examples(examples, predictions, threshold=0.0):
+def score_examples(examples, predictions, threshold=0.0, word_filter=None):
     """Return {'all': Score, ('OT'|'NT'): Score, genre: Score}.
 
     predictions[k] is a list of (pos, conf) per English word; links with
@@ -89,8 +89,11 @@ def score_examples(examples, predictions, threshold=0.0):
     for ex in examples:
         pred = predictions[ex.key]
         book = ex.key[0]
-        for g, (pos, conf) in zip(ex.gold, pred):
-            p = pos if (pos is not None and conf >= threshold) else None
+        for e, g, (pos, conf) in zip(ex.english, ex.gold, pred):
+            if word_filter is not None and not word_filter(e):
+                continue
+            th = threshold(e) if callable(threshold) else threshold
+            p = pos if (pos is not None and conf >= th) else None
             for k in ("all", testament(book), BOOK_GENRE.get(book, "?"),
                       f"{testament(book)}-{BOOK_GENRE.get(book, '?')}"):
                 out[k].add(g, p)
@@ -118,10 +121,11 @@ def calibration(examples, predictions, bins=(0.0, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 
     return rows
 
 
-def threshold_curve(examples, predictions, thresholds=(0.0, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)):
+def threshold_curve(examples, predictions, thresholds=(0.0, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9),
+                    word_filter=None):
     rows = []
     for t in thresholds:
-        d = score_examples(examples, predictions, t)["all"].as_dict()
+        d = score_examples(examples, predictions, t, word_filter)["all"].as_dict()
         rows.append({"threshold": t, **{k: d[k] for k in ("precision", "recall", "f1", "pred")}})
     return rows
 

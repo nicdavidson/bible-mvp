@@ -322,3 +322,27 @@ def test_api_renderings(client):
     occ = client.get("/api/word/G26/renderings",
                      params={"translation": "WEB", "rendering": "love"}).json()
     assert occ["total"] > 50
+
+
+# --- reranker ------------------------------------------------------------------------
+
+def test_reranker_learns_to_attach_function_words():
+    from aligner.rerank import Reranker
+    from aligner.rerank import align as rerank_align
+    from aligner.rerank import training_data
+    m = Aligner(Params(em_iters=2))
+    exs = []
+    god, said = _tok(1, "H0430", gloss="God"), _tok(2, "H0559", gloss="said")
+    for i in range(40):
+        exs.append(Example(("Genesis", 2, i + 1), ["the", "god", "say"], [god, said],
+                           [frozenset({1}), frozenset({1}), frozenset({2})]))
+    m.fit(exs, log=lambda *a: None)
+    data, covered, total = training_data(m, exs)
+    assert covered == total == 120
+    rr = Reranker(epochs=3)
+    rr.fit(data, log=lambda *a: None)
+    out = rerank_align(m, rr, ["the", "god", "say"], [god, said])
+    assert [p for p, _ in out] == [1, 1, 2]
+    # constrained words keep the constrained decision
+    out = rerank_align(m, rr, ["the", "god", "say"], [god, said], [NO_LINK, None, None])
+    assert out[0][0] is None

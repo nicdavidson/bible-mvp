@@ -28,8 +28,10 @@ from aligner.data import TEST_BOOKS, split_of, ylt_examples  # noqa: E402
 from aligner.kjv import KJV_CACHE_KEY, KJV_USFM_URL  # noqa: E402
 from aligner.metrics import (calibration, error_classes, score_examples,  # noqa: E402
                              threshold_curve)
-from aligner.pipeline import (Context, bsb_rows, fit_calibrator, kjv_rows,  # noqa: E402
-                              model_rows, self_train, train, write_rows)
+from aligner.pipeline import (ClassCalibrator, Context, Predictor,  # noqa: E402
+                              bsb_rows, fit_calibrator, kjv_rows, model_rows, self_train,
+                              train, train_reranker, write_rows)
+from aligner.rerank import is_function  # noqa: E402
 from aligner.renderings import build_renderings  # noqa: E402
 from source_cache import cached_fetch_bytes  # noqa: E402
 
@@ -48,35 +50,45 @@ def kjv_zip():
     return path
 
 
-def production_model(ctx, translation):
-    """The model used to write one translation's rows, and its calibrator.
+USE_RERANK = True  # see docs/ALIGNMENT_2026-11.md, "Round two"
 
-    Trained on all clean BSB gold, then (for a translation other than BSB) one
-    round of self-training on that translation's own text. Calibrated on the
-    dev books with a model built by the same recipe without them, so the
-    calibration is out-of-sample.
+
+def reranker(ctx):
+    """One reranker for every translation, trained out-of-fold on the train+test books
+    (not dev, so dev-book calibration stays out-of-sample)."""
+    if "_reranker" not in ctx.__dict__:
+        ctx._reranker = train_reranker(ctx, ("train", "test")) if USE_RERANK else None
+    return ctx._reranker
+
+
+def production_predictor(ctx, translation):
+    """The predictor that writes one translation's rows.
+
+    HMM on all clean BSB gold, then (for a translation other than BSB) one round
+    of self-training on that translation's own text; reranker on top. Calibrated
+    on the dev books with a predictor built by the same recipe without them.
     """
     cache = ctx.__dict__.setdefault("_production", {})
     if translation not in cache:
         def recipe(splits):
             m = train(ctx, splits, with_kjv=False)
             return m if translation == "BSB" else self_train(ctx, m, splits, translation)
-        calib = fit_calibrator(recipe(("train", "test")), ctx.bsb_clean(("dev",)))
-        cache[translation] = (recipe(("train", "dev", "test")), calib)
+        rr = reranker(ctx)
+        calib = fit_calibrator(Predictor(recipe(("train", "test")), rr),
+                               ctx.bsb_clean(("dev",)))
+        cache[translation] = Predictor(recipe(("train", "dev", "test")), rr, calib)
     return cache[translation]
 
 
 def step_bsb(ctx):
-    model, calib = production_model(ctx, "BSB")
-    rows = list(bsb_rows(ctx, model, calib))
+    rows = list(bsb_rows(ctx, production_predictor(ctx, "BSB")))
     write_rows(ctx.conn, "BSB", rows)
     print(f"BSB: {len(rows)} alignments ({Counter(r[5] for r in rows)})")
 
 
 def step_kjv(ctx):
-    model, calib = production_model(ctx, "KJV")
     stats = {}
-    rows = list(kjv_rows(ctx, model, calib, stats))
+    rows = list(kjv_rows(ctx, production_predictor(ctx, "KJV"), stats))
     write_rows(ctx.conn, "KJV", rows)
     print(f"KJV: {len(rows)} alignments ({Counter(r[5] for r in rows)})")
     for (status, linked), n in sorted(stats.items()):
@@ -84,8 +96,7 @@ def step_kjv(ctx):
 
 
 def step_web(ctx):
-    model, calib = production_model(ctx, "WEB")
-    rows = list(model_rows(ctx, "WEB", model, calib))
+    rows = list(model_rows(ctx, "WEB", production_predictor(ctx, "WEB")))
     write_rows(ctx.conn, "WEB", rows)
     print(f"WEB: {len(rows)} alignments")
 
@@ -99,76 +110,85 @@ def _fmt(d):
     return {k: (round(v, 4) if isinstance(v, float) else v) for k, v in d.items()}
 
 
-def _scores(exs, preds):
-    return {k: _fmt(v.as_dict()) for k, v in sorted(score_examples(exs, preds).items())}
+def _scores(exs, preds, threshold=0.0, word_filter=None):
+    return {k: _fmt(v.as_dict()) for k, v in
+            sorted(score_examples(exs, preds, threshold, word_filter).items())}
+
+
+def _report(exs, preds, srcidx):
+    """Scores overall / content / function words, at 0 and 0.5, plus calibration."""
+    content = lambda e: not is_function(e)  # noqa: E731
+    return {
+        "all": _scores(exs, preds),
+        "at_0.5": _scores(exs, preds, 0.5)["all"],
+        "content": _scores(exs, preds, 0.0, content)["all"],
+        "content_at_0.5": _scores(exs, preds, 0.5, content)["all"],
+        "function": _scores(exs, preds, 0.0, is_function)["all"],
+        "function_at_0.5": _scores(exs, preds, 0.5, is_function)["all"],
+        "calibration": calibration(exs, preds),
+        "thresholds_content": threshold_curve(exs, preds, word_filter=content),
+        "thresholds_function": threshold_curve(exs, preds, word_filter=is_function),
+        "thresholds_all": threshold_curve(exs, preds),
+        "errors": dict(zip(("counts", "examples"), error_classes(exs, preds, srcidx))),
+    }
 
 
 def step_evaluate(ctx):
     out = {}
     t = time.time()
-    model = train(ctx, ("train",), with_kjv=False)
-    calib = fit_calibrator(model, ctx.bsb_clean(("dev",)))
 
-    def predict(exs, constraints=None):
-        return {e.key: [(p, calib(c)) for p, c in model.align(e.english, e.sources)]
-                for e in exs}
+    def done(what, d):
+        print(f"{what} ({time.time() - t:.0f}s)", {k: d["all"]["all"][k] for k in
+                                                   ("precision", "recall", "f1")}, flush=True)
 
     srcidx = lambda k: {tok.pos: tok for tok in ctx.src.get(k, [])}  # noqa: E731
     out["suspect_gold_verses"] = len(ctx.suspect)
     out["suspect_examples"] = sorted(f"{k[0]} {k[1]}:{k[2]}" for k in ctx.suspect)[:40]
+    dev = ctx.bsb_clean(("dev",))
+    rr = train_reranker(ctx, ("train",))  # never sees dev or test books
+    model = train(ctx, ("train",), with_kjv=False)
+    variants = {"hmm": Predictor(model), "rerank": Predictor(model, rr)}
+    for v in variants.values():
+        v.calib = fit_calibrator(v, dev)
 
-    # 1. Held-out BSB.
+    def run(pred, exs, constraints=None):
+        return {e.key: pred.align(e.english, e.sources) for e in exs}
+
     test_all = [e for e in ctx.bsb if split_of(e.key[0]) == "test"]
     test_clean = [e for e in test_all if e.key not in ctx.suspect]
-    preds = predict(test_all)
-    out["bsb_test_clean"] = _scores(test_clean, preds)
-    out["bsb_test_all_gold"] = _scores(test_all, preds)
-    out["bsb_calibration"] = calibration(test_clean, preds)
-    out["bsb_thresholds"] = threshold_curve(test_clean, preds)
-    c, s = error_classes(test_clean, preds, srcidx)
-    out["bsb_errors"] = {"counts": dict(c), "examples": s}
-    print(f"BSB test done ({time.time() - t:.0f}s)", out["bsb_test_clean"]["all"])
+    for name, pred in variants.items():
+        preds = run(pred, test_all)
+        out[f"bsb_{name}"] = _report(test_clean, preds, srcidx)
+        out[f"bsb_{name}_all_gold"] = _scores(test_all, preds)["all"]
+        done(f"BSB {name}", out[f"bsb_{name}"])
 
-    # 2. KJV aligned as if untagged, scored against its Strong's tags.
-    kjv_exs, resolution = ctx.kjv
-    kjv_test = [e for e in kjv_exs if e.key[0] in TEST_BOOKS]
-    preds = predict(kjv_test)
-    out["kjv_test_vs_tags"] = _scores(kjv_test, preds)
-    out["kjv_calibration"] = calibration(kjv_test, preds)
-    out["kjv_thresholds"] = threshold_curve(kjv_test, preds)
-    c, s = error_classes(kjv_test, preds, srcidx)
-    out["kjv_errors"] = {"counts": dict(c), "examples": s}
-    # 2b. The production recipe for an untagged translation: + self-training on
-    #     the KJV's own text (no tags used), calibrated on BSB dev.
-    st = self_train(ctx, model, ("train",), "KJV")
-    st_calib = fit_calibrator(st, ctx.bsb_clean(("dev",)))
-    preds = {e.key: [(p, st_calib(c)) for p, c in st.align(e.english, e.sources)]
-             for e in kjv_test}
-    out["kjv_test_selftrained"] = _scores(kjv_test, preds)
-    out["kjv_selftrained_calibration"] = calibration(kjv_test, preds)
-    out["kjv_selftrained_thresholds"] = threshold_curve(kjv_test, preds)
-    c, s = error_classes(kjv_test, preds, srcidx)
-    out["kjv_selftrained_errors"] = {"counts": dict(c), "examples": s}
-    print(f"KJV self-trained done ({time.time() - t:.0f}s)", out["kjv_test_selftrained"]["all"])
-    status = Counter(st for res in resolution.values() for st, _ in res)
-    out["kjv_tag_resolution"] = dict(status)
-    print(f"KJV test done ({time.time() - t:.0f}s)", out["kjv_test_vs_tags"]["all"])
-
-    # 3. YLT (Clear-Bible manual alignment; not in the app) as a second modern gold.
     ylt = [e for e in ylt_examples(ctx.src, ctx.vocab, log=lambda *a: None)
            if e.key[0] in TEST_BOOKS]
-    preds = predict(ylt)
-    out["ylt_test"] = _scores(ylt, preds)
-    print(f"YLT test done ({time.time() - t:.0f}s)", out["ylt_test"]["all"])
+    for name, pred in variants.items():
+        out[f"ylt_{name}"] = _report(ylt, run(pred, ylt), srcidx)
+        done(f"YLT {name}", out[f"ylt_{name}"])
+    del ylt
 
-    # 4. Does adding KJV tag data help on modern English (BSB dev)?
-    dev = ctx.bsb_clean(("dev",))
-    m2 = train(ctx, ("train",), with_kjv=True)
-    out["bsb_dev_bsb_only"] = _scores(dev, {e.key: model.align(e.english, e.sources)
-                                            for e in dev})["all"]
-    out["bsb_dev_with_kjv"] = _scores(dev, {e.key: m2.align(e.english, e.sources)
-                                            for e in dev})["all"]
-    out["calibrator"] = calib.points[:: max(1, len(calib.points) // 40)]
+    # KJV as if untagged: production recipe (self-training on KJV text, no tags).
+    kjv_exs, resolution = ctx.kjv
+    kjv_test = [e for e in kjv_exs if e.key[0] in TEST_BOOKS]
+    kjv_dev = [e for e in kjv_exs if split_of(e.key[0]) == "dev"]
+    st = self_train(ctx, model, ("train",), "KJV")
+    for name, rrk in (("hmm", None), ("rerank", rr)):
+        pred = Predictor(st, rrk)
+        pred.calib = fit_calibrator(pred, dev)
+        preds = run(pred, kjv_test)
+        out[f"kjv_{name}"] = _report(kjv_test, preds, srcidx)
+        done(f"KJV {name}", out[f"kjv_{name}"])
+        if rrk is not None:
+            # KJV-specific calibration: content words refitted on KJV tags (dev books).
+            kc = fit_calibrator(Predictor(st, rrk), kjv_dev)
+            pred.calib = ClassCalibrator(pred.calib.function, kc.content)
+            preds = run(pred, kjv_test)
+            out["kjv_rerank_kjvcalib"] = _report(kjv_test, preds, srcidx)
+            done("KJV rerank + KJV calibration", out["kjv_rerank_kjvcalib"])
+    out["kjv_tag_resolution"] = dict(Counter(s for res in resolution.values() for s, _ in res))
+    out["rerank_weights"] = dict(sorted(rr.w.items(), key=lambda kv: -abs(kv[1]))[:60])
     EVAL_PATH.write_text(json.dumps(out, indent=1, ensure_ascii=False))
     print(f"Wrote {EVAL_PATH} ({time.time() - t:.0f}s)")
 
