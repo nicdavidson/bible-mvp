@@ -339,7 +339,7 @@ def test_study_rail_shows_more_commentary_on_phones(browser, server, w, h, befor
     pg.wait_for_selector("#study-view[open] .study-chip")
     pg.wait_for_timeout(800)
     m = pg.evaluate("""() => { const r = document.querySelector('.study-chips').getBoundingClientRect();
-        const chips = [...document.querySelectorAll('.study-chip:not(.is-empty)')].map(c => c.getBoundingClientRect());
+        const chips = [...document.querySelectorAll('.study-chip')].map(c => c.getBoundingClientRect());
         return { whole: chips.filter(b => b.left >= r.left - 1 && b.right <= r.right + 1).length,
                  tools: [...document.querySelectorAll('.study-tool')].filter(t => t.offsetParent)
                         .map(t => [t.getAttribute('aria-label'), Math.round(t.getBoundingClientRect().width), Math.round(t.getBoundingClientRect().height)]) }; }""")

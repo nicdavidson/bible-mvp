@@ -86,7 +86,7 @@ def study_rail(page, tag):
     page.wait_for_selector("#study-view[open] .study-chip", timeout=15000)
     page.wait_for_timeout(1200)
     n = page.evaluate("""() => { const r = document.querySelector('.study-chips').getBoundingClientRect();
-        return [...document.querySelectorAll('.study-chip:not(.is-empty)')].map(c => c.getBoundingClientRect())
+        return [...document.querySelectorAll('.study-chip')].map(c => c.getBoundingClientRect())
             .filter(b => b.left >= r.left - 1 && b.right <= r.right + 1).length; }""")
     shoot(page, tag, "20-study-rail")
     return n

@@ -38,7 +38,7 @@ def test_select_range_study_switch_follow_ref_and_back(server, page):
     assert len(page.locator(".study-verse").all()) == 3
 
     # Every source in the library has something on John 3:16-18
-    chips = page.locator(".study-chip:not(.is-empty)")
+    chips = page.locator(".study-chip")
     slugs = [chips.nth(i).get_attribute("data-slug") for i in range(chips.count())]
     assert {"scofield-notes-1917", "john-gill", "tyndale-study-notes"} <= set(slugs)
 
@@ -119,7 +119,12 @@ def test_deep_link_to_a_removed_source_opens_the_first_available(server, page, p
     assert _path(page) == f"{path}?study={first}"   # the link is rewritten to what is shown
     assert page.evaluate("Alpine.$data(document.body).study.error") is None
     if first == "john-gill":
-        assert page.locator('.study-chip.is-empty[data-slug="scofield-notes-1917"]').count() == 1
+        # Scofield has nothing here: not a chip, but listed under All as nothing here
+        assert not page.locator('.study-chip[data-slug="scofield-notes-1917"]').count()
+        page.tap(".study-all-btn")
+        row = page.locator('#study-all li[data-slug="scofield-notes-1917"]')
+        row.wait_for()
+        assert "Nothing here" in row.inner_text()
 
 
 def test_offline_study_from_cache(server, browser):

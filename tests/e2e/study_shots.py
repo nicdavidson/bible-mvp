@@ -79,11 +79,11 @@ def run():
                 ready(page, "scofield-notes-1917")
                 shot(page, tag, "05-scofield")
 
-                # Your sources (5)
-                tap(".study-manage-btn")
-                page.wait_for_selector("#study-manage[open]")
+                # All: every source and what it has here (5)
+                tap(".study-all-btn")
+                page.wait_for_selector("#study-all[open]")
                 page.wait_for_timeout(300)
-                shot(page, tag, "06-your-sources")
+                shot(page, tag, "06-all-sources")
                 page.keyboard.press("Escape")
 
                 # Treasury of David on Psalm 23:1-3: verse expositions first, overview below
