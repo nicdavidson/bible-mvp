@@ -223,3 +223,46 @@ async navigate(ref, { kind = 'read', source = 'user' } = {}) {
 5. P1 and P2 polish.
 
 Add a Playwright regression test for each P0 (the audit scripts can be turned into `tests/e2e/`). The back-stack and race bugs are easy to reintroduce.
+
+---
+
+## Status after `v2/nav` (2026-11-13)
+
+Navigation now goes through one function, `navigate(target, { kind, source })` in
+`frontend/static/js/modules/nav.js`. `kind` is `'read'` (previous/next, picker, Recent,
+bookmarks), `'jump'` (cross-ref, search hit, topic, note link, word occurrence,
+commentary link, path to Christ, memory verse) or `'stay'` (translation switch).
+`source` is `'user'` (push), `'pop'` (Back/Forward, never touches history), `'init'` or
+`'replace'`. History entries carry `{ nav, idx, ref | plan | home, ret, scroll }`.
+The study view pushes through the same numbering (`navPushState`). References are
+canonicalized before anything changes (`BibleRef.parse`). Flow tests are in
+`tests/e2e/test_nav_flow.py`; before and after screenshots are in `docs/nav/`.
+
+| Item | Status |
+|---|---|
+| P0-1 Back re-pushes | Fixed on `ui/p0-fixes`; now structural: only `source: 'user'` pushes. Tested (Back/Forward through mixed reads and jumps, history length unchanged). |
+| P0-2 nav while a verse is selected | Fixed on `ui/p0-fixes`; `loadPassage(r)` now takes the reference as an argument and `referenceInput` no longer exists. Navigation controls, the chip and dialogs no longer count as "outside" the action bar, so leaving a jumped-to verse no longer rewrites its entry. |
+| P0-3 action bar covered | Already fixed. |
+| P0-4 plan 404 / stale error | Already fixed; plan-list readings now open the day's reading at that section instead of a single chapter. |
+| P0-5 plan-mode chapter buttons | Fixed properly: in plan reading they are **← Day / Day →** (verse buttons hidden), as are swipes and arrow keys. Moving between days doesn't mark a day read; "Complete & Next" does. |
+| P1-1 three pickers | Fixed: one picker (`<dialog id="passage-picker">`, also inline on Home), same template, same behaviour. Old pickers and their CSS deleted. |
+| P1-2 Home unreachable | Already fixed (menu + `/`); Home is now "Continue reading" plus the picker. |
+| P1-3 abbreviated refs corrupt state | Fixed client-side as well: everything is canonical before loading (URL, title, state, Recent); old Recent entries are migrated on load. |
+| P1-4 `Jude 5` | Already fixed on the server; the client parser handles it too. |
+| P1-5 cramped mobile header | Fixed: one header row with a tappable running head ("John 3 BSB ▾"); translation lives in the picker; Read aloud and Immersive move to the menu on phones. |
+| P1-6 peek chips / cross-refs lose context | Already fixed for the selection; the cross-refs tab now says whose they are ("Cross-references for John 3:16"). |
+| P1-7 search | Partly: a typed reference gets a "Go to …" row and Enter goes there; results are kept and the return chip offers "Results". **Left:** translation duplicates/labels (search API work is happening on the semantic-search branch). |
+| P1-8 Back from plan | Fixed (plan days are history entries; `/` is Home). Tested. |
+| P1-9 guest notes after sign-in | **Left:** account sync, not navigation; needs a Supabase test account. |
+| P1-10 sheet covers jumped-to verse | Fixed: a jump folds the phone sheet; tested that the target verse is in the top three quarters of the screen. |
+| P2-1 sidebar toggle over "Study" | Already fixed: "Study" is fully visible beside the toggle at 1280x800 (`docs/nav/after-1280x800-07-*.png`). |
+| P2-2 sheet tab bar overflows | Fixed: counts become dots on phones, labels don't wrap. |
+| P2-3 scroll not restored on Back | Fixed: scroll position is saved in the entry and restored on Back/Forward and on the chip. |
+| P2-4 Recent misses cached loads | Fixed: Recent is written in one place after any successful load; one line per chapter. |
+| P2-5 empty sheet on Home | Fixed (hidden on phones on Home). |
+| P2-6 red letters per verse | **Left:** needs word-level speaker data (L). |
+| P2-7 plan date picker off-screen | Fixed: scrolled into view when it opens. |
+| P2-8 two exit functions | Fixed: one `exitPlanReading()`; it keeps reading the day's chapter (or the one with the selected verse). The dead plan overlay (`planReadingMode`) is deleted. |
+| P2-9, P2-10 | Already fixed. |
+| P2-11 note-mode copy | Fixed ("Tap verses to add them to this note"). |
+| P2-12 double fetch on cached chapters | **Left:** the background refresh is what brings cross-refs and red-letter data for cached chapters; skipping it needs those cached too. |
