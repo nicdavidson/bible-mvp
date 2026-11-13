@@ -1,0 +1,3989 @@
+{
+ "suspect_gold_verses": 639,
+ "suspect_examples": [
+  "1 Chronicles 11:21",
+  "1 Chronicles 11:9",
+  "1 Chronicles 12:18",
+  "1 Chronicles 12:36",
+  "1 Chronicles 17:21",
+  "1 Chronicles 21:10",
+  "1 Chronicles 21:6",
+  "1 Chronicles 28:19",
+  "1 Chronicles 9:20",
+  "1 Chronicles 9:23",
+  "1 Chronicles 9:25",
+  "1 Corinthians 10:29",
+  "1 Corinthians 11:17",
+  "1 Corinthians 12:25",
+  "1 Corinthians 4:4",
+  "1 Corinthians 5:10",
+  "1 Corinthians 7:1",
+  "1 Corinthians 7:15",
+  "1 Corinthians 8:6",
+  "1 Corinthians 8:8",
+  "1 Corinthians 9:8",
+  "1 John 2:16",
+  "1 John 2:20",
+  "1 Kings 10:13",
+  "1 Kings 11:10",
+  "1 Kings 11:3",
+  "1 Kings 11:41",
+  "1 Kings 12:10",
+  "1 Kings 12:16",
+  "1 Kings 12:5",
+  "1 Kings 12:7",
+  "1 Kings 16:3",
+  "1 Kings 17:20",
+  "1 Kings 17:5",
+  "1 Kings 1:49",
+  "1 Kings 20:10",
+  "1 Kings 20:25",
+  "1 Kings 20:37",
+  "1 Kings 21:11",
+  "1 Kings 22:17"
+ ],
+ "bsb_hmm": {
+  "all": {
+   "NT": {
+    "precision": 0.8493,
+    "recall": 0.8422,
+    "f1": 0.8457,
+    "aer": 0.1972,
+    "aer_cap": 0.0505,
+    "null_precision": 0.4758,
+    "words": 32506,
+    "pred": 31678
+   },
+   "NT-epistle": {
+    "precision": 0.8349,
+    "recall": 0.831,
+    "f1": 0.833,
+    "aer": 0.2088,
+    "aer_cap": 0.05,
+    "null_precision": 0.0294,
+    "words": 7745,
+    "pred": 7573
+   },
+   "NT-narrative": {
+    "precision": 0.8553,
+    "recall": 0.8457,
+    "f1": 0.8505,
+    "aer": 0.2046,
+    "aer_cap": 0.0644,
+    "null_precision": 0.7859,
+    "words": 13755,
+    "pred": 13277
+   },
+   "NT-prophecy": {
+    "precision": 0.8521,
+    "recall": 0.8456,
+    "f1": 0.8488,
+    "aer": 0.1794,
+    "aer_cap": 0.0331,
+    "null_precision": 0.0521,
+    "words": 11006,
+    "pred": 10828
+   },
+   "OT": {
+    "precision": 0.8057,
+    "recall": 0.7923,
+    "f1": 0.799,
+    "aer": 0.224,
+    "aer_cap": 0.0285,
+    "null_precision": 0.0455,
+    "words": 53898,
+    "pred": 52828
+   },
+   "OT-narrative": {
+    "precision": 0.8228,
+    "recall": 0.815,
+    "f1": 0.8189,
+    "aer": 0.213,
+    "aer_cap": 0.0388,
+    "null_precision": 0.0152,
+    "words": 20248,
+    "pred": 19990
+   },
+   "OT-poetry": {
+    "precision": 0.7836,
+    "recall": 0.7642,
+    "f1": 0.7738,
+    "aer": 0.2432,
+    "aer_cap": 0.0217,
+    "null_precision": 0.0625,
+    "words": 21805,
+    "pred": 21187
+   },
+   "OT-prophecy": {
+    "precision": 0.8166,
+    "recall": 0.8052,
+    "f1": 0.8109,
+    "aer": 0.208,
+    "aer_cap": 0.0231,
+    "null_precision": 0.0667,
+    "words": 11845,
+    "pred": 11651
+   },
+   "all": {
+    "precision": 0.8221,
+    "recall": 0.8109,
+    "f1": 0.8165,
+    "aer": 0.2138,
+    "aer_cap": 0.0368,
+    "null_precision": 0.3728,
+    "words": 86404,
+    "pred": 84506
+   },
+   "epistle": {
+    "precision": 0.8349,
+    "recall": 0.831,
+    "f1": 0.833,
+    "aer": 0.2088,
+    "aer_cap": 0.05,
+    "null_precision": 0.0294,
+    "words": 7745,
+    "pred": 7573
+   },
+   "narrative": {
+    "precision": 0.8358,
+    "recall": 0.8273,
+    "f1": 0.8315,
+    "aer": 0.2096,
+    "aer_cap": 0.0492,
+    "null_precision": 0.6565,
+    "words": 34003,
+    "pred": 33267
+   },
+   "poetry": {
+    "precision": 0.7836,
+    "recall": 0.7642,
+    "f1": 0.7738,
+    "aer": 0.2432,
+    "aer_cap": 0.0217,
+    "null_precision": 0.0625,
+    "words": 21805,
+    "pred": 21187
+   },
+   "prophecy": {
+    "precision": 0.8337,
+    "recall": 0.8246,
+    "f1": 0.8291,
+    "aer": 0.1942,
+    "aer_cap": 0.028,
+    "null_precision": 0.0556,
+    "words": 22851,
+    "pred": 22479
+   }
+  },
+  "at_0.5": {
+   "precision": 0.8659,
+   "recall": 0.7662,
+   "f1": 0.813,
+   "aer": 0.2187,
+   "aer_cap": 0.0368,
+   "null_precision": 0.4993,
+   "words": 86404,
+   "pred": 75801
+  },
+  "content": {
+   "precision": 0.8706,
+   "recall": 0.861,
+   "f1": 0.8658,
+   "aer": 0.1681,
+   "aer_cap": 0.0389,
+   "null_precision": 0.3607,
+   "words": 41122,
+   "pred": 40329
+  },
+  "content_at_0.5": {
+   "precision": 0.9081,
+   "recall": 0.8252,
+   "f1": 0.8647,
+   "aer": 0.1705,
+   "aer_cap": 0.0389,
+   "null_precision": 0.4721,
+   "words": 41122,
+   "pred": 37060
+  },
+  "function": {
+   "precision": 0.7778,
+   "recall": 0.7654,
+   "f1": 0.7715,
+   "aer": 0.2556,
+   "aer_cap": 0.0349,
+   "null_precision": 0.3832,
+   "words": 45282,
+   "pred": 44177
+  },
+  "function_at_0.5": {
+   "precision": 0.8256,
+   "recall": 0.7126,
+   "f1": 0.7649,
+   "aer": 0.2637,
+   "aer_cap": 0.0349,
+   "null_precision": 0.5228,
+   "words": 45282,
+   "pred": 38741
+  },
+  "calibration": [
+   {
+    "bin": "0.00-0.30",
+    "links": 1440,
+    "mean_conf": 0.2176719179171517,
+    "accuracy": 0.32430555555555557
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 7265,
+    "mean_conf": 0.4245278452429047,
+    "accuracy": 0.4631796283551273
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 6083,
+    "mean_conf": 0.5525780220995914,
+    "accuracy": 0.5765247410817032
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 5013,
+    "mean_conf": 0.6418065059618149,
+    "accuracy": 0.6598843008178735
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 9071,
+    "mean_conf": 0.741735841665154,
+    "accuracy": 0.7600044096571491
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 10898,
+    "mean_conf": 0.8527802243411351,
+    "accuracy": 0.8605248669480638
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 22213,
+    "mean_conf": 0.9231371781191914,
+    "accuracy": 0.931796695628686
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 22523,
+    "mean_conf": 0.9686867023106513,
+    "accuracy": 0.9702526306442304
+   }
+  ],
+  "calibration_content": [
+   {
+    "bin": "0.00-0.30",
+    "links": 501,
+    "mean_conf": 0.21125083236495748,
+    "accuracy": 0.3153692614770459
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 2768,
+    "mean_conf": 0.4365034528022079,
+    "accuracy": 0.46965317919075145
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 2026,
+    "mean_conf": 0.5635706217523923,
+    "accuracy": 0.5844027640671273
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 1882,
+    "mean_conf": 0.6414643659504313,
+    "accuracy": 0.6965993623804463
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 2923,
+    "mean_conf": 0.750366684886257,
+    "accuracy": 0.7817310981867944
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 2066,
+    "mean_conf": 0.8561847041008966,
+    "accuracy": 0.8765730880929332
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 7462,
+    "mean_conf": 0.9265454062230845,
+    "accuracy": 0.9323237737871884
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 20701,
+    "mean_conf": 0.9692087812039176,
+    "accuracy": 0.9712091203323511
+   }
+  ],
+  "calibration_function": [
+   {
+    "bin": "0.00-0.30",
+    "links": 939,
+    "mean_conf": 0.22109786452167776,
+    "accuracy": 0.329073482428115
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 4497,
+    "mean_conf": 0.4171566018085824,
+    "accuracy": 0.4591950189014899
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 4057,
+    "mean_conf": 0.5470884961206466,
+    "accuracy": 0.5725905841754991
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 3131,
+    "mean_conf": 0.6420121615036282,
+    "accuracy": 0.6378153944426701
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 6148,
+    "mean_conf": 0.7376324007518051,
+    "accuracy": 0.7496746909564086
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 8832,
+    "mean_conf": 0.8519838412813933,
+    "accuracy": 0.8567708333333334
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 14751,
+    "mean_conf": 0.921413078186207,
+    "accuracy": 0.9315300657582537
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 1822,
+    "mean_conf": 0.9627550035348668,
+    "accuracy": 0.9593852908891328
+   }
+  ],
+  "thresholds_content": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8706141982196435,
+    "recall": 0.8609646649174861,
+    "f1": 0.865762544692393,
+    "pred": 40329
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8775986742994878,
+    "recall": 0.8570903116647458,
+    "f1": 0.8672232629110893,
+    "pred": 39828
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8898697688783651,
+    "recall": 0.8478212893259116,
+    "f1": 0.8683367865888114,
+    "pred": 38854
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.9080679978413384,
+    "recall": 0.8252127216105539,
+    "f1": 0.8646600120758983,
+    "pred": 37060
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.9267854084603528,
+    "recall": 0.7961795934381207,
+    "f1": 0.8565323484798522,
+    "pred": 35034
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9398527992277992,
+    "recall": 0.7640322699296241,
+    "f1": 0.8428712482923728,
+    "pred": 33152
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9551424129147508,
+    "recall": 0.7080012751036021,
+    "f1": 0.8132094071257571,
+    "pred": 30229
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9609061534637645,
+    "recall": 0.663593340035801,
+    "f1": 0.7850429333952194,
+    "pred": 28163
+   }
+  ],
+  "thresholds_function": [
+   {
+    "threshold": 0.0,
+    "precision": 0.7777576566991874,
+    "recall": 0.7654384245232578,
+    "f1": 0.7715488688036827,
+    "pred": 44177
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.7875017345853185,
+    "recall": 0.7585546248440563,
+    "f1": 0.7727571885709099,
+    "pred": 43238
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8029632480277082,
+    "recall": 0.7437176973801461,
+    "f1": 0.7722057735011102,
+    "pred": 41576
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8256111096770863,
+    "recall": 0.7125512386383889,
+    "f1": 0.7649260424015593,
+    "pred": 38741
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8552070118786761,
+    "recall": 0.6608002138656212,
+    "f1": 0.7455386316794853,
+    "pred": 34684
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.8767787532088867,
+    "recall": 0.6163117091427553,
+    "f1": 0.7238262189139337,
+    "pred": 31553
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9075378862428656,
+    "recall": 0.5136339333452148,
+    "f1": 0.6559970409571366,
+    "pred": 25405
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9345924093404936,
+    "recall": 0.3450588130458029,
+    "f1": 0.504026943915654,
+    "pred": 16573
+   }
+  ],
+  "thresholds_all": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8220718055522684,
+    "recall": 0.810911765049201,
+    "f1": 0.8164536506537388,
+    "pred": 84506
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8307008884501481,
+    "recall": 0.805460551658126,
+    "f1": 0.8178860343141612,
+    "pred": 83066
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8449459157030959,
+    "recall": 0.793274113156451,
+    "f1": 0.8182951131554075,
+    "pred": 80430
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8659252516457566,
+    "recall": 0.7661814658744703,
+    "f1": 0.8130055118597881,
+    "pred": 75801
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8911758799736079,
+    "recall": 0.7252448376892459,
+    "f1": 0.7996936680674703,
+    "pred": 69718
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9090951240244185,
+    "recall": 0.6866311034329804,
+    "f1": 0.7823559923923018,
+    "pred": 64705
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9334040335046914,
+    "recall": 0.6061585871201952,
+    "f1": 0.7350020877122213,
+    "pred": 55634
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.951157904148784,
+    "recall": 0.4966907516137693,
+    "f1": 0.6525976764694605,
+    "pred": 44736
+   }
+  ],
+  "errors": {
+   "counts": {
+    "wrong source word": 5991,
+    "same lemma, wrong occurrence": 651,
+    "spurious (link, gold has none)": 461,
+    "adjacent source word": 7933,
+    "missed (no link, gold has one)": 1624
+   },
+   "examples": {
+    "wrong source word": [
+     "Ruth 1:1 'ruled' pred וַ/יְהִ֥י#5 (0.49) gold שְׁפֹ֣ט#3",
+     "Ruth 1:1 'went' pred יְהוּדָ֗ה#12 (0.49) gold וַ/יֵּ֨לֶךְ#8",
+     "Ruth 1:3 'Then' pred וַ/יָּ֥מָת#1 (0.64) gold נָעֳמִ֑י#4",
+     "Ruth 1:5 'and' pred וְ/כִלְי֑וֹן#5 (0.53) gold הָֽ/אִשָּׁ֔ה#7",
+     "Ruth 1:5 'Naomi' pred וְ/כִלְי֑וֹן#5 (0.57) gold הָֽ/אִשָּׁ֔ה#7",
+     "Ruth 1:5 'without' pred וַ/תִּשָּׁאֵר֙#6 (0.35) gold מִ/שְּׁנֵ֥י#8"
+    ],
+    "same lemma, wrong occurrence": [
+     "Ruth 1:1 'there' pred וַ/יְהִ֥י#5 (0.91) gold וַ/יְהִ֗י#1",
+     "Ruth 1:1 'was' pred וַ/יְהִ֥י#5 (0.78) gold וַ/יְהִ֗י#1",
+     "Ruth 1:2 'Bethlehem' pred מִ/בֵּ֥ית#13 (0.49) gold לֶ֖חֶם#14",
+     "Ruth 1:6 'the' pred בִּ/שְׂדֵ֣ה#9 (0.54) gold מִ/שְּׂדֵ֣י#5",
+     "Ruth 1:6 'land' pred בִּ/שְׂדֵ֣ה#9 (0.60) gold מִ/שְּׂדֵ֣י#5",
+     "Ruth 1:6 'of' pred מוֹאָ֔ב#10 (0.60) gold מוֹאָ֑ב#6"
+    ],
+    "spurious (link, gold has none)": [
+     "Ruth 1:1 'And' pred וַ/יֵּ֨לֶךְ#8 (0.71) gold -",
+     "Ruth 1:1 'a' pred אִ֜ישׁ#9 (0.92) gold -",
+     "Ruth 1:1 'certain' pred אִ֜ישׁ#9 (0.95) gold -",
+     "Ruth 1:1 'man' pred אִ֜ישׁ#9 (0.96) gold -",
+     "Ruth 2:6 'She' pred הִ֔יא#9 (0.56) gold -",
+     "Ruth 2:6 'is' pred הִ֔יא#9 (0.54) gold -"
+    ],
+    "adjacent source word": [
+     "Ruth 1:2 'of' pred וְ/שֵׁ֥ם#7 (0.50) gold שְׁנֵֽי\\־#8",
+     "Ruth 1:2 'settled' pred שָֽׁם\\׃#20 (0.48) gold וַ/יִּֽהְיוּ\\־#19",
+     "Ruth 1:3 'and' pred וַ/תִּשָּׁאֵ֥ר#5 (0.66) gold הִ֖יא#6",
+     "Ruth 1:3 'she' pred וַ/תִּשָּׁאֵ֥ר#5 (0.82) gold הִ֖יא#6",
+     "Ruth 1:3 'with' pred הִ֖יא#6 (0.54) gold וּ/שְׁנֵ֥י#7",
+     "Ruth 1:3 'her' pred הִ֖יא#6 (0.71) gold וּ/שְׁנֵ֥י#7"
+    ],
+    "missed (no link, gold has one)": [
+     "Ruth 1:2 'They' pred - (0.48) gold אֶפְרָתִ֔ים#12",
+     "Ruth 1:5 'sons' pred - (0.53) gold יְלָדֶ֖י/הָ#9",
+     "Ruth 1:7 'leading' pred - (0.49) gold לָ/שׁ֖וּב#12",
+     "Ruth 1:9 'new' pred - (0.60) gold אִישָׁ֑/הּ#8",
+     "Ruth 1:17 'anything' pred - (0.56) gold הַ/מָּ֔וֶת#13",
+     "Ruth 1:19 'women' pred - (0.38) gold וַ/תֹּאמַ֖רְנָה#15"
+    ]
+   }
+  }
+ },
+ "bsb_hmm_all_gold": {
+  "precision": 0.8131,
+  "recall": 0.8019,
+  "f1": 0.8074,
+  "aer": 0.2226,
+  "aer_cap": 0.037,
+  "null_precision": 0.3688,
+  "words": 88547,
+  "pred": 86600
+ },
+ "bsb_rerank": {
+  "all": {
+   "NT": {
+    "precision": 0.8558,
+    "recall": 0.8644,
+    "f1": 0.8601,
+    "aer": 0.1832,
+    "aer_cap": 0.0505,
+    "null_precision": 0.4311,
+    "words": 32506,
+    "pred": 32265
+   },
+   "NT-epistle": {
+    "precision": 0.8374,
+    "recall": 0.8524,
+    "f1": 0.8449,
+    "aer": 0.197,
+    "aer_cap": 0.05,
+    "null_precision": 0.0,
+    "words": 7745,
+    "pred": 7745
+   },
+   "NT-narrative": {
+    "precision": 0.863,
+    "recall": 0.8686,
+    "f1": 0.8658,
+    "aer": 0.1898,
+    "aer_cap": 0.0644,
+    "null_precision": 0.737,
+    "words": 13755,
+    "pred": 13514
+   },
+   "NT-prophecy": {
+    "precision": 0.86,
+    "recall": 0.8676,
+    "f1": 0.8638,
+    "aer": 0.1648,
+    "aer_cap": 0.0331,
+    "null_precision": 0.0,
+    "words": 11006,
+    "pred": 11006
+   },
+   "OT": {
+    "precision": 0.8275,
+    "recall": 0.8302,
+    "f1": 0.8288,
+    "aer": 0.1947,
+    "aer_cap": 0.0285,
+    "null_precision": 0.0,
+    "words": 53898,
+    "pred": 53897
+   },
+   "OT-narrative": {
+    "precision": 0.8448,
+    "recall": 0.8476,
+    "f1": 0.8462,
+    "aer": 0.1866,
+    "aer_cap": 0.0388,
+    "null_precision": 0.0,
+    "words": 20248,
+    "pred": 20248
+   },
+   "OT-poetry": {
+    "precision": 0.8077,
+    "recall": 0.8106,
+    "f1": 0.8092,
+    "aer": 0.2084,
+    "aer_cap": 0.0217,
+    "null_precision": 0.0,
+    "words": 21805,
+    "pred": 21804
+   },
+   "OT-prophecy": {
+    "precision": 0.8344,
+    "recall": 0.8365,
+    "f1": 0.8354,
+    "aer": 0.1839,
+    "aer_cap": 0.0231,
+    "null_precision": 0.0,
+    "words": 11845,
+    "pred": 11845
+   },
+   "all": {
+    "precision": 0.8381,
+    "recall": 0.8429,
+    "f1": 0.8405,
+    "aer": 0.1903,
+    "aer_cap": 0.0368,
+    "null_precision": 0.3279,
+    "words": 86404,
+    "pred": 86162
+   },
+   "epistle": {
+    "precision": 0.8374,
+    "recall": 0.8524,
+    "f1": 0.8449,
+    "aer": 0.197,
+    "aer_cap": 0.05,
+    "null_precision": 0.0,
+    "words": 7745,
+    "pred": 7745
+   },
+   "narrative": {
+    "precision": 0.8521,
+    "recall": 0.856,
+    "f1": 0.854,
+    "aer": 0.1879,
+    "aer_cap": 0.0492,
+    "null_precision": 0.6132,
+    "words": 34003,
+    "pred": 33762
+   },
+   "poetry": {
+    "precision": 0.8077,
+    "recall": 0.8106,
+    "f1": 0.8092,
+    "aer": 0.2084,
+    "aer_cap": 0.0217,
+    "null_precision": 0.0,
+    "words": 21805,
+    "pred": 21804
+   },
+   "prophecy": {
+    "precision": 0.8467,
+    "recall": 0.8514,
+    "f1": 0.849,
+    "aer": 0.1746,
+    "aer_cap": 0.028,
+    "null_precision": 0.0,
+    "words": 22851,
+    "pred": 22851
+   }
+  },
+  "at_0.5": {
+   "precision": 0.8631,
+   "recall": 0.8217,
+   "f1": 0.8419,
+   "aer": 0.1898,
+   "aer_cap": 0.0368,
+   "null_precision": 0.419,
+   "words": 86404,
+   "pred": 81564
+  },
+  "content": {
+   "precision": 0.8768,
+   "recall": 0.8818,
+   "f1": 0.8793,
+   "aer": 0.1548,
+   "aer_cap": 0.0389,
+   "null_precision": 0.3138,
+   "words": 41122,
+   "pred": 41015
+  },
+  "content_at_0.5": {
+   "precision": 0.8985,
+   "recall": 0.8665,
+   "f1": 0.8822,
+   "aer": 0.1527,
+   "aer_cap": 0.0389,
+   "null_precision": 0.3988,
+   "words": 41122,
+   "pred": 39331
+  },
+  "function": {
+   "precision": 0.803,
+   "recall": 0.8076,
+   "f1": 0.8053,
+   "aer": 0.2228,
+   "aer_cap": 0.0349,
+   "null_precision": 0.3401,
+   "words": 45282,
+   "pred": 45147
+  },
+  "function_at_0.5": {
+   "precision": 0.8302,
+   "recall": 0.7811,
+   "f1": 0.8049,
+   "aer": 0.224,
+   "aer_cap": 0.0349,
+   "null_precision": 0.4365,
+   "words": 45282,
+   "pred": 42233
+  },
+  "calibration": [
+   {
+    "bin": "0.00-0.30",
+    "links": 639,
+    "mean_conf": 0.24306450522152648,
+    "accuracy": 0.30985915492957744
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 3959,
+    "mean_conf": 0.41742046192036764,
+    "accuracy": 0.4086890628946704
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 6606,
+    "mean_conf": 0.5407596362298666,
+    "accuracy": 0.5522252497729337
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 6939,
+    "mean_conf": 0.6423825495050729,
+    "accuracy": 0.6587404525147715
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 9869,
+    "mean_conf": 0.7636697809396849,
+    "accuracy": 0.7804235484851555
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 15741,
+    "mean_conf": 0.860473157082257,
+    "accuracy": 0.8812019566736548
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 18592,
+    "mean_conf": 0.9295461215058988,
+    "accuracy": 0.9391135972461274
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 23817,
+    "mean_conf": 0.96971761764301,
+    "accuracy": 0.9718268463702397
+   }
+  ],
+  "calibration_content": [
+   {
+    "bin": "0.00-0.30",
+    "links": 308,
+    "mean_conf": 0.22267609159349128,
+    "accuracy": 0.3051948051948052
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 1376,
+    "mean_conf": 0.37665299597224144,
+    "accuracy": 0.3859011627906977
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1615,
+    "mean_conf": 0.5460529779367579,
+    "accuracy": 0.5145510835913313
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 3837,
+    "mean_conf": 0.638291980921058,
+    "accuracy": 0.6421683606984624
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 2399,
+    "mean_conf": 0.7619098279606116,
+    "accuracy": 0.7890787828261776
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 2429,
+    "mean_conf": 0.8537165837881471,
+    "accuracy": 0.8752573075339646
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 7622,
+    "mean_conf": 0.9345898790888649,
+    "accuracy": 0.9399107845709788
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 21429,
+    "mean_conf": 0.9710699444680855,
+    "accuracy": 0.9734005319893602
+   }
+  ],
+  "calibration_function": [
+   {
+    "bin": "0.00-0.30",
+    "links": 331,
+    "mean_conf": 0.26203620128628385,
+    "accuracy": 0.31419939577039274
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 2583,
+    "mean_conf": 0.4391378576403144,
+    "accuracy": 0.42082849399922573
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 4991,
+    "mean_conf": 0.5390468037600964,
+    "accuracy": 0.5644159487076739
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 3102,
+    "mean_conf": 0.6474423533918754,
+    "accuracy": 0.6792392005157962
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 7470,
+    "mean_conf": 0.7642349920771421,
+    "accuracy": 0.7776439089692102
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 13312,
+    "mean_conf": 0.8617060083841983,
+    "accuracy": 0.8822866586538461
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 10970,
+    "mean_conf": 0.9260416985070453,
+    "accuracy": 0.938559708295351
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 2388,
+    "mean_conf": 0.9575823531812894,
+    "accuracy": 0.9577051926298158
+   }
+  ],
+  "thresholds_content": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8768011703035474,
+    "recall": 0.8818322257914225,
+    "f1": 0.8793095016871241,
+    "pred": 41015
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8811260962488024,
+    "recall": 0.8795272308182732,
+    "f1": 0.8803259375613587,
+    "pred": 40707
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8959065510353721,
+    "recall": 0.8688850199847968,
+    "f1": 0.8821889159986058,
+    "pred": 39551
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8984516030611985,
+    "recall": 0.8665064613422917,
+    "f1": 0.8821899340922709,
+    "pred": 39331
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.9148902322621699,
+    "recall": 0.8461293249307276,
+    "f1": 0.8791673567142694,
+    "pred": 37716
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9457776203547921,
+    "recall": 0.7857090311664746,
+    "f1": 0.8583444950442005,
+    "pred": 33879
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9577191867852605,
+    "recall": 0.7392903558029474,
+    "f1": 0.8344473505763828,
+    "pred": 31480
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.964613954769199,
+    "recall": 0.6871582354527844,
+    "f1": 0.8025833428800551,
+    "pred": 29051
+   }
+  ],
+  "thresholds_function": [
+   {
+    "threshold": 0.0,
+    "precision": 0.802976941989501,
+    "recall": 0.8076100516841918,
+    "f1": 0.8052868328983173,
+    "pred": 45147
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8065869332381292,
+    "recall": 0.8052931741222599,
+    "f1": 0.80593953446892,
+    "pred": 44816
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.812340377443779,
+    "recall": 0.8007039743361255,
+    "f1": 0.8064802037404777,
+    "pred": 44245
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8301801908460209,
+    "recall": 0.7810773480662984,
+    "f1": 0.8048805684048622,
+    "pred": 42233
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.865796681166425,
+    "recall": 0.718321154874354,
+    "f1": 0.7851942043102399,
+    "pred": 37242
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.8827475102519039,
+    "recall": 0.6713821065763679,
+    "f1": 0.7626917042061042,
+    "pred": 34140
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9121859767529059,
+    "recall": 0.5419711281411513,
+    "f1": 0.6799519271080802,
+    "pred": 26670
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9419823326845336,
+    "recall": 0.28031990732489753,
+    "f1": 0.43206400439515164,
+    "pred": 13358
+   }
+  ],
+  "thresholds_all": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8381188923191198,
+    "recall": 0.8429420210344465,
+    "f1": 0.8405235376620052,
+    "pred": 86162
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8420658770155397,
+    "recall": 0.8406307999393012,
+    "f1": 0.841347726529277,
+    "pred": 85523
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8517829013318058,
+    "recall": 0.8331601862984277,
+    "f1": 0.8423686306907032,
+    "pred": 83796
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8631013682506988,
+    "recall": 0.8217441548284677,
+    "f1": 0.8419151722447125,
+    "pred": 81564
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8904986792603858,
+    "recall": 0.7791616570754882,
+    "f1": 0.8311180561175893,
+    "pred": 74958
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9141416368955733,
+    "recall": 0.7258051337123114,
+    "f1": 0.8091588152620893,
+    "pred": 68019
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.936835769561479,
+    "recall": 0.6359009676779231,
+    "f1": 0.7575772324936204,
+    "pred": 58150
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9574854394114457,
+    "recall": 0.47398708984580185,
+    "f1": 0.6340823560642733,
+    "pred": 42409
+   }
+  ],
+  "errors": {
+   "counts": {
+    "wrong source word": 5833,
+    "same lemma, wrong occurrence": 615,
+    "spurious (link, gold has none)": 494,
+    "adjacent source word": 7006,
+    "missed (no link, gold has one)": 1
+   },
+   "examples": {
+    "wrong source word": [
+     "Ruth 1:1 'ruled' pred וַ/יְהִ֥י#5 (0.62) gold שְׁפֹ֣ט#3",
+     "Ruth 1:1 'went' pred יְהוּדָ֗ה#12 (0.53) gold וַ/יֵּ֨לֶךְ#8",
+     "Ruth 1:3 'Then' pred וַ/יָּ֥מָת#1 (0.50) gold נָעֳמִ֑י#4",
+     "Ruth 1:5 'and' pred וְ/כִלְי֑וֹן#5 (0.80) gold הָֽ/אִשָּׁ֔ה#7",
+     "Ruth 1:5 'Naomi' pred וְ/כִלְי֑וֹן#5 (0.83) gold הָֽ/אִשָּׁ֔ה#7",
+     "Ruth 1:5 'without' pred וַ/תִּשָּׁאֵר֙#6 (0.62) gold מִ/שְּׁנֵ֥י#8"
+    ],
+    "same lemma, wrong occurrence": [
+     "Ruth 1:1 'there' pred וַ/יְהִ֥י#5 (0.89) gold וַ/יְהִ֗י#1",
+     "Ruth 1:1 'was' pred וַ/יְהִ֥י#5 (0.65) gold וַ/יְהִ֗י#1",
+     "Ruth 1:2 'Bethlehem' pred מִ/בֵּ֥ית#13 (0.55) gold לֶ֖חֶם#14",
+     "Ruth 1:6 'the' pred בִּ/שְׂדֵ֣ה#9 (0.58) gold מִ/שְּׂדֵ֣י#5",
+     "Ruth 1:6 'land' pred בִּ/שְׂדֵ֣ה#9 (0.38) gold מִ/שְּׂדֵ֣י#5",
+     "Ruth 1:6 'of' pred מוֹאָ֔ב#10 (0.65) gold מוֹאָ֑ב#6"
+    ],
+    "spurious (link, gold has none)": [
+     "Ruth 1:1 'And' pred אִ֜ישׁ#9 (0.58) gold -",
+     "Ruth 1:1 'a' pred אִ֜ישׁ#9 (0.86) gold -",
+     "Ruth 1:1 'certain' pred אִ֜ישׁ#9 (0.92) gold -",
+     "Ruth 1:1 'man' pred אִ֜ישׁ#9 (0.98) gold -",
+     "Ruth 2:6 'She' pred הִ֔יא#9 (0.65) gold -",
+     "Ruth 2:6 'is' pred הִ֔יא#9 (0.72) gold -"
+    ],
+    "adjacent source word": [
+     "Ruth 1:2 'and' pred שָֽׁם\\׃#20 (0.58) gold וַ/יִּֽהְיוּ\\־#19",
+     "Ruth 1:2 'settled' pred שָֽׁם\\׃#20 (0.38) gold וַ/יִּֽהְיוּ\\־#19",
+     "Ruth 1:3 'and' pred וַ/תִּשָּׁאֵ֥ר#5 (0.87) gold הִ֖יא#6",
+     "Ruth 1:3 'she' pred וַ/תִּשָּׁאֵ֥ר#5 (0.88) gold הִ֖יא#6",
+     "Ruth 1:3 'with' pred הִ֖יא#6 (0.47) gold וּ/שְׁנֵ֥י#7",
+     "Ruth 1:3 'her' pred הִ֖יא#6 (0.72) gold וּ/שְׁנֵ֥י#7"
+    ],
+    "missed (no link, gold has one)": [
+     "Job 17:15 'for' pred - (0.47) gold וְ֝/תִקְוָתִ֗/י#4"
+    ]
+   }
+  }
+ },
+ "bsb_rerank_all_gold": {
+  "precision": 0.8289,
+  "recall": 0.8336,
+  "f1": 0.8312,
+  "aer": 0.1994,
+  "aer_cap": 0.037,
+  "null_precision": 0.3244,
+  "words": 88547,
+  "pred": 88305
+ },
+ "ylt_hmm": {
+  "all": {
+   "NT": {
+    "precision": 0.8241,
+    "recall": 0.8547,
+    "f1": 0.8391,
+    "aer": 0.164,
+    "aer_cap": 0.0038,
+    "null_precision": 0.1981,
+    "words": 36259,
+    "pred": 35279
+   },
+   "NT-epistle": {
+    "precision": 0.8161,
+    "recall": 0.8505,
+    "f1": 0.8329,
+    "aer": 0.169,
+    "aer_cap": 0.0024,
+    "null_precision": 0.0907,
+    "words": 8331,
+    "pred": 8153
+   },
+   "NT-narrative": {
+    "precision": 0.8292,
+    "recall": 0.8612,
+    "f1": 0.8449,
+    "aer": 0.159,
+    "aer_cap": 0.0047,
+    "null_precision": 0.3088,
+    "words": 15361,
+    "pred": 14809
+   },
+   "NT-prophecy": {
+    "precision": 0.8233,
+    "recall": 0.8497,
+    "f1": 0.8363,
+    "aer": 0.1669,
+    "aer_cap": 0.0038,
+    "null_precision": 0.0916,
+    "words": 12567,
+    "pred": 12317
+   },
+   "OT": {
+    "precision": 0.8069,
+    "recall": 0.8629,
+    "f1": 0.834,
+    "aer": 0.1704,
+    "aer_cap": 0.0054,
+    "null_precision": 0.042,
+    "words": 59539,
+    "pred": 58578
+   },
+   "OT-narrative": {
+    "precision": 0.7938,
+    "recall": 0.8516,
+    "f1": 0.8217,
+    "aer": 0.1841,
+    "aer_cap": 0.0073,
+    "null_precision": 0.0233,
+    "words": 23494,
+    "pred": 23319
+   },
+   "OT-poetry": {
+    "precision": 0.8241,
+    "recall": 0.8814,
+    "f1": 0.8518,
+    "aer": 0.1512,
+    "aer_cap": 0.0036,
+    "null_precision": 0.0603,
+    "words": 23366,
+    "pred": 22828
+   },
+   "OT-prophecy": {
+    "precision": 0.7999,
+    "recall": 0.8501,
+    "f1": 0.8243,
+    "aer": 0.1798,
+    "aer_cap": 0.0051,
+    "null_precision": 0.0377,
+    "words": 12679,
+    "pred": 12431
+   },
+   "all": {
+    "precision": 0.8134,
+    "recall": 0.8597,
+    "f1": 0.8359,
+    "aer": 0.168,
+    "aer_cap": 0.0048,
+    "null_precision": 0.092,
+    "words": 95798,
+    "pred": 93857
+   },
+   "epistle": {
+    "precision": 0.8161,
+    "recall": 0.8505,
+    "f1": 0.8329,
+    "aer": 0.169,
+    "aer_cap": 0.0024,
+    "null_precision": 0.0907,
+    "words": 8331,
+    "pred": 8153
+   },
+   "narrative": {
+    "precision": 0.8076,
+    "recall": 0.8554,
+    "f1": 0.8308,
+    "aer": 0.1743,
+    "aer_cap": 0.0063,
+    "null_precision": 0.1333,
+    "words": 38855,
+    "pred": 38128
+   },
+   "poetry": {
+    "precision": 0.8241,
+    "recall": 0.8814,
+    "f1": 0.8518,
+    "aer": 0.1512,
+    "aer_cap": 0.0036,
+    "null_precision": 0.0603,
+    "words": 23366,
+    "pred": 22828
+   },
+   "prophecy": {
+    "precision": 0.8115,
+    "recall": 0.8499,
+    "f1": 0.8303,
+    "aer": 0.1733,
+    "aer_cap": 0.0045,
+    "null_precision": 0.0588,
+    "words": 25246,
+    "pred": 24748
+   }
+  },
+  "at_0.5": {
+   "precision": 0.8473,
+   "recall": 0.8251,
+   "f1": 0.836,
+   "aer": 0.168,
+   "aer_cap": 0.0048,
+   "null_precision": 0.2389,
+   "words": 95798,
+   "pred": 86467
+  },
+  "content": {
+   "precision": 0.8839,
+   "recall": 0.8982,
+   "f1": 0.891,
+   "aer": 0.1151,
+   "aer_cap": 0.0069,
+   "null_precision": 0.1959,
+   "words": 41669,
+   "pred": 41016
+  },
+  "content_at_0.5": {
+   "precision": 0.9157,
+   "recall": 0.8673,
+   "f1": 0.8908,
+   "aer": 0.1155,
+   "aer_cap": 0.0069,
+   "null_precision": 0.4208,
+   "words": 41669,
+   "pred": 38231
+  },
+  "function": {
+   "precision": 0.7586,
+   "recall": 0.8277,
+   "f1": 0.7917,
+   "aer": 0.2106,
+   "aer_cap": 0.003,
+   "null_precision": 0.0681,
+   "words": 54129,
+   "pred": 52841
+  },
+  "function_at_0.5": {
+   "precision": 0.7931,
+   "recall": 0.7899,
+   "f1": 0.7915,
+   "aer": 0.2109,
+   "aer_cap": 0.003,
+   "null_precision": 0.1972,
+   "words": 54129,
+   "pred": 48236
+  },
+  "calibration": [
+   {
+    "bin": "0.00-0.30",
+    "links": 945,
+    "mean_conf": 0.22495572320767254,
+    "accuracy": 0.2740740740740741
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 6445,
+    "mean_conf": 0.4263745096194322,
+    "accuracy": 0.4375484871993794
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 5765,
+    "mean_conf": 0.5523655430579485,
+    "accuracy": 0.5550737207285342
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 4883,
+    "mean_conf": 0.6424111687870373,
+    "accuracy": 0.6356747900880606
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 9255,
+    "mean_conf": 0.7422007986103557,
+    "accuracy": 0.7312803889789303
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 12623,
+    "mean_conf": 0.8534821990247251,
+    "accuracy": 0.807652697457023
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 27368,
+    "mean_conf": 0.9229664817461671,
+    "accuracy": 0.8881905875475007
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 26573,
+    "mean_conf": 0.9696070815033849,
+    "accuracy": 0.9666578858239566
+   }
+  ],
+  "calibration_content": [
+   {
+    "bin": "0.00-0.30",
+    "links": 324,
+    "mean_conf": 0.22403113388057772,
+    "accuracy": 0.33641975308641975
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 2461,
+    "mean_conf": 0.4340523898239254,
+    "accuracy": 0.4624136529865908
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1867,
+    "mean_conf": 0.5636247598963837,
+    "accuracy": 0.5859667916443492
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 1743,
+    "mean_conf": 0.6415949285088484,
+    "accuracy": 0.6620768789443489
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 2505,
+    "mean_conf": 0.7516766321222279,
+    "accuracy": 0.7880239520958083
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 2024,
+    "mean_conf": 0.8554970137524368,
+    "accuracy": 0.8878458498023716
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 6275,
+    "mean_conf": 0.9270408804106182,
+    "accuracy": 0.9472509960159362
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 23817,
+    "mean_conf": 0.9703581153751901,
+    "accuracy": 0.967544191123987
+   }
+  ],
+  "calibration_function": [
+   {
+    "bin": "0.00-0.30",
+    "links": 621,
+    "mean_conf": 0.22543811763920021,
+    "accuracy": 0.24154589371980675
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 3984,
+    "mean_conf": 0.4216317226758433,
+    "accuracy": 0.4221887550200803
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 3898,
+    "mean_conf": 0.5469727883536496,
+    "accuracy": 0.5402770651616213
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 3140,
+    "mean_conf": 0.6428642601261721,
+    "accuracy": 0.6210191082802548
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 6750,
+    "mean_conf": 0.7386842115070622,
+    "accuracy": 0.7102222222222222
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 10599,
+    "mean_conf": 0.8530974471604997,
+    "accuracy": 0.7923388998962166
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 21093,
+    "mean_conf": 0.9217543804983924,
+    "accuracy": 0.8706205850282084
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 2756,
+    "mean_conf": 0.9631167427062931,
+    "accuracy": 0.9589985486211902
+   }
+  ],
+  "thresholds_content": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8838989662570704,
+    "recall": 0.8982210990535653,
+    "f1": 0.8910024822433582,
+    "pred": 41016
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8882581342770077,
+    "recall": 0.8955205391209553,
+    "f1": 0.8918745527672909,
+    "pred": 40692
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8995374094931617,
+    "recall": 0.886477379713592,
+    "f1": 0.8929596446130426,
+    "pred": 39776
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.9156705291517355,
+    "recall": 0.8673257023933403,
+    "f1": 0.8908426959143945,
+    "pred": 38231
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.9325981740182598,
+    "recall": 0.8402209999504484,
+    "f1": 0.8840028152125746,
+    "pred": 36364
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9462176135871292,
+    "recall": 0.8116297507556612,
+    "f1": 0.873771388181321,
+    "pred": 34621
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9585564827500311,
+    "recall": 0.7627223626183044,
+    "f1": 0.849499158365297,
+    "pred": 32116
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9633125083078559,
+    "recall": 0.7182002873990387,
+    "f1": 0.822891532063474,
+    "pred": 30092
+   }
+  ],
+  "thresholds_function": [
+   {
+    "threshold": 0.0,
+    "precision": 0.7586343937472796,
+    "recall": 0.8276794747382983,
+    "f1": 0.791654323913344,
+    "pred": 52841
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.7647836078130984,
+    "recall": 0.824582412817707,
+    "f1": 0.7935580658301292,
+    "pred": 52220
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.7749415394289532,
+    "recall": 0.8142382260029318,
+    "f1": 0.7941040252914761,
+    "pred": 50889
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.793079857367941,
+    "recall": 0.7898540251481428,
+    "f1": 0.7914636543255852,
+    "pred": 48236
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8153051558482566,
+    "recall": 0.7463712757830405,
+    "f1": 0.7793168123659333,
+    "pred": 44338
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.8301131122870042,
+    "recall": 0.7061094708153531,
+    "f1": 0.763106514487175,
+    "pred": 41198
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.8536054342777519,
+    "recall": 0.6071273718332542,
+    "f1": 0.7095715543972683,
+    "pred": 34448
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.8808335779277957,
+    "recall": 0.4337331984390808,
+    "f1": 0.5812512105365099,
+    "pred": 23849
+   }
+  ],
+  "thresholds_all": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8133756672384586,
+    "recall": 0.8597443549749423,
+    "f1": 0.8359174824255963,
+    "pred": 93857
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8188608575856725,
+    "recall": 0.8568275240723013,
+    "f1": 0.8374140787091306,
+    "pred": 92912
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8296034853581867,
+    "recall": 0.8470747226758264,
+    "f1": 0.8382480775660315,
+    "pred": 90665
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8472827784010085,
+    "recall": 0.8250689791091841,
+    "f1": 0.8360283461332177,
+    "pred": 86467
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8681569230006692,
+    "recall": 0.7890309139028099,
+    "f1": 0.826704897431813,
+    "pred": 80702
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.8831295585539245,
+    "recall": 0.7540739906526268,
+    "f1": 0.8135152538666214,
+    "pred": 75819
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9042425335015924,
+    "recall": 0.6778534827411453,
+    "f1": 0.7748505075341628,
+    "pred": 66564
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9268459984056654,
+    "recall": 0.5630384593727125,
+    "f1": 0.7005240443896424,
+    "pred": 53941
+   }
+  ],
+  "errors": {
+   "counts": {
+    "spurious (link, gold has none)": 6359,
+    "adjacent source word": 8046,
+    "same lemma, wrong occurrence": 351,
+    "wrong source word": 2760,
+    "missed (no link, gold has one)": 1297
+   },
+   "examples": {
+    "spurious (link, gold has none)": [
+     "Ruth 1:1 'the' pred בִּ/ימֵי֙#2 (0.91) gold -",
+     "Ruth 1:1 'the' pred שְׁפֹ֣ט#3 (0.73) gold -",
+     "Ruth 1:1 'the' pred בָּ/אָ֑רֶץ#7 (0.92) gold -",
+     "Ruth 1:1 'there' pred וַ/יֵּ֨לֶךְ#8 (0.72) gold -",
+     "Ruth 1:1 'a' pred אִ֜ישׁ#9 (0.95) gold -",
+     "Ruth 1:1 'man' pred אִ֜ישׁ#9 (0.97) gold -"
+    ],
+    "adjacent source word": [
+     "Ruth 1:1 'of' pred שְׁפֹ֣ט#3 (0.82) gold בִּ/ימֵי֙#2",
+     "Ruth 1:1 'to' pred לָ/גוּר֙#13 (0.91) gold בִּ/שְׂדֵ֣י#14",
+     "Ruth 1:1 'in' pred בִּ/שְׂדֵ֣י#14 (0.93) gold מוֹאָ֔ב#15",
+     "Ruth 1:1 'of' pred מוֹאָ֔ב#15 (0.58) gold ה֥וּא#16",
+     "Ruth 1:1 'he' pred ה֥וּא#16 (0.53) gold וְ/אִשְׁתּ֖/וֹ#17",
+     "Ruth 1:1 'and' pred וְ/אִשְׁתּ֖/וֹ#17 (0.71) gold וּ/שְׁנֵ֥י#18"
+    ],
+    "same lemma, wrong occurrence": [
+     "Ruth 1:1 'the' pred שְׁפֹ֣ט#3 (0.47) gold הַ/שֹּׁפְטִ֔ים#4",
+     "Ruth 1:1 'judges' pred שְׁפֹ֣ט#3 (0.49) gold הַ/שֹּׁפְטִ֔ים#4",
+     "Ruth 1:22 'Beth-Lehem' pred לֶ֔חֶם#13 (0.29) gold בֵּ֣ית#12,בִּ/תְחִלַּ֖ת#14",
+     "Ruth 2:23 'barley-harvest' pred וּ/קְצִ֣יר#9 (0.37) gold קְצִֽיר\\־#7,הַ/שְּׂעֹרִ֖ים#8",
+     "Ruth 3:13 'thee' pred וּ/גְאַלְתִּ֥י/ךְ#13 (0.47) gold לְ/גָֽאֳלֵ֛/ךְ#12",
+     "Ruth 4:2 'down' pred וַ/יֵּשֵֽׁבוּ\\׃#9 (0.49) gold שְׁבוּ\\־#7"
+    ],
+    "wrong source word": [
+     "Ruth 1:1 'Beth-Lehem-Judah' pred מִ/בֵּ֧ית#10 (0.42) gold יְהוּדָ֗ה#12,לָ/גוּר֙#13,בִּ/שְׂדֵ֣י#14",
+     "Ruth 1:1 'sojourn' pred לָ/גוּר֙#13 (0.98) gold מוֹאָ֔ב#15",
+     "Ruth 1:1 'fields' pred בִּ/שְׂדֵ֣י#14 (0.97) gold ה֥וּא#16",
+     "Ruth 1:1 'Moab' pred מוֹאָ֔ב#15 (0.98) gold אִ֜ישׁ#9",
+     "Ruth 1:1 'and' pred וְ/אִשְׁתּ֖/וֹ#17 (0.65) gold בָנָֽי/ו\\׃#19",
+     "Ruth 1:2 'Beth-Lehem-Judah' pred מִ/בֵּ֥ית#13 (0.49) gold יְהוּדָ֑ה#15,וַ/יָּבֹ֥אוּ#16"
+    ],
+    "missed (no link, gold has one)": [
+     "Ruth 1:5 'of' pred - (0.07) gold מִ/שְּׁנֵ֥י#8",
+     "Ruth 1:6 'God' pred - (0.58) gold יְהוָה֙#13",
+     "Ruth 1:6 'looked' pred - (0.49) gold פָקַ֤ד#12",
+     "Ruth 1:13 'do' pred - (0.12) gold תְּשַׂבֵּ֗רְנָה#2",
+     "Ruth 1:13 'for' pred - (0.54) gold הֲ/לָהֵן֙#6",
+     "Ruth 1:13 'do' pred - (0.15) gold תֵּֽעָגֵ֔נָה#7"
+    ]
+   }
+  }
+ },
+ "ylt_rerank": {
+  "all": {
+   "NT": {
+    "precision": 0.8273,
+    "recall": 0.876,
+    "f1": 0.8509,
+    "aer": 0.1522,
+    "aer_cap": 0.0038,
+    "null_precision": 0.1062,
+    "words": 36259,
+    "pred": 36021
+   },
+   "NT-epistle": {
+    "precision": 0.8186,
+    "recall": 0.8717,
+    "f1": 0.8443,
+    "aer": 0.1576,
+    "aer_cap": 0.0024,
+    "null_precision": 0.0,
+    "words": 8331,
+    "pred": 8331
+   },
+   "NT-narrative": {
+    "precision": 0.8305,
+    "recall": 0.8807,
+    "f1": 0.8548,
+    "aer": 0.149,
+    "aer_cap": 0.0047,
+    "null_precision": 0.2162,
+    "words": 15361,
+    "pred": 15123
+   },
+   "NT-prophecy": {
+    "precision": 0.8292,
+    "recall": 0.8731,
+    "f1": 0.8506,
+    "aer": 0.1526,
+    "aer_cap": 0.0038,
+    "null_precision": 0.0,
+    "words": 12567,
+    "pred": 12567
+   },
+   "OT": {
+    "precision": 0.7937,
+    "recall": 0.8628,
+    "f1": 0.8268,
+    "aer": 0.1775,
+    "aer_cap": 0.0054,
+    "null_precision": 0.0,
+    "words": 59539,
+    "pred": 59539
+   },
+   "OT-narrative": {
+    "precision": 0.7774,
+    "recall": 0.8403,
+    "f1": 0.8076,
+    "aer": 0.198,
+    "aer_cap": 0.0073,
+    "null_precision": 0.0,
+    "words": 23494,
+    "pred": 23494
+   },
+   "OT-poetry": {
+    "precision": 0.8107,
+    "recall": 0.8876,
+    "f1": 0.8474,
+    "aer": 0.1555,
+    "aer_cap": 0.0036,
+    "null_precision": 0.0,
+    "words": 23366,
+    "pred": 23366
+   },
+   "OT-prophecy": {
+    "precision": 0.7927,
+    "recall": 0.8593,
+    "f1": 0.8247,
+    "aer": 0.1794,
+    "aer_cap": 0.0051,
+    "null_precision": 0.0,
+    "words": 12679,
+    "pred": 12679
+   },
+   "all": {
+    "precision": 0.8064,
+    "recall": 0.8678,
+    "f1": 0.836,
+    "aer": 0.1679,
+    "aer_cap": 0.0048,
+    "null_precision": 0.034,
+    "words": 95798,
+    "pred": 95560
+   },
+   "epistle": {
+    "precision": 0.8186,
+    "recall": 0.8717,
+    "f1": 0.8443,
+    "aer": 0.1576,
+    "aer_cap": 0.0024,
+    "null_precision": 0.0,
+    "words": 8331,
+    "pred": 8331
+   },
+   "narrative": {
+    "precision": 0.7982,
+    "recall": 0.8563,
+    "f1": 0.8262,
+    "aer": 0.1788,
+    "aer_cap": 0.0063,
+    "null_precision": 0.0833,
+    "words": 38855,
+    "pred": 38617
+   },
+   "poetry": {
+    "precision": 0.8107,
+    "recall": 0.8876,
+    "f1": 0.8474,
+    "aer": 0.1555,
+    "aer_cap": 0.0036,
+    "null_precision": 0.0,
+    "words": 23366,
+    "pred": 23366
+   },
+   "prophecy": {
+    "precision": 0.8109,
+    "recall": 0.8663,
+    "f1": 0.8377,
+    "aer": 0.166,
+    "aer_cap": 0.0045,
+    "null_precision": 0.0,
+    "words": 25246,
+    "pred": 25246
+   }
+  },
+  "at_0.5": {
+   "precision": 0.8241,
+   "recall": 0.8538,
+   "f1": 0.8387,
+   "aer": 0.1653,
+   "aer_cap": 0.0048,
+   "null_precision": 0.1262,
+   "words": 95798,
+   "pred": 92002
+  },
+  "content": {
+   "precision": 0.8908,
+   "recall": 0.9175,
+   "f1": 0.904,
+   "aer": 0.1022,
+   "aer_cap": 0.0069,
+   "null_precision": 0.075,
+   "words": 41669,
+   "pred": 41571
+  },
+  "content_at_0.5": {
+   "precision": 0.9083,
+   "recall": 0.9065,
+   "f1": 0.9074,
+   "aer": 0.0989,
+   "aer_cap": 0.0069,
+   "null_precision": 0.2395,
+   "words": 41669,
+   "pred": 40283
+  },
+  "function": {
+   "precision": 0.7414,
+   "recall": 0.8264,
+   "f1": 0.7816,
+   "aer": 0.2207,
+   "aer_cap": 0.003,
+   "null_precision": 0.0246,
+   "words": 54129,
+   "pred": 53989
+  },
+  "function_at_0.5": {
+   "precision": 0.7584,
+   "recall": 0.8099,
+   "f1": 0.7833,
+   "aer": 0.219,
+   "aer_cap": 0.003,
+   "null_precision": 0.1002,
+   "words": 54129,
+   "pred": 51719
+  },
+  "calibration": [
+   {
+    "bin": "0.00-0.30",
+    "links": 420,
+    "mean_conf": 0.25046176241502355,
+    "accuracy": 0.26666666666666666
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 3138,
+    "mean_conf": 0.4184147256677263,
+    "accuracy": 0.3601019757807521
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 6040,
+    "mean_conf": 0.5422058358198115,
+    "accuracy": 0.47036423841059605
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 6609,
+    "mean_conf": 0.6425017543124792,
+    "accuracy": 0.6006960205779996
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 10385,
+    "mean_conf": 0.7648535646413354,
+    "accuracy": 0.6921521425132402
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 19049,
+    "mean_conf": 0.8616975804976651,
+    "accuracy": 0.8234552994907869
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 22002,
+    "mean_conf": 0.928373129505903,
+    "accuracy": 0.8838741932551586
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 27917,
+    "mean_conf": 0.9711304687376834,
+    "accuracy": 0.9558333631837231
+   }
+  ],
+  "calibration_content": [
+   {
+    "bin": "0.00-0.30",
+    "links": 202,
+    "mean_conf": 0.23327851081282885,
+    "accuracy": 0.2524752475247525
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 1086,
+    "mean_conf": 0.3784891582447756,
+    "accuracy": 0.36095764272559855
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1400,
+    "mean_conf": 0.5466914744078968,
+    "accuracy": 0.5071428571428571
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 3412,
+    "mean_conf": 0.6383729225460779,
+    "accuracy": 0.6465416178194607
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 2063,
+    "mean_conf": 0.761749472150507,
+    "accuracy": 0.7910809500727096
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 2081,
+    "mean_conf": 0.8543695458349229,
+    "accuracy": 0.8870735223450265
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 6785,
+    "mean_conf": 0.9343344004715454,
+    "accuracy": 0.948415622697126
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 24542,
+    "mean_conf": 0.9729518689782674,
+    "accuracy": 0.9681770026892674
+   }
+  ],
+  "calibration_function": [
+   {
+    "bin": "0.00-0.30",
+    "links": 218,
+    "mean_conf": 0.26638385793632385,
+    "accuracy": 0.2798165137614679
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 2052,
+    "mean_conf": 0.43954492363133596,
+    "accuracy": 0.35964912280701755
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 4640,
+    "mean_conf": 0.5408524103837543,
+    "accuracy": 0.45926724137931035
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 3197,
+    "mean_conf": 0.6469082522752467,
+    "accuracy": 0.5517672818267125
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 8322,
+    "mean_conf": 0.7656230602924492,
+    "accuracy": 0.6676279740447008
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 16968,
+    "mean_conf": 0.8625963098784495,
+    "accuracy": 0.8156529938708157
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 15217,
+    "mean_conf": 0.9257151007550369,
+    "accuracy": 0.8550962739041861
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 3375,
+    "mean_conf": 0.9578857858623119,
+    "accuracy": 0.8660740740740741
+   }
+  ],
+  "thresholds_content": [
+   {
+    "threshold": 0.0,
+    "precision": 0.890837362584494,
+    "recall": 0.9175214310490065,
+    "f1": 0.90398252230481,
+    "pred": 41571
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8939544103072349,
+    "recall": 0.9162578663098955,
+    "f1": 0.904968738911796,
+    "pred": 41369
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.9058622905442143,
+    "recall": 0.9081066349536693,
+    "f1": 0.906983074334356,
+    "pred": 40462
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.9083236104560236,
+    "recall": 0.9065457608641792,
+    "f1": 0.9074338148676296,
+    "pred": 40283
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.9227683049147443,
+    "recall": 0.8889549576334176,
+    "f1": 0.9055460912360401,
+    "pred": 38883
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9493388965633898,
+    "recall": 0.8342995887220653,
+    "f1": 0.8881093982830693,
+    "pred": 35471
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9591115900383141,
+    "recall": 0.7938655170705119,
+    "f1": 0.8687000135556459,
+    "pred": 33408
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9638969578957449,
+    "recall": 0.7481294286705317,
+    "f1": 0.842416549261393,
+    "pred": 31327
+   }
+  ],
+  "thresholds_function": [
+   {
+    "threshold": 0.0,
+    "precision": 0.7413547204060086,
+    "recall": 0.8263993558111206,
+    "f1": 0.7815703657417352,
+    "pred": 53989
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.7432259024381171,
+    "recall": 0.8251398839634134,
+    "f1": 0.7820437556260029,
+    "pred": 53771
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.7470790120215299,
+    "recall": 0.8224764107117049,
+    "f1": 0.7829667629773768,
+    "pred": 53321
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.7584446721707689,
+    "recall": 0.809902339314104,
+    "f1": 0.7833293394041058,
+    "pred": 51719
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.7879309246160708,
+    "recall": 0.7659034129622365,
+    "f1": 0.7767610352625849,
+    "pred": 47079
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.8051365024383574,
+    "recall": 0.7294819647760824,
+    "f1": 0.7654444023181498,
+    "pred": 43882
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.8373172103487064,
+    "recall": 0.6147667912373794,
+    "f1": 0.7089876537330492,
+    "pred": 35560
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.8570890705679862,
+    "recall": 0.32901121136415257,
+    "f1": 0.47549421857515867,
+    "pred": 18592
+   }
+  ],
+  "thresholds_all": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8063834240267894,
+    "recall": 0.8678191339602455,
+    "f1": 0.8359740717637166,
+    "pred": 95560
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8087660290098801,
+    "recall": 0.8665578016780224,
+    "f1": 0.8366651262674315,
+    "pred": 95140
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8155849141102332,
+    "recall": 0.8613998535953601,
+    "f1": 0.8378665556638806,
+    "pred": 93783
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8240690419773483,
+    "recall": 0.8538318599020215,
+    "f1": 0.8386864826296897,
+    "pred": 92002
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8489216165282334,
+    "recall": 0.8218368151359874,
+    "f1": 0.8351596788683716,
+    "pred": 85962
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.8695953524126372,
+    "recall": 0.7771270904893294,
+    "f1": 0.8207650403216213,
+    "pred": 79353
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.8963142326876232,
+    "recall": 0.6961765865195112,
+    "f1": 0.7836691746480481,
+    "pred": 68968
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9241170696528376,
+    "recall": 0.5195224956360155,
+    "f1": 0.6651239240451575,
+    "pred": 49919
+   }
+  ],
+  "errors": {
+   "counts": {
+    "spurious (link, gold has none)": 6765,
+    "adjacent source word": 8799,
+    "same lemma, wrong occurrence": 338,
+    "wrong source word": 2600
+   },
+   "examples": {
+    "spurious (link, gold has none)": [
+     "Ruth 1:1 'the' pred בִּ/ימֵי֙#2 (0.95) gold -",
+     "Ruth 1:1 'the' pred שְׁפֹ֣ט#3 (0.86) gold -",
+     "Ruth 1:1 'the' pred בָּ/אָ֑רֶץ#7 (0.95) gold -",
+     "Ruth 1:1 'there' pred וַ/יֵּ֨לֶךְ#8 (0.74) gold -",
+     "Ruth 1:1 'a' pred אִ֜ישׁ#9 (0.91) gold -",
+     "Ruth 1:1 'man' pred אִ֜ישׁ#9 (0.98) gold -"
+    ],
+    "adjacent source word": [
+     "Ruth 1:1 'of' pred שְׁפֹ֣ט#3 (0.80) gold בִּ/ימֵי֙#2",
+     "Ruth 1:1 'is' pred רָעָ֖ב#6 (0.66) gold וַ/יְהִ֥י#5",
+     "Ruth 1:1 'Beth-Lehem-Judah' pred לֶ֣חֶם#11 (0.64) gold יְהוּדָ֗ה#12,לָ/גוּר֙#13,בִּ/שְׂדֵ֣י#14",
+     "Ruth 1:1 'to' pred לָ/גוּר֙#13 (0.91) gold בִּ/שְׂדֵ֣י#14",
+     "Ruth 1:1 'in' pred בִּ/שְׂדֵ֣י#14 (0.90) gold מוֹאָ֔ב#15",
+     "Ruth 1:1 'of' pred מוֹאָ֔ב#15 (0.80) gold ה֥וּא#16"
+    ],
+    "same lemma, wrong occurrence": [
+     "Ruth 1:1 'the' pred שְׁפֹ֣ט#3 (0.72) gold הַ/שֹּׁפְטִ֔ים#4",
+     "Ruth 1:1 'judges' pred שְׁפֹ֣ט#3 (0.62) gold הַ/שֹּׁפְטִ֔ים#4",
+     "Ruth 1:22 'Beth-Lehem' pred לֶ֔חֶם#13 (0.38) gold בֵּ֣ית#12,בִּ/תְחִלַּ֖ת#14",
+     "Ruth 3:13 'thee' pred וּ/גְאַלְתִּ֥י/ךְ#13 (0.59) gold לְ/גָֽאֳלֵ֛/ךְ#12",
+     "Ruth 4:2 'down' pred וַ/יֵּשֵֽׁבוּ\\׃#9 (0.63) gold שְׁבוּ\\־#7",
+     "Ruth 4:4 'dost' pred גְּאָ֔ל#14 (0.35) gold תִּגְאַל֙#13"
+    ],
+    "wrong source word": [
+     "Ruth 1:1 'sojourn' pred לָ/גוּר֙#13 (0.98) gold מוֹאָ֔ב#15",
+     "Ruth 1:1 'fields' pred בִּ/שְׂדֵ֣י#14 (0.99) gold ה֥וּא#16",
+     "Ruth 1:1 'Moab' pred מוֹאָ֔ב#15 (0.98) gold אִ֜ישׁ#9",
+     "Ruth 1:3 'dieth' pred נָעֳמִ֑י#4 (0.60) gold וַ/יָּ֥מָת#1",
+     "Ruth 1:3 'her' pred הִ֖יא#6 (0.58) gold בָנֶֽי/הָ\\׃#8",
+     "Ruth 1:5 'her' pred וַ/תִּשָּׁאֵר֙#6 (0.35) gold יְלָדֶ֖י/הָ#9"
+    ]
+   }
+  }
+ },
+ "kjv_hmm": {
+  "all": {
+   "NT": {
+    "precision": 0.8492,
+    "recall": 0.8665,
+    "f1": 0.8578,
+    "aer": 0.1422,
+    "aer_cap": 0.0,
+    "null_precision": 0.113,
+    "words": 18563,
+    "pred": 18164
+   },
+   "NT-epistle": {
+    "precision": 0.8629,
+    "recall": 0.8933,
+    "f1": 0.8778,
+    "aer": 0.1222,
+    "aer_cap": 0.0,
+    "null_precision": 0.1345,
+    "words": 4119,
+    "pred": 4018
+   },
+   "NT-narrative": {
+    "precision": 0.8363,
+    "recall": 0.8468,
+    "f1": 0.8415,
+    "aer": 0.1585,
+    "aer_cap": 0.0,
+    "null_precision": 0.0678,
+    "words": 8736,
+    "pred": 8547
+   },
+   "NT-prophecy": {
+    "precision": 0.8591,
+    "recall": 0.8777,
+    "f1": 0.8683,
+    "aer": 0.1317,
+    "aer_cap": 0.0,
+    "null_precision": 0.1491,
+    "words": 5708,
+    "pred": 5599
+   },
+   "OT": {
+    "precision": 0.8116,
+    "recall": 0.9052,
+    "f1": 0.8559,
+    "aer": 0.1441,
+    "aer_cap": 0.0,
+    "null_precision": 0.0943,
+    "words": 21162,
+    "pred": 20657
+   },
+   "OT-narrative": {
+    "precision": 0.8453,
+    "recall": 0.928,
+    "f1": 0.8847,
+    "aer": 0.1153,
+    "aer_cap": 0.0,
+    "null_precision": 0.065,
+    "words": 7563,
+    "pred": 7459
+   },
+   "OT-poetry": {
+    "precision": 0.7783,
+    "recall": 0.8786,
+    "f1": 0.8254,
+    "aer": 0.1746,
+    "aer_cap": 0.0,
+    "null_precision": 0.1158,
+    "words": 9323,
+    "pred": 8994
+   },
+   "OT-prophecy": {
+    "precision": 0.8233,
+    "recall": 0.9202,
+    "f1": 0.8691,
+    "aer": 0.1309,
+    "aer_cap": 0.0,
+    "null_precision": 0.0816,
+    "words": 4276,
+    "pred": 4204
+   },
+   "all": {
+    "precision": 0.8292,
+    "recall": 0.8862,
+    "f1": 0.8568,
+    "aer": 0.1432,
+    "aer_cap": 0.0,
+    "null_precision": 0.0985,
+    "words": 39725,
+    "pred": 38821
+   },
+   "epistle": {
+    "precision": 0.8629,
+    "recall": 0.8933,
+    "f1": 0.8778,
+    "aer": 0.1222,
+    "aer_cap": 0.0,
+    "null_precision": 0.1345,
+    "words": 4119,
+    "pred": 4018
+   },
+   "narrative": {
+    "precision": 0.8405,
+    "recall": 0.883,
+    "f1": 0.8612,
+    "aer": 0.1388,
+    "aer_cap": 0.0,
+    "null_precision": 0.0658,
+    "words": 16299,
+    "pred": 16006
+   },
+   "poetry": {
+    "precision": 0.7783,
+    "recall": 0.8786,
+    "f1": 0.8254,
+    "aer": 0.1746,
+    "aer_cap": 0.0,
+    "null_precision": 0.1158,
+    "words": 9323,
+    "pred": 8994
+   },
+   "prophecy": {
+    "precision": 0.8437,
+    "recall": 0.895,
+    "f1": 0.8686,
+    "aer": 0.1314,
+    "aer_cap": 0.0,
+    "null_precision": 0.1023,
+    "words": 9984,
+    "pred": 9803
+   }
+  },
+  "at_0.5": {
+   "precision": 0.8658,
+   "recall": 0.8675,
+   "f1": 0.8667,
+   "aer": 0.1333,
+   "aer_cap": 0.0,
+   "null_precision": 0.327,
+   "words": 39725,
+   "pred": 36394
+  },
+  "content": {
+   "precision": 0.9045,
+   "recall": 0.9102,
+   "f1": 0.9074,
+   "aer": 0.0926,
+   "aer_cap": 0.0,
+   "null_precision": 0.1624,
+   "words": 30076,
+   "pred": 29554
+  },
+  "content_at_0.5": {
+   "precision": 0.9237,
+   "recall": 0.8986,
+   "f1": 0.911,
+   "aer": 0.089,
+   "aer_cap": 0.0,
+   "null_precision": 0.2895,
+   "words": 30076,
+   "pred": 28570
+  },
+  "function": {
+   "precision": 0.5891,
+   "recall": 0.7848,
+   "f1": 0.673,
+   "aer": 0.327,
+   "aer_cap": 0.0,
+   "null_precision": 0.0817,
+   "words": 9649,
+   "pred": 9267
+  },
+  "function_at_0.5": {
+   "precision": 0.6545,
+   "recall": 0.7362,
+   "f1": 0.693,
+   "aer": 0.307,
+   "aer_cap": 0.0,
+   "null_precision": 0.3368,
+   "words": 9649,
+   "pred": 7824
+  },
+  "calibration": [
+   {
+    "bin": "0.00-0.30",
+    "links": 327,
+    "mean_conf": 0.21921060716956087,
+    "accuracy": 0.1651376146788991
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 2100,
+    "mean_conf": 0.42335810007125585,
+    "accuracy": 0.2980952380952381
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1866,
+    "mean_conf": 0.5630119173660781,
+    "accuracy": 0.45766345123258306
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 2092,
+    "mean_conf": 0.6652472125654738,
+    "accuracy": 0.4947418738049713
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 2040,
+    "mean_conf": 0.7675742037317129,
+    "accuracy": 0.696078431372549
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 2987,
+    "mean_conf": 0.8549317628202514,
+    "accuracy": 0.759625041848008
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 9604,
+    "mean_conf": 0.9285977458560866,
+    "accuracy": 0.8678675551853394
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 17805,
+    "mean_conf": 0.9698641389575792,
+    "accuracy": 0.988374052232519
+   }
+  ],
+  "calibration_content": [
+   {
+    "bin": "0.00-0.30",
+    "links": 57,
+    "mean_conf": 0.22088990318510487,
+    "accuracy": 0.2807017543859649
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 927,
+    "mean_conf": 0.396084466767822,
+    "accuracy": 0.3516720604099245
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1371,
+    "mean_conf": 0.5589789119404408,
+    "accuracy": 0.4989059080962801
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 911,
+    "mean_conf": 0.6600934808065259,
+    "accuracy": 0.6234906695938529
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 1288,
+    "mean_conf": 0.7680349715323644,
+    "accuracy": 0.7569875776397516
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 1253,
+    "mean_conf": 0.8648306889933006,
+    "accuracy": 0.8715083798882681
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 6452,
+    "mean_conf": 0.9327539677579845,
+    "accuracy": 0.921574705517669
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 17295,
+    "mean_conf": 0.9699992063443018,
+    "accuracy": 0.9901705695287656
+   }
+  ],
+  "calibration_function": [
+   {
+    "bin": "0.00-0.30",
+    "links": 270,
+    "mean_conf": 0.21885608912183493,
+    "accuracy": 0.14074074074074075
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 1173,
+    "mean_conf": 0.4449119432701334,
+    "accuracy": 0.2557544757033248
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 495,
+    "mean_conf": 0.5741821202722389,
+    "accuracy": 0.3434343434343434
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 1181,
+    "mean_conf": 0.6692226991297426,
+    "accuracy": 0.3954276037256562
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 752,
+    "mean_conf": 0.7667850163284725,
+    "accuracy": 0.5917553191489362
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 1734,
+    "mean_conf": 0.8477787325464161,
+    "accuracy": 0.6787773933102653
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 3152,
+    "mean_conf": 0.9200901495010675,
+    "accuracy": 0.7579314720812182
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 510,
+    "mean_conf": 0.9652837655195999,
+    "accuracy": 0.9274509803921569
+   }
+  ],
+  "thresholds_content": [
+   {
+    "threshold": 0.0,
+    "precision": 0.9045137714015024,
+    "recall": 0.9102424407518387,
+    "f1": 0.9073690641865516,
+    "pred": 29554
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.9057192256839679,
+    "recall": 0.9096976300735494,
+    "f1": 0.9077040686316148,
+    "pred": 29497
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.9175022474241062,
+    "recall": 0.9035685099427949,
+    "f1": 0.9104820723966375,
+    "pred": 28922
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.9236961848092404,
+    "recall": 0.898597112503405,
+    "f1": 0.9109737995788602,
+    "pred": 28570
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.9451082760395603,
+    "recall": 0.8753064560065378,
+    "f1": 0.908869128643909,
+    "pred": 27199
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.956253804017042,
+    "recall": 0.8559656769272678,
+    "f1": 0.903334770734512,
+    "pred": 26288
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.96652,
+    "recall": 0.8227662762190139,
+    "f1": 0.8888684520306063,
+    "pred": 25000
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9715332463047964,
+    "recall": 0.7855829474257695,
+    "f1": 0.8687188176597949,
+    "pred": 23747
+   }
+  ],
+  "thresholds_function": [
+   {
+    "threshold": 0.0,
+    "precision": 0.5890795295133269,
+    "recall": 0.7847901092581944,
+    "f1": 0.6729951303704617,
+    "pred": 9267
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.6025341780593532,
+    "recall": 0.7793271995399655,
+    "f1": 0.6796213878267411,
+    "pred": 8997
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.6130653266331658,
+    "recall": 0.7717078780908568,
+    "f1": 0.6832993890020367,
+    "pred": 8756
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.6545245398773006,
+    "recall": 0.7361989649223691,
+    "f1": 0.6929634641407307,
+    "pred": 7824
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.6755355437303862,
+    "recall": 0.7117596319723979,
+    "f1": 0.6931746587329366,
+    "pred": 7329
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.7293428757319453,
+    "recall": 0.6446233467510063,
+    "f1": 0.6843711843711843,
+    "pred": 6148
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.7485174203113417,
+    "recall": 0.5806497987349051,
+    "f1": 0.6539831606217615,
+    "pred": 5396
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.7815401419989078,
+    "recall": 0.4114433582518689,
+    "f1": 0.5390845733659823,
+    "pred": 3662
+   }
+  ],
+  "thresholds_all": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8292161459004147,
+    "recall": 0.8862184781411738,
+    "f1": 0.8567702441945572,
+    "pred": 38821
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8348573803709669,
+    "recall": 0.8847318577249201,
+    "f1": 0.8590713464674276,
+    "pred": 38494
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.846754073995435,
+    "recall": 0.8783173659288624,
+    "f1": 0.8622469662982082,
+    "pred": 37678
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8658295323404956,
+    "recall": 0.8674980728994605,
+    "f1": 0.8666629995324404,
+    "pred": 36394
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8878880908248378,
+    "recall": 0.8439874463164849,
+    "f1": 0.8653813583243944,
+    "pred": 34528
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9132445431002589,
+    "recall": 0.8154938883382887,
+    "f1": 0.8616055846422338,
+    "pred": 32436
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9278194499276221,
+    "recall": 0.7764012773923576,
+    "f1": 0.8453836930455636,
+    "pred": 30396
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9461490751213105,
+    "recall": 0.7139356899019932,
+    "f1": 0.8138013274128003,
+    "pred": 27409
+   }
+  ],
+  "errors": {
+   "counts": {
+    "adjacent source word": 1940,
+    "spurious (link, gold has none)": 3066,
+    "wrong source word": 1624,
+    "missed (no link, gold has one)": 569
+   },
+   "examples": {
+    "adjacent source word": [
+     "1 John 1:1 'with' pred τοῖς#9 (0.91) gold ἑωράκαμεν#8",
+     "1 John 1:1 'of' pred τοῦ#20 (0.46) gold περὶ#19",
+     "1 John 1:6 'do' pred οὐ#15 (0.72) gold ποιοῦμεν#16",
+     "1 John 1:8 'ourselves' pred πλανῶμεν#8 (0.70) gold ἑαυτοὺς#7",
+     "1 John 2:2 'the' pred τοῦ#19 (0.88) gold κόσμου.#20",
+     "1 John 2:3 'hereby' pred ἐν#2 (0.36) gold τούτῳ#3"
+    ],
+    "spurious (link, gold has none)": [
+     "1 John 1:2 'it' pred καὶ#7 (0.41) gold -",
+     "1 John 1:3 'is' pred μετὰ#21 (0.82) gold -",
+     "1 John 1:9 'our' pred ἡμῖν#12 (0.47) gold -",
+     "1 John 2:2 'the' pred τοῦ#19 (0.60) gold -",
+     "1 John 2:2 'sins' pred τοῦ#19 (0.54) gold -",
+     "1 John 2:2 'of' pred τοῦ#19 (0.67) gold -"
+    ],
+    "wrong source word": [
+     "1 John 1:2 'shew' pred μαρτυροῦμεν#8 (0.39) gold ἀπαγγέλλομεν#10",
+     "1 John 1:3 'truly' pred ἡμῶν·#14 (0.29) gold δὲ#18",
+     "1 John 1:4 'we' pred ἵνα#5 (0.30) gold γράφομεν#3",
+     "1 John 1:5 'declare' pred ὅτι#13 (0.35) gold ἀναγγέλλομεν#11",
+     "1 John 2:2 'and' pred ἡμῶν·#8 (0.49) gold δὲ#13",
+     "1 John 2:2 'whole' pred κόσμου.#20 (0.81) gold ὅλου#18"
+    ],
+    "missed (no link, gold has one)": [
+     "1 John 1:5 'all' pred - (0.26) gold οὐδεμία.#24",
+     "1 John 2:13 'known' pred - (0.39) gold ἐγνώκατε#5",
+     "1 John 2:13 'Father' pred - (0.39) gold πατέρες,#3",
+     "1 John 3:1 'of' pred - (0.48) gold ποταπὴν#2",
+     "1 John 3:2 'sons' pred - (0.65) gold τέκνα#3",
+     "1 John 3:7 'man' pred - (0.69) gold μηδεὶς#2"
+    ]
+   }
+  }
+ },
+ "kjv_rerank": {
+  "all": {
+   "NT": {
+    "precision": 0.8509,
+    "recall": 0.8873,
+    "f1": 0.8687,
+    "aer": 0.1313,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 18563,
+    "pred": 18563
+   },
+   "NT-epistle": {
+    "precision": 0.8577,
+    "recall": 0.9103,
+    "f1": 0.8833,
+    "aer": 0.1168,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 4119,
+    "pred": 4119
+   },
+   "NT-narrative": {
+    "precision": 0.8423,
+    "recall": 0.8717,
+    "f1": 0.8567,
+    "aer": 0.1433,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 8736,
+    "pred": 8736
+   },
+   "NT-prophecy": {
+    "precision": 0.8591,
+    "recall": 0.8949,
+    "f1": 0.8767,
+    "aer": 0.1233,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 5708,
+    "pred": 5708
+   },
+   "OT": {
+    "precision": 0.8153,
+    "recall": 0.9315,
+    "f1": 0.8696,
+    "aer": 0.1304,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 21162,
+    "pred": 21162
+   },
+   "OT-narrative": {
+    "precision": 0.8515,
+    "recall": 0.9479,
+    "f1": 0.8971,
+    "aer": 0.1029,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 7563,
+    "pred": 7563
+   },
+   "OT-poetry": {
+    "precision": 0.7782,
+    "recall": 0.9106,
+    "f1": 0.8392,
+    "aer": 0.1608,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 9323,
+    "pred": 9323
+   },
+   "OT-prophecy": {
+    "precision": 0.8323,
+    "recall": 0.9463,
+    "f1": 0.8857,
+    "aer": 0.1143,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 4276,
+    "pred": 4276
+   },
+   "all": {
+    "precision": 0.8319,
+    "recall": 0.9098,
+    "f1": 0.8692,
+    "aer": 0.1308,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 39725,
+    "pred": 39725
+   },
+   "epistle": {
+    "precision": 0.8577,
+    "recall": 0.9103,
+    "f1": 0.8833,
+    "aer": 0.1168,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 4119,
+    "pred": 4119
+   },
+   "narrative": {
+    "precision": 0.8466,
+    "recall": 0.9057,
+    "f1": 0.8751,
+    "aer": 0.1249,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 16299,
+    "pred": 16299
+   },
+   "poetry": {
+    "precision": 0.7782,
+    "recall": 0.9106,
+    "f1": 0.8392,
+    "aer": 0.1608,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 9323,
+    "pred": 9323
+   },
+   "prophecy": {
+    "precision": 0.8477,
+    "recall": 0.9158,
+    "f1": 0.8804,
+    "aer": 0.1196,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 9984,
+    "pred": 9984
+   }
+  },
+  "at_0.5": {
+   "precision": 0.8616,
+   "recall": 0.895,
+   "f1": 0.878,
+   "aer": 0.122,
+   "aer_cap": 0.0,
+   "null_precision": 0.1702,
+   "words": 39725,
+   "pred": 37732
+  },
+  "content": {
+   "precision": 0.9132,
+   "recall": 0.9352,
+   "f1": 0.924,
+   "aer": 0.076,
+   "aer_cap": 0.0,
+   "null_precision": 0.0,
+   "words": 30076,
+   "pred": 30076
+  },
+  "content_at_0.5": {
+   "precision": 0.9342,
+   "recall": 0.9229,
+   "f1": 0.9285,
+   "aer": 0.0715,
+   "aer_cap": 0.0,
+   "null_precision": 0.2062,
+   "words": 30076,
+   "pred": 29014
+  },
+  "function": {
+   "precision": 0.5788,
+   "recall": 0.8029,
+   "f1": 0.6727,
+   "aer": 0.3273,
+   "aer_cap": 0.0,
+   "null_precision": 0.0,
+   "words": 9649,
+   "pred": 9649
+  },
+  "function_at_0.5": {
+   "precision": 0.6201,
+   "recall": 0.7772,
+   "f1": 0.6898,
+   "aer": 0.3102,
+   "aer_cap": 0.0,
+   "null_precision": 0.1608,
+   "words": 9649,
+   "pred": 8718
+  },
+  "calibration": [
+   {
+    "bin": "0.00-0.30",
+    "links": 378,
+    "mean_conf": 0.26157033832458215,
+    "accuracy": 0.1984126984126984
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 1615,
+    "mean_conf": 0.41554885301679384,
+    "accuracy": 0.2873065015479876
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1551,
+    "mean_conf": 0.5460272211053351,
+    "accuracy": 0.3223726627981947
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 2217,
+    "mean_conf": 0.6504808889322081,
+    "accuracy": 0.5096977898060442
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 2167,
+    "mean_conf": 0.7517143656542367,
+    "accuracy": 0.5703737886479003
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 3686,
+    "mean_conf": 0.849203834153886,
+    "accuracy": 0.6915355398806294
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 8962,
+    "mean_conf": 0.9330084303737824,
+    "accuracy": 0.9018076322249498
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 19149,
+    "mean_conf": 0.9723190716490474,
+    "accuracy": 0.992897801451773
+   }
+  ],
+  "calibration_content": [
+   {
+    "bin": "0.00-0.30",
+    "links": 238,
+    "mean_conf": 0.28634608657602406,
+    "accuracy": 0.226890756302521
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 824,
+    "mean_conf": 0.44286659350933455,
+    "accuracy": 0.3713592233009709
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 386,
+    "mean_conf": 0.5423783333106477,
+    "accuracy": 0.4378238341968912
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 1490,
+    "mean_conf": 0.6447972839582706,
+    "accuracy": 0.5697986577181208
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 1021,
+    "mean_conf": 0.7552762699026355,
+    "accuracy": 0.6464250734573947
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 1399,
+    "mean_conf": 0.8534435501149938,
+    "accuracy": 0.7969978556111508
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 5825,
+    "mean_conf": 0.9404572538070851,
+    "accuracy": 0.9517596566523605
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 18893,
+    "mean_conf": 0.972455442295388,
+    "accuracy": 0.9933308632826973
+   }
+  ],
+  "calibration_function": [
+   {
+    "bin": "0.00-0.30",
+    "links": 140,
+    "mean_conf": 0.21945156629713036,
+    "accuracy": 0.15
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 791,
+    "mean_conf": 0.387091434349469,
+    "accuracy": 0.1997471554993679
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1165,
+    "mean_conf": 0.5472362088210007,
+    "accuracy": 0.28412017167381975
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 727,
+    "mean_conf": 0.662129542867788,
+    "accuracy": 0.38651994497936726
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 1146,
+    "mean_conf": 0.7485409762671437,
+    "accuracy": 0.5026178010471204
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 2287,
+    "mean_conf": 0.8466103218541093,
+    "accuracy": 0.6270222999562746
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 3137,
+    "mean_conf": 0.9191769364308495,
+    "accuracy": 0.8090532355753906
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 256,
+    "mean_conf": 0.962254811409513,
+    "accuracy": 0.9609375
+   }
+  ],
+  "thresholds_content": [
+   {
+    "threshold": 0.0,
+    "precision": 0.9131533448596888,
+    "recall": 0.9351675292835739,
+    "f1": 0.9240293385371104,
+    "pred": 30076
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.9186272538373885,
+    "recall": 0.9333287932443476,
+    "f1": 0.9259196703036854,
+    "pred": 29838
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.9214016426551771,
+    "recall": 0.9320689185508036,
+    "f1": 0.9267045839257906,
+    "pred": 29708
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.934169711173916,
+    "recall": 0.9229092890220648,
+    "f1": 0.9285053612414785,
+    "pred": 29014
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.9408620930557496,
+    "recall": 0.9171547262326342,
+    "f1": 0.9288571625629353,
+    "pred": 28628
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9612351683985555,
+    "recall": 0.8882457096159084,
+    "f1": 0.923300180511804,
+    "pred": 27138
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9735421373052036,
+    "recall": 0.8657722691364751,
+    "f1": 0.9164999549427774,
+    "pred": 26117
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.983534266526418,
+    "recall": 0.8278057749931899,
+    "f1": 0.8989757053581334,
+    "pred": 24718
+   }
+  ],
+  "thresholds_function": [
+   {
+    "threshold": 0.0,
+    "precision": 0.5788164576640066,
+    "recall": 0.8029039677975848,
+    "f1": 0.6726889491117133,
+    "pred": 9649
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.5851298769586707,
+    "recall": 0.7998849913743531,
+    "f1": 0.6758578803522624,
+    "pred": 9509
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.6072417229542686,
+    "recall": 0.7883841288096607,
+    "f1": 0.6860574216550948,
+    "pred": 9031
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.6200963523743978,
+    "recall": 0.7771707878090857,
+    "f1": 0.6898047722342733,
+    "pred": 8718
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.6719184430027804,
+    "recall": 0.729585968947671,
+    "f1": 0.6995657867530498,
+    "pred": 7553
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.7023146791678875,
+    "recall": 0.6891891891891891,
+    "f1": 0.6956900304745319,
+    "pred": 6826
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.7426056338028169,
+    "recall": 0.6063829787234043,
+    "f1": 0.6676163342830009,
+    "pred": 5680
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.8205128205128205,
+    "recall": 0.40023001725129387,
+    "f1": 0.5380229973910523,
+    "pred": 3393
+   }
+  ],
+  "thresholds_all": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8319446192573946,
+    "recall": 0.9098392247549829,
+    "f1": 0.869150153190706,
+    "pred": 39725
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8380308536864309,
+    "recall": 0.9077744741768528,
+    "f1": 0.8715095611264553,
+    "pred": 39347
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8481633495960144,
+    "recall": 0.9045534632749698,
+    "f1": 0.8754512875850952,
+    "pred": 38739
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8616028834941164,
+    "recall": 0.8950005506001542,
+    "f1": 0.877984228151669,
+    "pred": 37732
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8847184986595175,
+    "recall": 0.8812355467459531,
+    "f1": 0.8829735880284117,
+    "pred": 36181
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9091979743257567,
+    "recall": 0.8501266380354586,
+    "f1": 0.8786706123378101,
+    "pred": 33964
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9322892096738686,
+    "recall": 0.8160995485078736,
+    "f1": 0.8703336709678366,
+    "pred": 31797
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9638575646544058,
+    "recall": 0.7459255588591565,
+    "f1": 0.8410025607201055,
+    "pred": 28111
+   }
+  ],
+  "errors": {
+   "counts": {
+    "adjacent source word": 1804,
+    "spurious (link, gold has none)": 3401,
+    "wrong source word": 1471
+   },
+   "examples": {
+    "adjacent source word": [
+     "1 John 1:1 'with' pred τοῖς#9 (0.86) gold ἑωράκαμεν#8",
+     "1 John 1:1 'of' pred τοῦ#20 (0.32) gold περὶ#19",
+     "1 John 1:6 'do' pred οὐ#15 (0.54) gold ποιοῦμεν#16",
+     "1 John 1:8 'ourselves' pred πλανῶμεν#8 (0.81) gold ἑαυτοὺς#7",
+     "1 John 2:2 'the' pred τοῦ#19 (0.66) gold κόσμου.#20",
+     "1 John 2:3 'hereby' pred ἐν#2 (0.77) gold τούτῳ#3"
+    ],
+    "spurious (link, gold has none)": [
+     "1 John 1:2 'it' pred καὶ#7 (0.53) gold -",
+     "1 John 1:3 'is' pred μετὰ#21 (0.65) gold -",
+     "1 John 1:9 'our' pred ἡμῖν#12 (0.51) gold -",
+     "1 John 2:2 'the' pred τοῦ#19 (0.78) gold -",
+     "1 John 2:2 'sins' pred τοῦ#19 (0.46) gold -",
+     "1 John 2:2 'of' pred τοῦ#19 (0.40) gold -"
+    ],
+    "wrong source word": [
+     "1 John 1:2 'shew' pred μαρτυροῦμεν#8 (0.48) gold ἀπαγγέλλομεν#10",
+     "1 John 1:3 'truly' pred ἡμῶν·#14 (0.72) gold δὲ#18",
+     "1 John 1:4 'we' pred ἡμῶν#8 (0.41) gold γράφομεν#3",
+     "1 John 1:5 'declare' pred ὅτι#13 (0.64) gold ἀναγγέλλομεν#11",
+     "1 John 2:2 'and' pred ἡμῶν·#8 (0.54) gold δὲ#13",
+     "1 John 2:3 'do' pred γινώσκομεν#4 (0.73) gold ἐν#2"
+    ]
+   }
+  }
+ },
+ "kjv_rerank_kjvcalib": {
+  "all": {
+   "NT": {
+    "precision": 0.8509,
+    "recall": 0.8873,
+    "f1": 0.8687,
+    "aer": 0.1313,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 18563,
+    "pred": 18563
+   },
+   "NT-epistle": {
+    "precision": 0.8577,
+    "recall": 0.9103,
+    "f1": 0.8833,
+    "aer": 0.1168,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 4119,
+    "pred": 4119
+   },
+   "NT-narrative": {
+    "precision": 0.8423,
+    "recall": 0.8717,
+    "f1": 0.8567,
+    "aer": 0.1433,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 8736,
+    "pred": 8736
+   },
+   "NT-prophecy": {
+    "precision": 0.8591,
+    "recall": 0.8949,
+    "f1": 0.8767,
+    "aer": 0.1233,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 5708,
+    "pred": 5708
+   },
+   "OT": {
+    "precision": 0.8153,
+    "recall": 0.9315,
+    "f1": 0.8696,
+    "aer": 0.1304,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 21162,
+    "pred": 21162
+   },
+   "OT-narrative": {
+    "precision": 0.8515,
+    "recall": 0.9479,
+    "f1": 0.8971,
+    "aer": 0.1029,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 7563,
+    "pred": 7563
+   },
+   "OT-poetry": {
+    "precision": 0.7782,
+    "recall": 0.9106,
+    "f1": 0.8392,
+    "aer": 0.1608,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 9323,
+    "pred": 9323
+   },
+   "OT-prophecy": {
+    "precision": 0.8323,
+    "recall": 0.9463,
+    "f1": 0.8857,
+    "aer": 0.1143,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 4276,
+    "pred": 4276
+   },
+   "all": {
+    "precision": 0.8319,
+    "recall": 0.9098,
+    "f1": 0.8692,
+    "aer": 0.1308,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 39725,
+    "pred": 39725
+   },
+   "epistle": {
+    "precision": 0.8577,
+    "recall": 0.9103,
+    "f1": 0.8833,
+    "aer": 0.1168,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 4119,
+    "pred": 4119
+   },
+   "narrative": {
+    "precision": 0.8466,
+    "recall": 0.9057,
+    "f1": 0.8751,
+    "aer": 0.1249,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 16299,
+    "pred": 16299
+   },
+   "poetry": {
+    "precision": 0.7782,
+    "recall": 0.9106,
+    "f1": 0.8392,
+    "aer": 0.1608,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 9323,
+    "pred": 9323
+   },
+   "prophecy": {
+    "precision": 0.8477,
+    "recall": 0.9158,
+    "f1": 0.8804,
+    "aer": 0.1196,
+    "aer_cap": 0.0,
+    "null_precision": 0.0,
+    "words": 9984,
+    "pred": 9984
+   }
+  },
+  "at_0.5": {
+   "precision": 0.8597,
+   "recall": 0.8971,
+   "f1": 0.878,
+   "aer": 0.122,
+   "aer_cap": 0.0,
+   "null_precision": 0.1644,
+   "words": 39725,
+   "pred": 37904
+  },
+  "content": {
+   "precision": 0.9132,
+   "recall": 0.9352,
+   "f1": 0.924,
+   "aer": 0.076,
+   "aer_cap": 0.0,
+   "null_precision": 0.0,
+   "words": 30076,
+   "pred": 30076
+  },
+  "content_at_0.5": {
+   "precision": 0.9313,
+   "recall": 0.9255,
+   "f1": 0.9284,
+   "aer": 0.0716,
+   "aer_cap": 0.0,
+   "null_precision": 0.178,
+   "words": 30076,
+   "pred": 29186
+  },
+  "function": {
+   "precision": 0.5788,
+   "recall": 0.8029,
+   "f1": 0.6727,
+   "aer": 0.3273,
+   "aer_cap": 0.0,
+   "null_precision": 0.0,
+   "words": 9649,
+   "pred": 9649
+  },
+  "function_at_0.5": {
+   "precision": 0.6201,
+   "recall": 0.7772,
+   "f1": 0.6898,
+   "aer": 0.3102,
+   "aer_cap": 0.0,
+   "null_precision": 0.1608,
+   "words": 9649,
+   "pred": 8718
+  },
+  "calibration": [
+   {
+    "bin": "0.00-0.30",
+    "links": 404,
+    "mean_conf": 0.22510069362853571,
+    "accuracy": 0.2079207920792079
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 1417,
+    "mean_conf": 0.39228163067208344,
+    "accuracy": 0.2674664784756528
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1954,
+    "mean_conf": 0.553021308556802,
+    "accuracy": 0.3556806550665302
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 2774,
+    "mean_conf": 0.6560790571835492,
+    "accuracy": 0.5428983417447729
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 2061,
+    "mean_conf": 0.7520768271518866,
+    "accuracy": 0.6108685104318292
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 2443,
+    "mean_conf": 0.8462697596026919,
+    "accuracy": 0.6389684813753582
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 5229,
+    "mean_conf": 0.9282902801032185,
+    "accuracy": 0.8422260470453241
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 23443,
+    "mean_conf": 0.9938588937387423,
+    "accuracy": 0.9879708228469053
+   }
+  ],
+  "calibration_content": [
+   {
+    "bin": "0.00-0.30",
+    "links": 264,
+    "mean_conf": 0.22809644297094714,
+    "accuracy": 0.23863636363636365
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 626,
+    "mean_conf": 0.39883984998708155,
+    "accuracy": 0.35303514376996803
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 789,
+    "mean_conf": 0.5615633126026954,
+    "accuracy": 0.46134347275031684
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 2047,
+    "mean_conf": 0.653930203694324,
+    "accuracy": 0.5984367366878358
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 915,
+    "mean_conf": 0.7565053354731104,
+    "accuracy": 0.746448087431694
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 156,
+    "mean_conf": 0.8412770296732713,
+    "accuracy": 0.8141025641025641
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 2092,
+    "mean_conf": 0.9419559393289378,
+    "accuracy": 0.8919694072657743
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 23187,
+    "mean_conf": 0.9942078239615496,
+    "accuracy": 0.988269288825635
+   }
+  ],
+  "calibration_function": [
+   {
+    "bin": "0.00-0.30",
+    "links": 140,
+    "mean_conf": 0.21945156629713036,
+    "accuracy": 0.15
+   },
+   {
+    "bin": "0.30-0.50",
+    "links": 791,
+    "mean_conf": 0.387091434349469,
+    "accuracy": 0.1997471554993679
+   },
+   {
+    "bin": "0.50-0.60",
+    "links": 1165,
+    "mean_conf": 0.5472362088210007,
+    "accuracy": 0.28412017167381975
+   },
+   {
+    "bin": "0.60-0.70",
+    "links": 727,
+    "mean_conf": 0.662129542867788,
+    "accuracy": 0.38651994497936726
+   },
+   {
+    "bin": "0.70-0.80",
+    "links": 1146,
+    "mean_conf": 0.7485409762671437,
+    "accuracy": 0.5026178010471204
+   },
+   {
+    "bin": "0.80-0.90",
+    "links": 2287,
+    "mean_conf": 0.8466103218541093,
+    "accuracy": 0.6270222999562746
+   },
+   {
+    "bin": "0.90-0.95",
+    "links": 3137,
+    "mean_conf": 0.9191769364308495,
+    "accuracy": 0.8090532355753906
+   },
+   {
+    "bin": "0.95-1.00",
+    "links": 256,
+    "mean_conf": 0.962254811409513,
+    "accuracy": 0.9609375
+   }
+  ],
+  "thresholds_content": [
+   {
+    "threshold": 0.0,
+    "precision": 0.9131533448596888,
+    "recall": 0.9351675292835739,
+    "f1": 0.9240293385371104,
+    "pred": 30076
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.9191265262310478,
+    "recall": 0.9330223372378098,
+    "f1": 0.9260223048327137,
+    "pred": 29812
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.9264516129032258,
+    "recall": 0.9290384091528194,
+    "f1": 0.9277432078615391,
+    "pred": 29450
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.9312684163640101,
+    "recall": 0.925497139743939,
+    "f1": 0.9283738087918844,
+    "pred": 29186
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.9443251047645879,
+    "recall": 0.9131026968128575,
+    "f1": 0.9284514844629101,
+    "pred": 28397
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.9711954459203036,
+    "recall": 0.8713906292563334,
+    "f1": 0.918590042715101,
+    "pred": 26350
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9792805189699233,
+    "recall": 0.8481340234268592,
+    "f1": 0.9090013320438661,
+    "pred": 25435
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9802998536334507,
+    "recall": 0.8438095886679379,
+    "f1": 0.9069482313759218,
+    "pred": 25279
+   }
+  ],
+  "thresholds_function": [
+   {
+    "threshold": 0.0,
+    "precision": 0.5788164576640066,
+    "recall": 0.8029039677975848,
+    "f1": 0.6726889491117133,
+    "pred": 9649
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.5851298769586707,
+    "recall": 0.7998849913743531,
+    "f1": 0.6758578803522624,
+    "pred": 9509
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.6072417229542686,
+    "recall": 0.7883841288096607,
+    "f1": 0.6860574216550948,
+    "pred": 9031
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.6200963523743978,
+    "recall": 0.7771707878090857,
+    "f1": 0.6898047722342733,
+    "pred": 8718
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.6719184430027804,
+    "recall": 0.729585968947671,
+    "f1": 0.6995657867530498,
+    "pred": 7553
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.7023146791678875,
+    "recall": 0.6891891891891891,
+    "f1": 0.6956900304745319,
+    "pred": 6826
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.7426056338028169,
+    "recall": 0.6063829787234043,
+    "f1": 0.6676163342830009,
+    "pred": 5680
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.8205128205128205,
+    "recall": 0.40023001725129387,
+    "f1": 0.5380229973910523,
+    "pred": 3393
+   }
+  ],
+  "thresholds_all": [
+   {
+    "threshold": 0.0,
+    "precision": 0.8319446192573946,
+    "recall": 0.9098392247549829,
+    "f1": 0.869150153190706,
+    "pred": 39725
+   },
+   {
+    "threshold": 0.3,
+    "precision": 0.8383560947076626,
+    "recall": 0.9075267041074772,
+    "f1": 0.8715711547359376,
+    "pred": 39321
+   },
+   {
+    "threshold": 0.4,
+    "precision": 0.8515371222161586,
+    "recall": 0.902103292588922,
+    "f1": 0.8760911703763118,
+    "pred": 38481
+   },
+   {
+    "threshold": 0.5,
+    "precision": 0.8596981848881384,
+    "recall": 0.8970928311859927,
+    "f1": 0.8779975211510481,
+    "pred": 37904
+   },
+   {
+    "threshold": 0.6,
+    "precision": 0.8870931849791377,
+    "recall": 0.8779594758286532,
+    "f1": 0.8825026980656944,
+    "pred": 35950
+   },
+   {
+    "threshold": 0.7,
+    "precision": 0.915872920183265,
+    "recall": 0.8364992842197996,
+    "f1": 0.8743884892086331,
+    "pred": 33176
+   },
+   {
+    "threshold": 0.8,
+    "precision": 0.9360758476618994,
+    "recall": 0.8018390045149213,
+    "f1": 0.8637731876214061,
+    "pred": 31115
+   },
+   {
+    "threshold": 0.9,
+    "precision": 0.9613909040178571,
+    "recall": 0.7588646624821055,
+    "f1": 0.8482060434488277,
+    "pred": 28672
+   }
+  ],
+  "errors": {
+   "counts": {
+    "adjacent source word": 1804,
+    "spurious (link, gold has none)": 3401,
+    "wrong source word": 1471
+   },
+   "examples": {
+    "adjacent source word": [
+     "1 John 1:1 'with' pred τοῖς#9 (0.86) gold ἑωράκαμεν#8",
+     "1 John 1:1 'of' pred τοῦ#20 (0.32) gold περὶ#19",
+     "1 John 1:6 'do' pred οὐ#15 (0.54) gold ποιοῦμεν#16",
+     "1 John 1:8 'ourselves' pred πλανῶμεν#8 (0.81) gold ἑαυτοὺς#7",
+     "1 John 2:2 'the' pred τοῦ#19 (0.66) gold κόσμου.#20",
+     "1 John 2:3 'hereby' pred ἐν#2 (0.70) gold τούτῳ#3"
+    ],
+    "spurious (link, gold has none)": [
+     "1 John 1:2 'it' pred καὶ#7 (0.53) gold -",
+     "1 John 1:3 'is' pred μετὰ#21 (0.65) gold -",
+     "1 John 1:9 'our' pred ἡμῖν#12 (0.51) gold -",
+     "1 John 2:2 'the' pred τοῦ#19 (0.78) gold -",
+     "1 John 2:2 'sins' pred τοῦ#19 (0.46) gold -",
+     "1 John 2:2 'of' pred τοῦ#19 (0.40) gold -"
+    ],
+    "wrong source word": [
+     "1 John 1:2 'shew' pred μαρτυροῦμεν#8 (0.52) gold ἀπαγγέλλομεν#10",
+     "1 John 1:3 'truly' pred ἡμῶν·#14 (0.67) gold δὲ#18",
+     "1 John 1:4 'we' pred ἡμῶν#8 (0.41) gold γράφομεν#3",
+     "1 John 1:5 'declare' pred ὅτι#13 (0.62) gold ἀναγγέλλομεν#11",
+     "1 John 2:2 'and' pred ἡμῶν·#8 (0.54) gold δὲ#13",
+     "1 John 2:3 'do' pred γινώσκομεν#4 (0.73) gold ἐν#2"
+    ]
+   }
+  }
+ },
+ "kjv_tag_resolution": {
+  "unique": 284435,
+  "untagged": 401555,
+  "ordered": 62810,
+  "added": 26997,
+  "missing": 6638,
+  "ambiguous": 7198
+ },
+ "rerank_weights": {
+  "null|no": -2.976037975064607,
+  "agree|then": 2.8007755964853263,
+  "null|at": -2.736990138354963,
+  "null|but": -2.6706571957550436,
+  "agree|when": 2.6687321976483758,
+  "agree|but": 2.5633962303123203,
+  "agree|so": 2.3988931732327705,
+  "null|when": -2.3424332159560075,
+  "agree|if": 2.2584884271519328,
+  "null|or": -2.240585920780445,
+  "null|who": -2.145422942386707,
+  "agree|this": 2.116058486594748,
+  "agree|that": 2.092132145107854,
+  "null|not": -2.073918639338801,
+  "null|from": -2.069878392713616,
+  "right|a": 2.0642847518926803,
+  "null|so": -2.002018131640809,
+  "agree|be": 1.9035218458922962,
+  "null|in": -1.856664830543057,
+  "null|content": -1.8325064787737422,
+  "agree|in": 1.8154591325628677,
+  "null|all": -1.7899267359883009,
+  "null|into": -1.7532020247480795,
+  "null|by": -1.747720288614781,
+  "null|that": -1.7281405310841085,
+  "agree|by": 1.717798245774271,
+  "null|this": -1.6969540453150311,
+  "agree|at": 1.6645955789470133,
+  "null|and": -1.6645603280460624,
+  "agree|on": 1.6644186439265023,
+  "agree|aux": 1.6629649780258344,
+  "agree|from": 1.6403766109798212,
+  "agree|what": 1.6305179583845473,
+  "null|with": -1.6047299919405231,
+  "agree|all": 1.602495150209178,
+  "agree|to": 1.5839055302170801,
+  "null|be": -1.577061558689384,
+  "null|as": -1.5516824782902123,
+  "agree|pron": 1.5338038865673542,
+  "null|on": -1.5293560907966748,
+  "agree|as": 1.5088404636902162,
+  "agree|for": 1.4780041078445811,
+  "agree|content": 1.4561710548545346,
+  "null|what": -1.4472479116575492,
+  "right|then": 1.4241985336344993,
+  "rank1|a": -1.3863788900941412,
+  "null": -1.3823490223496988,
+  "right|what": 1.3585691658439176,
+  "agreespan|aux": 1.3534562041743317,
+  "null|upon": -1.351029932288774,
+  "null|to": -1.3392469043510173,
+  "null|which": -1.3282451649247282,
+  "agree|no": 1.2929767807131791,
+  "agree|not": 1.2881531399957078,
+  "agree|into": 1.2849450094866215,
+  "agree|of": 1.28463248252208,
+  "agree|with": 1.2800755764608933,
+  "agree|and": 1.279838425518363,
+  "right|if": 1.2709143954303233,
+  "agree|a": 1.2691107171398777
+ }
+}

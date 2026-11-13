@@ -23,6 +23,7 @@ Data sources:
     Network APIs:
         - KJV/WEB translations  (GitHub raw files)
         - Strong's lexicon      (openscriptures GitHub)
+        - KJV Strong's tags     (eBible.org eng-kjv2006 USFM, for the alignments step)
         - Commentary            (HelloAO Bible API, CrossWire SWORD modules, Tyndale Open
                                  Resources; cached in data/sources/)
         - Spurgeon devotionals  (CCEL)
@@ -71,13 +72,13 @@ IMPORT_STEPS = [
     {
         "name": "web",
         "description": "WEB translation from seven1m/open-bibles XML (~31K verses)",
-        "version": "1.0",
+        "version": "1.1",  # 1.1: keep poetry lines and words of Jesus (was truncating)
         "script": "import_web_xml.py",
     },
     {
         "name": "interlinear",
-        "description": "STEPBible Hebrew/Greek interlinear (426K words)",
-        "version": "1.0",
+        "description": "STEPBible Hebrew/Greek interlinear (448K words)",
+        "version": "1.1",  # 1.1: keep verses with alternative versification (Psa 3, Mal 4...)
         "script": "import_stepbible_alignment.py",
         "requires_data": "alignment",
     },
@@ -86,6 +87,15 @@ IMPORT_STEPS = [
         "description": "Strong's Hebrew & Greek lexicon",
         "version": "1.0",
         "script": "import_strongs.py",
+    },
+    {
+        "name": "alignments",
+        "description": "Word alignments for BSB, KJV, WEB + lemma_renderings index",
+        "version": "1.1",  # 1.1: every word tappable, reranker, KJV calibration
+        "script": "build_alignments.py",
+        "args": ["all"],
+        "requires_data": "clear-bible",
+        "data_source": "https://github.com/Clear-Bible/Alignments",
     },
     {
         "name": "cross_refs",
@@ -320,7 +330,7 @@ def run_import_script(step):
             text=True,
             cwd=str(PROJECT_ROOT),
             env=env,
-            timeout=1800,  # 30 min timeout
+            timeout=3600,  # 60 min timeout (alignments: ~15 min on a small box)
         )
 
         if result.returncode != 0:
@@ -358,6 +368,7 @@ def count_rows(conn, step_name):
         "full_bibles": "verses",
         "web": "verses",
         "interlinear": "word_alignments",
+        "alignments": "english_word_alignments",
         "strongs": "lexicon",
         "cross_refs": "cross_references",
         "speakers": "speaker_verses",
@@ -523,7 +534,7 @@ def main():
             sys.exit(1)
 
     # Network steps
-    NETWORK_STEPS = {"full_bibles", "web", "strongs", "spurgeon"} | {
+    NETWORK_STEPS = {"full_bibles", "web", "strongs", "alignments", "spurgeon"} | {
         s["name"] for s in IMPORT_STEPS if s["name"].startswith("commentary_")
     }
 

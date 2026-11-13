@@ -2311,29 +2311,36 @@ function bibleApp() {
             return '·';
         },
 
-        // Format verse text with clickable words
+        // Format verse text with clickable words. A word is letters with inner
+        // apostrophes or hyphens ("God’s", "bless'd", "Beth-el"); quotes, dashes and
+        // other punctuation around it are kept as text. data-position is the 1-based
+        // word index that word alignments are keyed on: this rule must match
+        // scripts/aligner/text.py exactly (tests/test_tokenizer_parity.py checks it).
         formatVerseText(text) {
-            // Wrap each word in a span with position for alignment lookup
+            const TAPPABLE_WORD_RE = /[A-Za-zÀ-ÖØ-öø-ÿ]+(?:['’-][A-Za-zÀ-ÖØ-öø-ÿ]+)*/g;
+            const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            let html = '';
+            let last = 0;
             let wordPosition = 0;
-            return text.split(/\s+/).map((word) => {
-                // Extract leading punctuation, the word, and trailing punctuation
-                const match = word.match(/^([.,;:!?'"()—]*)([a-zA-Z'-]+)([.,;:!?'"()—]*)$/);
-                if (!match) {
-                    // Pure punctuation or other - return as-is
-                    return word;
-                }
-                const [, leadingPunct, cleanWord, trailingPunct] = match;
-                if (cleanWord) wordPosition++;
-                return `${leadingPunct}<span class="word" data-word="${cleanWord}" data-position="${wordPosition}">${cleanWord}</span>${trailingPunct}`;
-            }).join(' ');
+            for (const m of text.matchAll(TAPPABLE_WORD_RE)) {
+                wordPosition++;
+                html += esc(text.slice(last, m.index))
+                    + `<span class="word" data-word="${m[0]}" data-position="${wordPosition}">${m[0]}</span>`;
+                last = m.index + m[0].length;
+            }
+            return html + esc(text.slice(last));
         },
 
         // Handle word click (for English words in verse text)
         // Highlight the interlinear word matching an original-language position
         _highlightInterlinearWord(verseBox, origPos) {
             if (!this.showInterlinear || !origPos) return;
-            verseBox?.querySelectorAll('.interlinear-word').forEach((el, idx) => {
-                if (idx + 1 === origPos) el.classList.add('selected');
+            // Match on the word's own position (data-word-id = book.chapter.verse.position),
+            // not its index: the NT list is filtered to the active translation's edition.
+            verseBox?.querySelectorAll('.interlinear-word').forEach((el) => {
+                if (Number((el.dataset.wordId || '').split('.').pop()) === origPos) {
+                    el.classList.add('selected');
+                }
             });
         },
 

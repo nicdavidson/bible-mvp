@@ -166,6 +166,29 @@ def cached_fetch_html(key: str, url: str, timeout: int = 30) -> str | None:
     return cached_fetch(key, url, timeout)
 
 
+def cached_fetch_bytes(key: str, url: str, timeout: int = 120) -> Path | None:
+    """Fetch a binary file (e.g. a zip) into the cache and return its local path.
+
+    Returns None on failure. The file is written atomically so an interrupted
+    download never leaves a truncated file that later reads as cached.
+    """
+    p = _cache_path(key)
+    if p.exists() and p.stat().st_size > 0:
+        return p
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "BibleMVP/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            data = response.read()
+    except Exception as e:
+        print(f"    Error fetching {url}: {e}")
+        return None
+    _ensure_dir(p)
+    tmp = p.with_suffix(p.suffix + ".part")
+    tmp.write_bytes(data)
+    os.replace(tmp, p)
+    return p
+
+
 def cache_stats() -> dict:
     """Get cache statistics."""
     if not SOURCES_DIR.exists():
