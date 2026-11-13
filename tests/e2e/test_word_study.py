@@ -212,11 +212,10 @@ def test_search_strongs_number_opens_the_study(server, browser):
     ctx, pg, errors = new_page(browser, 1280, 800, touch=False)
     pg.goto(f"{server}/John/3")
     pg.wait_for_selector("#verse-3")
-    pg.evaluate("Alpine.$data(document.body).showSearch = true")
-    pg.fill(".input-search", "G4102")
-    pg.keyboard.press("Enter")
-    pg.wait_for_selector(".strongs-study:visible")
-    pg.click(".strongs-study")
+    pg.evaluate("Alpine.$data(document.body).openSearch()")
+    pg.fill("#srch-input", "G4102")
+    pg.wait_for_selector(".srch-word:visible")     # the word's card leads
+    pg.keyboard.press("Enter")                     # and Enter opens its study
     _study_ready(pg)
     assert _path(pg) == "/word/G4102"
     assert _nfc(pg.inner_text("#ws-title")) == _nfc("πίστις")

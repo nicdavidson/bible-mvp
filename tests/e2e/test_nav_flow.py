@@ -134,8 +134,8 @@ def test_typed_reference_in_sloppy_form(server, browser, size):
     pg.wait_for_function("!document.getElementById('passage-picker').open")
     # Search accepts a reference too (P1-7)
     pg.click(".header-right .btn-icon[title^='Search']")
-    pg.fill(".input-search", "jn 3:16")
-    pg.press(".input-search", "Enter")
+    pg.fill("#srch-input", "jn 3:16")
+    pg.press("#srch-input", "Enter")
     _wait_ref(pg, "John 3:16")
     assert _path(pg) == "/John/3/16"
     ctx.close()
@@ -406,14 +406,14 @@ def test_search_hit_keeps_results(server, desktop):
     desktop.goto(f"{server}/John/3")
     _wait_ref(desktop, "John 3")
     desktop.keyboard.press("/")
-    desktop.fill(".input-search", "living water")
-    desktop.wait_for_selector(".search-result")
-    desktop.locator(".search-result").first.click()
+    desktop.fill("#srch-input", "living water")
+    desktop.wait_for_selector(".srch-kw .srch-hit")
+    desktop.locator(".srch-kw .srch-hit").first.click()
     desktop.wait_for_function("!Alpine.$data(document.body).loading && Alpine.$data(document.body).currentReference !== 'John 3'")
     assert _chip(desktop) == "Back to John 3"
     desktop.click(".return-chip-results")
-    desktop.wait_for_selector(".search-result")
-    assert desktop.input_value(".input-search") == "living water"
+    desktop.wait_for_selector(".srch-kw .srch-hit")
+    assert desktop.input_value("#srch-input") == "living water"
 
 
 # ---------- plan mode ----------

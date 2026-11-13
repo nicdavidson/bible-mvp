@@ -306,6 +306,7 @@ dialog.study-view::backdrop { background: var(--color-bg); }
 .study-tool:hover:not([aria-pressed="true"]) { background: var(--color-surface-hover); }
 .study-chips .study-manage-btn { color: var(--study-meta); }
 
+
 /* ---------- panes (scroll-snap carousel: swipe between sources) ---------- */
 .study-track {
     grid-area: track;
@@ -822,8 +823,6 @@ dialog.study-sheet[open] { animation: study-sheet-in 0.18s ease-out; }
     .action-bar-count { position: static; transform: none; order: 3; }
 }
 
-/* License credit under a search hit from a source that requires it */
-.result-credit { margin-top: 4px; font-size: 0.75rem; color: var(--color-text-secondary); }
 
 /* ---------- Settings: commentary download list ---------- */
 .download-hint { margin: 0 0 6px; font-size: 0.8rem; color: var(--color-text-secondary); }
@@ -926,3 +925,4 @@ dialog.study-sheet[open] { animation: study-sheet-in 0.18s ease-out; }
     .study-track, .study-chips { scroll-behavior: auto; }
 }
 .hymn-sheet .study-attribution { padding-inline: 0; }
+

@@ -289,15 +289,7 @@ function bibleApp() {
         darkMode: false,
         currentTheme: 'light',
         activeTab: 'notes',        // the reader's sheet: 'notes' (this chapter's) | 'topics'
-        showSearch: false,
-        searchQuery: '',
-        searchScope: 'all',
-        searchResults: [],
-        searchWordInfo: null,  // Strong's word info for Strong's searches
-        searchLoading: false,
-        searchPerformed: false,
-        searchDebounceTimer: null,
-        selectedResultIndex: -1,
+        showSearch: false,     // the search screen is open (modules/search.js)
 
         bookChapters: BOOK_CHAPTERS,
 
@@ -598,6 +590,7 @@ function bibleApp() {
 
             // Study view: dialog Esc/back handling + selection availability hint
             this.studyInit();
+            this.srchInit();
 
             // Open whatever the address bar names, and own Back/Forward (modules/nav.js)
             await this.navInit();
@@ -736,8 +729,8 @@ function bibleApp() {
 
         setupKeyboardShortcuts() {
             document.addEventListener('keydown', (e) => {
-                // The study view and the picker are modal <dialog>s: they own their keys
-                if (this.study?.open || this.picker.open) return;
+                // The study view, the picker and search are modal <dialog>s: they own their keys
+                if (this.study?.open || this.picker.open || this.showSearch) return;
                 // Ignore if typing in an input
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     // But allow Escape to blur inputs

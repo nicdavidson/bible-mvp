@@ -132,6 +132,19 @@ class OfflineStorage {
         });
     }
 
+    // Every saved verse of one translation (offline search). Keys are
+    // "translation:book:chapter:verse", so one key range holds exactly one translation.
+    async allVerses(translation) {
+        await this.ready;
+        const tx = this.db.transaction(STORES.VERSES, 'readonly');
+        const range = IDBKeyRange.bound(`${translation}:`, `${translation}:\uffff`);
+        return new Promise((resolve, reject) => {
+            const request = tx.objectStore(STORES.VERSES).getAll(range);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
     // ========== ALIGNMENTS ==========
 
     async saveChapterAlignments(translation, book, chapter, alignments) {
