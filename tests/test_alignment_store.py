@@ -189,3 +189,12 @@ def test_tidy_drops_redundant_indexes_and_lookups_keep_an_index():
         plan = " ".join(r[3] for r in conn.execute(
             f"EXPLAIN QUERY PLAN SELECT * FROM word_alignments WHERE {where}"))
         assert "sqlite_autoindex_word_alignments_1" in plan, plan
+
+
+def test_function_words_match_the_aligner_and_thresholds():
+    from aligner.rerank import WORD_CLASS
+    assert store.FUNCTION_WORDS == frozenset(WORD_CLASS)
+    assert store.is_function_word("thee") and store.is_function_word("hath")
+    assert store.is_function_word("A") and not store.is_function_word("love")
+    assert store.rendering_link_ok("love", 0.55) and not store.rendering_link_ok("a", 0.55)
+    assert store.rendering_link_ok("a", 0.7)

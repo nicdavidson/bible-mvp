@@ -56,6 +56,8 @@ class SourceToken:
     word_type: str | None = None
     alt_ref: tuple | None = None  # (chapter, verse) of the bracketed alternative reference
     alt_kind: str | None = None   # '(', '[' or '{' for an alternative reference
+    ext: str | None = None        # STEPBible disambiguated lemma, 'H2617B' / 'G2424G'
+    ext_gloss: str | None = None  # STEPBible's gloss for that lemma ('shame')
 
     @property
     def lemma(self) -> str | None:
@@ -86,6 +88,32 @@ def _hebrew_morphemes(dstrongs: str) -> list[str]:
         if code.startswith("H9") and code not in _HEB_PUNCT:
             out.append(code)
     return out
+
+
+_HEB_EXT_RE = re.compile(r"\{(H\d{4}[A-Za-z]?)(?:=[^=}]*=([^}]*))?\}")
+_GRK_EXT_RE = re.compile(r"^(G\d{4}[A-Za-z]?)(?:=|$)")
+
+
+def _extended_lemma(parts, is_greek):
+    """STEPBible's disambiguated lemma of the word and its gloss.
+
+    TAHOT marks the word's own lemma in braces, with letters 'extended for BDB'
+    ('{H2617B}' = BDB's second חֶסֶד, 'shame'); its gloss is in a later column
+    ('{H2617B=חֶ֫סֶד=shame}'). TAGNT: 'G2424G=N-GSM-P' (letters tell persons and
+    senses apart; no per-letter gloss).
+    """
+    if is_greek:  # TAGNT gives no per-letter gloss in a fixed column
+        m = _GRK_EXT_RE.match(parts[3]) if len(parts) > 3 else None
+        return (m.group(1) if m else None), None
+    ext = gloss = None
+    for p in parts[4:]:
+        for m in _HEB_EXT_RE.finditer(p):
+            ext = ext or m.group(1)
+            if m.group(2) and m.group(1) == ext:
+                gloss = m.group(2).split("»")[0].strip(" :")
+        if ext and gloss:
+            break
+    return ext, gloss
 
 
 def _iter_rows(path: Path):
@@ -125,8 +153,9 @@ def _iter_rows(path: Path):
             strong = extract_primary_strong(dstrongs, is_greek=is_greek)
             if not gloss and not strong:
                 continue  # the importer skips these too
+            ext, ext_gloss = _extended_lemma(parts, is_greek)
             yield (book, chapter, verse, pos, text, strong, morphemes, grammar or "",
-                   gloss or "", editions, word_type, alt_ref, alt_kind)
+                   gloss or "", editions, word_type, alt_ref, alt_kind, ext, ext_gloss)
 
 
 def load_source_tokens(alignment_dir: Path = ALIGNMENT_DIR, books=None) -> dict:
@@ -138,11 +167,11 @@ def load_source_tokens(alignment_dir: Path = ALIGNMENT_DIR, books=None) -> dict:
             rows = [r for r in rows if r[0] in books]
         for r in renumber_split_verses(rows):
             (book, chapter, verse, pos, text, strong, morphemes, grammar, gloss,
-             editions, word_type, alt_ref, alt_kind) = r
+             editions, word_type, alt_ref, alt_kind, ext, ext_gloss) = r
             verses.setdefault((book, chapter, verse), []).append(SourceToken(
                 pos=pos, text=text, strong=_pad(strong), morphemes=morphemes,
                 grammar=grammar, gloss=gloss, editions=editions, word_type=word_type,
-                alt_ref=alt_ref, alt_kind=alt_kind,
+                alt_ref=alt_ref, alt_kind=alt_kind, ext=ext, ext_gloss=ext_gloss,
             ))
     for toks in verses.values():
         toks.sort(key=lambda t: t.pos)

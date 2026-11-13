@@ -3,8 +3,9 @@
 One row per (lemma, translation, rendering) with a count. A rendering is the
 English words of one verse that are linked to the same source word, in English
 order, lowercased, with leading and trailing function words trimmed
-('his mercy' -> 'mercy'); words that are not adjacent are joined with ' … '. Only links at or above a confidence threshold
-are counted. Occurrences are listed on demand by
+('his mercy' -> 'mercy'); words that are not adjacent are joined with ' … '. Only links
+the reader would be shown are counted: content words at confidence >= 0.5, function
+words at >= 0.7 (backend.alignment_store.rendering_link_ok). Occurrences are listed on demand by
 GET /api/word/{strong}/renderings (backend/routers/words.py), which unpacks
 english_alignment_verses (backend/alignment_store.py) with the same grouping rule.
 """
@@ -49,7 +50,8 @@ def group_rendering(words) -> str:
     return out
 
 
-def build_renderings(conn, min_confidence: float) -> int:
+def build_renderings(conn, min_confidence: float = 0.5) -> int:
+    """`min_confidence` is kept for callers; the rule is alignment_store.rendering_link_ok."""
     from backend import alignment_store as store  # project root is on sys.path (pipeline.py)
 
     conn.execute(TABLE_SQL)
@@ -69,7 +71,7 @@ def build_renderings(conn, min_confidence: float) -> int:
         groups = defaultdict(list)
         for epos, opos, conf, _ in store.unpack(method, links):
             strong = strongs.get((book, ch, v, opos))
-            if conf >= min_confidence and strong is not None:
+            if strong is not None and store.rendering_link_ok(words[epos - 1], conf):
                 groups[(strong, opos)].append((epos, words[epos - 1]))
         for (strong, _opos), ws in groups.items():
             counts[(unpad(strong), tr, group_rendering(ws))] += 1

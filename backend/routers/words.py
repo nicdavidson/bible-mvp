@@ -248,6 +248,7 @@ def get_word_renderings(
             return {
                 "strong_number": plain,
                 "min_confidence": RENDERING_MIN_CONFIDENCE,
+                "min_confidence_function_words": alignment_store.FUNCTION_MIN_CONFIDENCE,
                 "translations": {tr: {"total": sum(r["count"] for r in rs),
                                       "renderings": rs[:50]} for tr, rs in by_tr.items()},
             }
@@ -274,7 +275,7 @@ def get_word_renderings(
                 words = alignment_store.tappable_words(row["text"])
                 unpacked = {vkey: [(epos, opos, words[epos - 1]) for epos, opos, conf, _ in
                                    alignment_store.unpack(row["method"], row["links"])
-                                   if conf >= RENDERING_MIN_CONFIDENCE]}
+                                   if alignment_store.rendering_link_ok(words[epos - 1], conf)]}
             ws = [(epos, word) for epos, opos, word in unpacked[vkey] if opos == row["pos"]]
             if ws:
                 groups[vkey + (row["pos"],)] = ws

@@ -11,6 +11,7 @@ STEPBible tokens, renderings from the word alignments, topics from Nave's,
 cross-references from OpenBible.info.
 """
 import json
+import math
 import re
 import threading
 from collections import Counter, OrderedDict, defaultdict
@@ -27,7 +28,6 @@ from ..word_study import (FUNCTION_LEMMAS, NT_EDITIONS, PRIMARY_TEXT_LABEL, PRIM
 router = APIRouter()
 
 RENDERINGS_PER_TRANSLATION = 12
-RENDERING_MIN_CONFIDENCE = 0.5  # = lemma_renderings / words.py
 VERSES_PAGE = 100
 
 COLLOCATE_METHOD = {
@@ -37,8 +37,10 @@ COLLOCATE_METHOD = {
     "excluded": "function words (articles, conjunctions, prepositions, particles, pronouns, "
                 "adverbs) and " + ", ".join(FUNCTION_LEMMAS.values()),
 }
-TOPIC_METHOD = ("Nave's topics sharing >= 3 verses with this lemma, more than chance "
-                "predicts (G2 >= 15.13), ranked by G2")
+TOPIC_METHOD = ("Nave's topics that share >= 4 verses with this lemma, spread over >= 3 "
+                "books, where the lemma is in >= 10% of the topic's verses, more than chance "
+                "predicts (G2 >= 15.13); entries about a person or place are left out. "
+                "Ranked by G2")
 XREF_METHOD = ("OpenBible.info cross-references whose two verses both contain this lemma, "
                "by votes")
 SAMPLE_METHOD = ("Up to 12 verses: one for each BSB rendering used in at least 5% of "
@@ -97,17 +99,20 @@ def _brief(conn, strongs) -> dict:
     return out
 
 
-HOMOGRAPH_ORDER = ("Several BDB entries share this Strong's number. Ordered by how often "
-                   "BSB, KJV and WEB render the lemma with a word from the entry's glosses, "
-                   "then by the count BDB prints, then the longer article first.")
+HOMOGRAPH_ORDER = ("Several BDB entries share this Strong's number. Each is matched to "
+                   "STEPBible's disambiguated lemma with the same letter (TAHOT 'H2617B' = BDB "
+                   "entry 'b') and ordered by how often that lemma occurs; then by how often "
+                   "BSB, KJV and WEB render the lemma with a word from the entry's glosses; "
+                   "then in BDB's own order.")
 
 
-def _order_homographs(conn, plain, entries):
-    """BDB homographs (e.g. H3581 'chameleon' vs 'strength, power'): the entry whose
-    glosses match the lemma's actual renderings first. Each entry gets `rendering_matches`."""
+def _order_homographs(conn, plain, entries, homographs=()):
+    """BDB homographs in a fixed, explainable order. Each entry gets `occurrences` (of the
+    STEPBible lemma with its letter; null when none) and `rendering_matches`."""
     renderings = conn.execute("SELECT rendering, SUM(count) FROM lemma_renderings "
                               "WHERE strong_number = ? GROUP BY rendering", (plain,)).fetchall() \
         if _has(conn, "lemma_renderings") else []
+    occ = {h["bdb_aug"]: (h["ext"], h["occurrences"]) for h in homographs if h.get("bdb_aug")}
 
     def stems(text):
         return {w[:5] for w in re.findall(r"[a-z]{3,}", (text or "").lower())}
@@ -115,13 +120,41 @@ def _order_homographs(conn, plain, entries):
     for e in entries:
         g = stems(e["gloss"])
         e["rendering_matches"] = sum(n for r, n in renderings if g & stems(r))
-    return sorted(entries, key=lambda e: (-e["rendering_matches"],
-                                          -(e["meta"].get("count") or 0),
-                                          -len(e["definition"] or ""),
-                                          e["meta"].get("aug") or ""))
+        ext, n = occ.get((e["meta"].get("aug") or "").lower(), (None, None))
+        e["homograph"], e["occurrences"] = ext, n
+    return sorted(entries, key=lambda e: (-(e["occurrences"] or 0), -e["rendering_matches"],
+                                          e["source_key"] or ""))
 
 
-def _lexicons(conn, plain, hebrew, word):
+def _senses(conn, plain):
+    """STEPBible's disambiguated lemmas for this number (lemma_senses), most frequent first."""
+    if not _has(conn, "lemma_senses"):
+        return []
+    return [dict(r) for r in conn.execute(
+        "SELECT ext, gloss, occurrences, bdb_aug, homograph FROM lemma_senses "
+        "WHERE strong_number = ? ORDER BY occurrences DESC, ext", (plain,))]
+
+
+def _pick_homograph(senses, requested):
+    """(selected ext or None for all, homograph rows). Default: the most frequent one."""
+    homs = [x for x in senses if x["homograph"]]
+    if len(homs) < 2:
+        if requested and requested != "all":
+            raise HTTPException(status_code=400, detail="This lemma has no homographs")
+        return None, homs
+    if requested == "all":
+        return None, homs
+    if requested:
+        want = requested.strip().upper()
+        match = [x for x in homs if x["ext"].upper() in (want, want[:1] + want[1:].zfill(5))]
+        if not match:
+            raise HTTPException(status_code=400, detail="Unknown homograph; one of " +
+                                ", ".join(x["ext"] for x in homs) + " or all")
+        return match[0]["ext"], homs
+    return homs[0]["ext"], homs
+
+
+def _lexicons(conn, plain, hebrew, word, homographs=()):
     sections = []
     if _has(conn, "lexicon_entries"):
         rows = defaultdict(list)
@@ -132,7 +165,7 @@ def _lexicons(conn, plain, hebrew, word):
                 "notes": r["notes"], "source_key": r["source_key"],
                 "meta": json.loads(r["meta"]) if r["meta"] else {}})
         if len(rows.get("bdb", [])) > 1:
-            rows["bdb"] = _order_homographs(conn, plain, rows["bdb"])
+            rows["bdb"] = _order_homographs(conn, plain, rows["bdb"], homographs)
         for src in (("bdb",) if hebrew else ("abbott-smith", "dodson")):
             if rows.get(src):
                 section = {"source": src, "entries": rows[src]}
@@ -147,16 +180,21 @@ def _lexicons(conn, plain, hebrew, word):
     return sections
 
 
-def _occurrences(conn, plain, padded, hebrew):
+def _occurrences(conn, plain, padded, hebrew, homograph=None):
     total = Counter()
     by_book, by_form, form_label, editions = Counter(), Counter(), {}, Counter()
     verses = set()
     order = {}
-    for r in conn.execute("""
+    join, params = "", [plain, padded]
+    if homograph:
+        join = """JOIN token_homographs t ON t.book = w.book AND t.chapter = w.chapter
+                  AND t.verse = w.verse AND t.word_position = w.word_position AND t.ext = ?"""
+        params = [homograph, plain, padded]
+    for r in conn.execute(f"""
             SELECT w.book, w.chapter, w.verse, w.grammar, w.word_type, w.editions,
                    b.testament, b.book_order
-            FROM word_alignments w JOIN books b ON b.name = w.book
-            WHERE w.strong_number IN (?, ?)""", (plain, padded)):
+            FROM word_alignments w JOIN books b ON b.name = w.book {join}
+            WHERE w.strong_number IN (?, ?)""", params):
         if r["testament"] == "NT":
             eds = editions_of(r["editions"])
             for e in NT_EDITIONS:
@@ -189,25 +227,48 @@ def _occurrences(conn, plain, padded, hebrew):
     return out
 
 
-def _renderings(conn, plain):
+RENDERING_RULE = ("A rendering is listed when it is at least min(3, 10% of the translation's "
+                  "total) occurrences (and at least 1) and at least 1% of them. Renderings made "
+                  "only of function words (pronouns, articles, auxiliaries...) are listed only "
+                  "for function-word lemmas. Links count when shown: content words at "
+                  "confidence >= 0.5, function words at >= 0.7. The rest are summed in `other`.")
+
+
+def _function_only(rendering: str) -> bool:
+    words = [w for w in rendering.replace("…", " ").split() if w]
+    return bool(words) and all(alignment_store.is_function_word(w) for w in words)
+
+
+def _renderings(conn, plain, function_word):
+    out = {"source": "alignments",
+           "min_confidence": alignment_store.CONTENT_MIN_CONFIDENCE,
+           "min_confidence_function_words": alignment_store.FUNCTION_MIN_CONFIDENCE,
+           "rule": RENDERING_RULE,
+           "verses_url": f"/api/word/{plain}/renderings?translation={{translation}}"
+                         "&rendering={rendering}",
+           "translations": {}}
     if not _has(conn, "lemma_renderings"):
-        return {"source": "alignments", "min_confidence": RENDERING_MIN_CONFIDENCE,
-                "translations": {}}
+        return out
     by_tr = defaultdict(list)
     for r in conn.execute("SELECT translation_id, rendering, count FROM lemma_renderings "
                           "WHERE strong_number = ? ORDER BY translation_id, count DESC, "
                           "rendering", (plain,)):
         by_tr[r["translation_id"]].append({"rendering": r["rendering"], "count": r["count"]})
-    return {
-        "source": "alignments",
-        "min_confidence": RENDERING_MIN_CONFIDENCE,
-        "verses_url": f"/api/word/{plain}/renderings?translation={{translation}}"
-                      "&rendering={rendering}",
-        "translations": {tr: {"total": sum(x["count"] for x in rs),
-                              "distinct": len(rs),
-                              "renderings": rs[:RENDERINGS_PER_TRANSLATION]}
-                         for tr, rs in by_tr.items()},
-    }
+    for tr, rs in by_tr.items():
+        total = sum(x["count"] for x in rs)
+        min_count = max(1, min(3, math.ceil(0.1 * total)))
+        shown, other = [], {"renderings": 0, "occurrences": 0}
+        for x in rs:
+            if (x["count"] >= min_count and x["count"] >= 0.01 * total
+                    and (function_word or not _function_only(x["rendering"]))
+                    and len(shown) < RENDERINGS_PER_TRANSLATION):
+                shown.append(x)
+            else:
+                other["renderings"] += 1
+                other["occurrences"] += x["count"]
+        out["translations"][tr] = {"total": total, "distinct": len(rs), "renderings": shown,
+                                   "other": other}
+    return out
 
 
 def _bsb_links(conn, refs):
@@ -223,8 +284,9 @@ def _bsb_links(conn, refs):
         if not r:
             continue
         links = defaultdict(list)
+        words = alignment_store.tappable_words(r["text"])
         for epos, opos, conf, _ in alignment_store.unpack(r["method"] or 0, r["links"] or ""):
-            if conf >= RENDERING_MIN_CONFIDENCE:
+            if alignment_store.rendering_link_ok(words[epos - 1], conf):
                 links[opos].append(epos)
         out[(b, c, v)] = (r["text"], links)
     return out
@@ -273,18 +335,36 @@ def _group_rendering(words):
     return g(words)
 
 
-def build_study(plain: str, padded: str) -> dict:
+def build_study(plain: str, padded: str, homograph_param: Optional[str] = None) -> dict:
     conn = get_db_connection()
     try:
         word = conn.execute("SELECT * FROM lexicon WHERE strong_number = ?", (plain,)).fetchone()
         prof = conn.execute("SELECT * FROM lemma_profile WHERE strong_number = ?",
                             (plain,)).fetchone() if _has(conn, "lemma_profile") else None
-        occ = _occurrences(conn, plain, padded, plain[0] == "H")
-        if not word and not occ["total"]:
+        senses = _senses(conn, plain)
+        selected, homographs = _pick_homograph(senses, homograph_param)
+        occ = _occurrences(conn, plain, padded, plain[0] == "H", selected)
+        if not word and not occ["total"] and not selected:
             raise HTTPException(status_code=404, detail=f"Word not found: {plain}")
+        occ["homograph"] = selected
+        occ["homographs"] = [{"ext": h["ext"], "gloss": h["gloss"],
+                              "occurrences": h["occurrences"], "bdb_aug": h["bdb_aug"],
+                              "selected": h["ext"] == selected,
+                              "url": f"/api/word/{plain}/study?homograph={h['ext']}"}
+                             for h in homographs] if len(homographs) > 1 else []
+        sense_rows = [x for x in senses if not x["homograph"]]
+        # STEPBible names Hebrew senses ('peace', 'well-being'); Greek letters have no gloss
+        occ["senses"] = [{"ext": x["ext"], "gloss": x["gloss"], "occurrences": x["occurrences"]}
+                         for x in sense_rows] \
+            if len(sense_rows) > 1 and all(x["gloss"] for x in sense_rows) else []
+        if occ["homographs"]:
+            occ["note"] = ("This Strong's number covers several words (BDB homographs). Counts, "
+                           "books and forms are for the selected one (`homograph`, default the "
+                           "most frequent; `homograph=all` for all). Renderings, collocates, "
+                           "topics, cross-references and samples cover the Strong's number.")
         hebrew = plain[0] == "H"
         function_word = bool(prof["function_word"]) if prof else None
-        lexicons = _lexicons(conn, plain, hebrew, word)
+        lexicons = _lexicons(conn, plain, hebrew, word, homographs)
         translit = word["transliteration"] if word else None
         translit_source = "strongs" if translit else None
         if not translit:  # Strong's Hebrew has none: the OSHB lexical index's lemma form
@@ -305,7 +385,7 @@ def build_study(plain: str, padded: str) -> dict:
             },
             "lexicons": lexicons,
             "occurrences": occ,
-            "renderings": _renderings(conn, plain),
+            "renderings": _renderings(conn, plain, bool(function_word)),
         }
 
         collocates = []
@@ -382,15 +462,20 @@ def build_study(plain: str, padded: str) -> dict:
 
 
 @router.get("/api/word/{strong_number}/study")
-def get_word_study(strong_number: str):
+def get_word_study(
+    strong_number: str,
+    homograph: Optional[str] = Query(default=None, max_length=10,
+                                     description="e.g. H2617B, or 'all'; default: the most "
+                                                 "frequent homograph"),
+):
     """Everything about one lemma, computed from data; each section names its source."""
     plain, padded = _parse_strong(strong_number)
-    key = (_db_key(), plain)
+    key = (_db_key(), plain, homograph)
     with _cache_lock:
         if key in _cache:
             _cache.move_to_end(key)
             return _cache[key]
-    out = build_study(plain, padded)
+    out = build_study(plain, padded, homograph)
     with _cache_lock:
         _cache[key] = out
         while len(_cache) > _CACHE_MAX:
@@ -406,6 +491,8 @@ def get_word_verses(
     edition: Optional[str] = Query(default=None, description="NT only: SBL (default), TR or Byz"),
     with_: Optional[str] = Query(default=None, alias="with",
                                  description="Only verses that also contain this lemma"),
+    homograph: Optional[str] = Query(default=None, max_length=10,
+                                     description="Only this homograph, e.g. H2617B"),
     offset: int = Query(default=0, ge=0),
 ):
     """Occurrences of a lemma (one row per occurrence), in canonical order, 100 per page."""
@@ -424,6 +511,11 @@ def get_word_verses(
               AND ((b.testament = 'OT' AND COALESCE(w.word_type, '') NOT LIKE 'X%')
                    OR (b.testament = 'NT' AND {edition_sql("w.editions")}))"""
         params = [plain, padded, ed]
+        if homograph:
+            sql += """ AND EXISTS (SELECT 1 FROM token_homographs t WHERE t.book = w.book
+                       AND t.chapter = w.chapter AND t.verse = w.verse
+                       AND t.word_position = w.word_position AND t.ext = ?)"""
+            params.append(homograph.strip().upper())
         if book:
             sql += " AND w.book = ?"
             params.append(book)
@@ -443,7 +535,8 @@ def get_word_verses(
             rows.append({**dict(r), "form": key, "form_label": label})
         return {"strong_number": plain, "text": PRIMARY_TEXT_LABEL["OT" if hebrew else "NT"]
                 if not edition else f"Greek NT ({edition} tokens in TAGNT)",
-                "filters": {"book": book, "form": form, "edition": edition, "with": with_},
+                "filters": {"book": book, "form": form, "edition": edition, "with": with_,
+                            "homograph": homograph},
                 "total": len(rows), "verses": len({(r["book"], r["chapter"], r["verse"])
                                                    for r in rows}),
                 "offset": offset, "occurrences": rows[offset:offset + VERSES_PAGE]}

@@ -21,6 +21,7 @@ was already stored rounded to 3 decimals, so C/1000 is the identical float.
 """
 import re
 from collections import Counter
+from functools import lru_cache
 
 TABLE = "english_alignment_verses"
 LEGACY_TABLE = "english_word_alignments"
@@ -121,3 +122,27 @@ def write_verse_rows(conn, translation: str, verse_links) -> int:
             rows.append((translation, book, ch, v, method, n, text))
     conn.executemany(f"INSERT INTO {TABLE} VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
     return sum(r[5] for r in rows)
+
+
+# --- which links count as a rendering -------------------------------------------------
+# docs/ALIGNMENT_2026-11.md, "One threshold or two?": show content-word links at >= 0.5 and
+# function-word links at >= 0.7. Function words are the aligner's word classes
+# (scripts/aligner/rerank.py WORD_CLASS; tests/test_alignment_store.py keeps them equal),
+# tested on the aligner's normalized form ('thee' -> 'you', 'hath' -> 'have').
+CONTENT_MIN_CONFIDENCE = 0.5
+FUNCTION_MIN_CONFIDENCE = 0.7
+FUNCTION_WORDS = frozenset(
+    "the a of to and in for with from on by at that which who this not be there as so "
+    "then but if when all or no what these those into upon "
+    "i you he she it we they will shall may have do can would should might must let".split())
+
+
+@lru_cache(maxsize=65536)
+def is_function_word(word: str) -> bool:
+    from scripts.aligner.text import normalize  # stdlib-only module, shipped in the image
+    return normalize(word) in FUNCTION_WORDS
+
+
+def rendering_link_ok(word: str, confidence: float) -> bool:
+    return confidence >= (FUNCTION_MIN_CONFIDENCE if is_function_word(word)
+                          else CONTENT_MIN_CONFIDENCE)

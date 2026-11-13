@@ -157,11 +157,58 @@ def test_counts_agree_with_the_printed_lexicons(client, agape):
     assert agape["occurrences"]["total"] == 116
     a_s = next(s for s in agape["lexicons"] if s["source"] == "abbott-smith")
     assert a_s["entries"][0]["meta"]["nt_occurrences"] == 116
-    hesed = client.get("/api/word/H2617/study").json()
+    hesed = client.get("/api/word/H2617/study", params={"homograph": "all"}).json()
     assert hesed["occurrences"]["total"] == 247
     bdb = next(s for s in hesed["lexicons"] if s["source"] == "bdb")
     assert bdb["entries"][0]["meta"]["count"] == 247
     assert [e["meta"]["homograph"] for e in bdb["entries"]] == ["I", "II"]
+
+
+@needs_db
+def test_homographs_are_counted_apart(client):
+    # TAHOT H2617A (kindness, BDB I) vs H2617B (shame, BDB II: Lev 20:17, Prov 14:34)
+    d = client.get("/api/word/H2617/study").json()
+    occ = d["occurrences"]
+    assert occ["homograph"] == "H2617A" and occ["total"] == 245
+    assert [(h["ext"], h["occurrences"]) for h in occ["homographs"]] == \
+        [("H2617A", 245), ("H2617B", 2)]
+    shame = client.get("/api/word/H2617/study", params={"homograph": "H2617B"}).json()
+    assert shame["occurrences"]["total"] == 2
+    v = client.get("/api/word/H2617/verses", params={"homograph": "H2617B"}).json()
+    assert {(o["book"], o["chapter"], o["verse"]) for o in v["occurrences"]} == \
+        {("Leviticus", 20, 17), ("Proverbs", 14, 34)}
+    assert client.get("/api/word/G26/study", params={"homograph": "x"}).status_code == 400
+    # shalom's letters are senses of one word: counted together, broken down
+    shalom = client.get("/api/word/H7965/study").json()["occurrences"]
+    assert shalom["homographs"] == [] and shalom["total"] == 237
+    assert shalom["senses"][0]["gloss"] == "peace"
+
+
+@needs_db
+def test_h1817_bdb_order_follows_occurrences(client):
+    bdb = next(s for s in client.get("/api/word/H1817/study").json()["lexicons"]
+               if s["source"] == "bdb")
+    assert [e["source_key"] for e in bdb["entries"]] == ["d.bm.af", "d.bm.ab", "d.bm.ac"]
+    assert bdb["entries"][0]["occurrences"] == 86
+
+
+@needs_db
+def test_renderings_hide_noise(client):
+    agape = client.get("/api/word/G26/study").json()["renderings"]["translations"]["BSB"]
+    assert [r["rendering"] for r in agape["renderings"]] == ["love"]
+    assert agape["other"]["occurrences"] == agape["total"] - 109
+    ruach = client.get("/api/word/H7307/study").json()["renderings"]["translations"]["BSB"]
+    assert "a" not in [r["rendering"] for r in ruach["renderings"]]
+    article = client.get("/api/word/G3588/study").json()["renderings"]["translations"]["BSB"]
+    assert article["renderings"][0]["rendering"] == "the"   # function lemma keeps them
+
+
+@needs_db
+def test_topics_leave_out_names_and_single_stories(client):
+    shalom = [t["topic"] for t in client.get("/api/word/H7965/study").json()["topics"]["items"]]
+    assert shalom == ["PEACE"]
+    agape = [t["topic"] for t in client.get("/api/word/G26/study").json()["topics"]["items"]]
+    assert "LOVE" in agape
 
 
 @needs_db

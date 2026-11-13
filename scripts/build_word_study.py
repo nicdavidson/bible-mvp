@@ -13,8 +13,9 @@ cross_references. Writes (docs/WORD_STUDY_2026-11.md has the method and why):
                       together >= 3 verses, observed > expected and Dunning's
                       log-likelihood G2 >= 15.13 (p < 0.0001, 1 df); ranked by logDice;
                       top 15. Function words are excluded on both sides.
-    lemma_topics      Nave's topics whose verse lists hold the lemma far more than
-                      chance (same G2 test over all verses, >= 3 shared verses); top 8 by G2
+    lemma_topics      Nave's topics about what the lemma means: >= 4 shared verses in
+                      >= 3 books, >= 10% of the topic's verses, G2 >= 15.13, not a
+                      person/place entry; top 8 by G2 (see topics())
     lemma_xrefs       OpenBible cross-references whose both ends contain the lemma;
                       top 8 pairs by votes
     lemma_samples     up to 12 representative occurrences (lemmas with more than 12):
@@ -26,6 +27,7 @@ cross_references. Writes (docs/WORD_STUDY_2026-11.md has the method and why):
                       rendering
 Deterministic, no model.
 """
+import json
 import math
 import os
 import sqlite3
@@ -53,7 +55,6 @@ TOP_XREFS = 8
 SAMPLE_MAX = 12
 SAMPLE_RENDERING_SHARE = 0.05
 SAMPLE_RENDERINGS_MAX = 6
-RENDERING_MIN_CONFIDENCE = 0.5   # as lemma_renderings
 
 SCHEMA = """
 DROP TABLE IF EXISTS lemma_profile;
@@ -83,6 +84,22 @@ CREATE TABLE lemma_xrefs (
     to_book TEXT NOT NULL, to_chapter INTEGER NOT NULL, to_verse INTEGER NOT NULL,
     votes INTEGER NOT NULL,
     PRIMARY KEY (strong_number, rank)
+) WITHOUT ROWID;
+DROP TABLE IF EXISTS lemma_senses;
+CREATE TABLE lemma_senses (
+    strong_number TEXT NOT NULL,   -- 'H2617'
+    ext TEXT NOT NULL,             -- STEPBible disambiguated lemma 'H2617B'
+    gloss TEXT,                    -- STEPBible's gloss for it ('shame'); NULL for Greek
+    occurrences INTEGER NOT NULL,  -- primary text
+    bdb_aug TEXT,                  -- the OpenScriptures BDB entry with this letter, if any
+    homograph INTEGER NOT NULL,    -- 1: a separate word (has its own BDB entry); 0: a sense
+    PRIMARY KEY (strong_number, ext)
+) WITHOUT ROWID;
+DROP TABLE IF EXISTS token_homographs;
+CREATE TABLE token_homographs (    -- tokens of lemmas with >= 2 homographs only
+    book TEXT NOT NULL, chapter INTEGER NOT NULL, verse INTEGER NOT NULL,
+    word_position INTEGER NOT NULL, ext TEXT NOT NULL,
+    PRIMARY KEY (book, chapter, verse, word_position)
 ) WITHOUT ROWID;
 DROP TABLE IF EXISTS lemma_samples;
 CREATE TABLE lemma_samples (
@@ -164,7 +181,44 @@ def collocates(tokens, prof):
     return rows
 
 
+TOPIC_MIN_HITS = 4          # shared verses
+TOPIC_MIN_SHARE = 0.10      # of the topic's verses
+TOPIC_MIN_BOOKS = 3         # shared verses spread over this many books
+NAME_TOPIC_SHARE = 0.5      # a topic named like a person/place whose verses mostly hold it
+
+
+def name_topics(conn, topic_verses, lemma_verses, names):
+    """Nave's entries about a person or place: the topic's name is the KJV rendering of a
+    proper-noun lemma AND at least half of the topic's verses contain that lemma
+    (JORAM is about Joram; SIN is not about the wilderness of Sin)."""
+    proper = set()
+    for (s,) in conn.execute("SELECT DISTINCT strong_number FROM word_alignments WHERE "
+                             "grammar LIKE 'N-%-P' OR grammar LIKE 'N-PRI%' OR grammar LIKE "
+                             "'HNp%' OR grammar LIKE 'H%/Np%' OR grammar LIKE 'ANp%'"):
+        if s and s[1:].isdigit():
+            proper.add(unpad(s))
+    lemmas_named = defaultdict(set)
+    for s, r in conn.execute("SELECT strong_number, rendering FROM lemma_renderings "
+                             "WHERE translation_id = 'KJV'"):
+        if s in proper and " " not in r:
+            lemmas_named[r.upper()].add(s)
+    out = set()
+    for tid, name in names.items():
+        ls = lemmas_named.get(name.split(",")[0].split("(")[0].strip().upper())
+        T = topic_verses.get(tid)
+        if ls and T and sum(any(k in lemma_verses.get(x, ()) for x in ls) for k in T) \
+                >= NAME_TOPIC_SHARE * len(T):
+            out.add(tid)
+    return out
+
+
 def topics(conn, lemma_verses):
+    """Nave's topics that are about what the lemma means, not the stories it occurs in.
+
+    Kept when: >= 4 shared verses, in >= 3 books (one episode cannot carry it), >= 10% of
+    the topic's verses contain the lemma, more than chance with G2 >= 15.13, and the
+    topic is not a person/place entry. Ranked by G2.
+    """
     maxv = {(b, c): m for b, c, m in conn.execute(
         "SELECT book, chapter, MAX(verse) FROM verses WHERE translation_id='KJV' GROUP BY 1, 2")}
     n = sum(1 for _ in conn.execute("SELECT 1 FROM verses WHERE translation_id='KJV'"))
@@ -173,19 +227,24 @@ def topics(conn, lemma_verses):
             "SELECT topic_id, book, chapter, verse_start, verse_end FROM naves_topic_refs"):
         for v in range(vs, min(ve or vs, maxv.get((b, c), vs)) + 1):
             topic_verses[tid].add((b, c, v))
+    names = dict(conn.execute("SELECT id, topic FROM naves_topics"))
+    excluded = name_topics(conn, topic_verses, lemma_verses, names)
     by_verse = defaultdict(list)
     for tid, vs in topic_verses.items():
-        for key in vs:
-            by_verse[key].append(tid)
+        if tid not in excluded:
+            for key in vs:
+                by_verse[key].append(tid)
     rows = []
     for s, vs in lemma_verses.items():
-        hits = Counter(tid for key in vs for tid in by_verse.get(key, ()))
+        shared = defaultdict(list)
+        for key in vs:
+            for tid in by_verse.get(key, ()):
+                shared[tid].append(key)
         items = []
-        for tid, h in hits.items():
-            if h < TOGETHER_MIN:
-                continue
-            size = len(topic_verses[tid])
-            if h * n <= len(vs) * size:
+        for tid, keys in shared.items():
+            h, size = len(keys), len(topic_verses[tid])
+            if (h < TOPIC_MIN_HITS or h < TOPIC_MIN_SHARE * size
+                    or len({k[0] for k in keys}) < TOPIC_MIN_BOOKS or h * n <= len(vs) * size):
                 continue
             score = g2(h, len(vs), size, n)
             if score >= G2_MIN:
@@ -193,7 +252,7 @@ def topics(conn, lemma_verses):
         items.sort()
         for rank, (neg, tid, h, size) in enumerate(items[:TOP_TOPICS], 1):
             rows.append((s, rank, tid, h, size, round(-neg, 1)))
-    return rows
+    return rows, len(excluded)
 
 
 def xref_pairs(conn, lemma_verses):
@@ -229,7 +288,8 @@ def verse_prominence(conn):
 
 
 def bsb_renderings(conn):
-    """(book, chapter, verse, source position) -> BSB rendering (conf >= 0.5)."""
+    """(book, chapter, verse, source position) -> BSB rendering (shown links only:
+    content words >= 0.5, function words >= 0.7)."""
     out = {}
     for b, c, v, method, links, text in conn.execute(f"""
             SELECT p.book, p.chapter, p.verse, p.method, p.links, v.text
@@ -239,7 +299,7 @@ def bsb_renderings(conn):
         words = store.tappable_words(text)
         groups = defaultdict(list)
         for epos, opos, conf, _ in store.unpack(method, links):
-            if conf >= RENDERING_MIN_CONFIDENCE:
+            if store.rendering_link_ok(words[epos - 1], conf):
                 groups[opos].append((epos, words[epos - 1]))
         for opos, ws in groups.items():
             out[(b, c, v, opos)] = group_rendering(ws)
@@ -298,6 +358,43 @@ def samples(tokens, prof, rendering_of, prominence):
     return rows
 
 
+def senses(conn, tokens):
+    """STEPBible's disambiguated lemmas per Strong's number.
+
+    A letter is a *homograph* (a different word) when the OpenScriptures BDB has an
+    entry for this Strong's number with the same letter (TAHOT 'H2617B' = BDB aug 'b',
+    the second חֶסֶד, 'shame'); other letters (H0430G 'God' / H0430J 'gods', Greek
+    persons) are senses of one word and stay in its counts.
+    """
+    from aligner.sources import load_source_tokens
+    primary = {(b, c, v, p) for _s, b, c, v, p, *_ in tokens}
+    augs = defaultdict(set)
+    for s, meta in conn.execute("SELECT strong_number, meta FROM lexicon_entries "
+                                "WHERE source = 'bdb' AND meta IS NOT NULL"):
+        aug = json.loads(meta).get("aug")
+        if aug:
+            augs[s].add(aug.lower())
+    count, gloss, tok_ext = Counter(), {}, {}
+    for (b, c, v), toks in load_source_tokens().items():
+        for t in toks:
+            if t.strong and t.ext and (b, c, v, t.pos) in primary:
+                s = unpad(t.strong)
+                count[(s, t.ext)] += 1
+                gloss.setdefault(t.ext, t.ext_gloss)
+                tok_ext[(b, c, v, t.pos)] = (s, t.ext)
+    rows = []
+    homs = defaultdict(set)
+    for (s, ext), n in sorted(count.items()):
+        letter = ext[5:].lower() if len(ext) > 5 else ""
+        is_hom = bool(letter) and letter in augs.get(s, ())
+        if is_hom:
+            homs[s].add(ext)
+        rows.append((s, ext, gloss.get(ext), n, letter if is_hom else None, int(is_hom)))
+    multi = {s for s, e in homs.items() if len(e) >= 2}
+    tok_rows = [(*k, ext) for k, (s, ext) in tok_ext.items() if s in multi]
+    return rows, tok_rows, multi
+
+
 def main():
     t0 = time.time()
     conn = sqlite3.connect(DB_PATH)
@@ -306,12 +403,16 @@ def main():
     print(f"{len(tokens)} primary-text tokens, {len(prof)} lemmas ({time.time() - t0:.0f}s)")
     col = collocates(tokens, prof)
     print(f"collocates: {len(col)} rows ({time.time() - t0:.0f}s)")
-    top = topics(conn, lemma_verses)
-    print(f"topics: {len(top)} rows ({time.time() - t0:.0f}s)")
+    top, n_name_topics = topics(conn, lemma_verses)
+    print(f"topics: {len(top)} rows; {n_name_topics} person/place topics excluded "
+          f"({time.time() - t0:.0f}s)")
     xrs = xref_pairs(conn, lemma_verses)
     print(f"xrefs: {len(xrs)} rows ({time.time() - t0:.0f}s)")
     smp = samples(tokens, prof, bsb_renderings(conn), verse_prominence(conn))
     print(f"samples: {len(smp)} rows ({time.time() - t0:.0f}s)")
+    sense_rows, hom_tokens, multi = senses(conn, tokens)
+    print(f"senses: {len(sense_rows)} rows; {len(multi)} Strong's numbers cover >= 2 BDB "
+          f"homographs ({len(hom_tokens)} tokens) ({time.time() - t0:.0f}s)")
     conn.executescript(SCHEMA)
     conn.executemany("INSERT INTO lemma_profile VALUES (?, ?, ?, ?, ?)",
                      [(s, *p) for s, p in sorted(prof.items())])
@@ -319,6 +420,8 @@ def main():
     conn.executemany("INSERT INTO lemma_topics VALUES (?, ?, ?, ?, ?, ?)", top)
     conn.executemany("INSERT INTO lemma_xrefs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", xrs)
     conn.executemany("INSERT INTO lemma_samples VALUES (?, ?, ?, ?, ?, ?, ?, ?)", smp)
+    conn.executemany("INSERT INTO lemma_senses VALUES (?, ?, ?, ?, ?, ?)", sense_rows)
+    conn.executemany("INSERT INTO token_homographs VALUES (?, ?, ?, ?, ?)", hom_tokens)
     conn.commit()
     print(f"Built word study tables for {len(prof)} lemmas in {time.time() - t0:.0f}s")
 
