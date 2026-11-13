@@ -1,68 +1,163 @@
 {
-  "version": "2026.10.02",
-  "sha256": "8cc34a3d531debea5b46b595c140da64ea0a25aa6adeafebc375371e8d35ed1f",
-  "size": 384897024,
-  "built": "2026-10-02T10:47:02.231895",
+  "version": "2026.11.13",
+  "sha256": "912149caa373abd7e0f229fb7fcd2d73b3818ab9c0d6296a40a2d6e6319722d1",
+  "size": 535650304,
+  "built": "2026-11-13T11:37:51.057870",
   "imports": {
     "schema": {
       "version": "1.0",
       "row_count": 20,
-      "completed_at": "2026-02-06T00:10:34.100500"
+      "completed_at": "2026-11-13T05:50:27.648376"
     },
     "bsb": {
       "version": "1.0",
       "row_count": 553492,
-      "completed_at": "2026-02-06T00:10:50.348207"
+      "completed_at": "2026-11-13T05:50:47.490064"
     },
     "full_bibles": {
       "version": "1.1",
       "row_count": 31102,
-      "completed_at": "2026-02-06T00:10:52.297206"
+      "completed_at": "2026-11-13T05:51:08.344368"
     },
     "web": {
-      "version": "1.0",
-      "row_count": 29684,
-      "completed_at": "2026-02-06T00:10:54.478896"
+      "version": "1.1",
+      "row_count": 31098,
+      "completed_at": "2026-11-13T05:51:31.809279"
     },
     "interlinear": {
-      "version": "1.0",
-      "row_count": 425441,
-      "completed_at": "2026-02-06T00:11:01.004056"
+      "version": "1.1",
+      "row_count": 447734,
+      "completed_at": "2026-11-13T05:51:45.710431"
     },
     "strongs": {
       "version": "1.0",
       "row_count": 14197,
-      "completed_at": "2026-02-06T00:11:01.177777"
+      "completed_at": "2026-11-13T05:51:46.942765"
+    },
+    "lexicons": {
+      "version": "1.0",
+      "row_count": 9280,
+      "completed_at": "2026-11-13T05:51:51.060466"
     },
     "cross_refs": {
       "version": "1.0",
       "row_count": 41649,
-      "completed_at": "2026-02-06T00:11:01.799220"
+      "completed_at": "2026-11-13T05:58:52.971715"
     },
     "commentary_mh": {
-      "version": "1.0",
-      "row_count": 519,
-      "completed_at": "2026-02-06T00:16:17.076342"
+      "version": "3.0",
+      "row_count": 4252,
+      "completed_at": "2026-11-13T05:59:09.427396"
     },
     "commentary_jg": {
+      "version": "2.1",
+      "row_count": 29699,
+      "completed_at": "2026-11-13T05:59:38.606351"
+    },
+    "commentary_jfb": {
+      "version": "1.1",
+      "row_count": 18214,
+      "completed_at": "2026-11-13T06:00:01.024995"
+    },
+    "commentary_kd": {
+      "version": "1.1",
+      "row_count": 6644,
+      "completed_at": "2026-11-13T06:00:36.787630"
+    },
+    "commentary_calvin": {
+      "version": "1.1",
+      "row_count": 7327,
+      "completed_at": "2026-11-13T06:01:05.663312"
+    },
+    "commentary_clarke": {
+      "version": "1.1",
+      "row_count": 21051,
+      "completed_at": "2026-11-13T06:01:27.876229"
+    },
+    "commentary_barnes": {
+      "version": "1.1",
+      "row_count": 7322,
+      "completed_at": "2026-11-13T06:01:46.862341"
+    },
+    "commentary_wesley": {
+      "version": "1.1",
+      "row_count": 16927,
+      "completed_at": "2026-11-13T06:02:02.600960"
+    },
+    "commentary_pnt": {
+      "version": "1.1",
+      "row_count": 6068,
+      "completed_at": "2026-11-13T06:02:15.794959"
+    },
+    "commentary_scofield": {
+      "version": "1.1",
+      "row_count": 3207,
+      "completed_at": "2026-11-13T06:02:29.289792"
+    },
+    "commentary_tdavid": {
+      "version": "1.1",
+      "row_count": 2547,
+      "completed_at": "2026-11-13T06:02:43.325503"
+    },
+    "commentary_catena": {
+      "version": "1.1",
+      "row_count": 821,
+      "completed_at": "2026-11-13T06:02:58.197331"
+    },
+    "commentary_tyndale": {
+      "version": "1.1",
+      "row_count": 17301,
+      "completed_at": "2026-11-13T06:03:16.112767"
+    },
+    "commentary_search": {
       "version": "1.0",
-      "row_count": 2397,
-      "completed_at": "2026-02-06T00:18:29.833600"
+      "row_count": 141380,
+      "completed_at": "2026-11-13T06:03:16.393467"
     },
     "speakers": {
       "version": "1.0",
       "row_count": 6981,
-      "completed_at": "2026-02-06T00:18:30.435895"
+      "completed_at": "2026-11-13T06:03:18.841290"
     },
     "spurgeon": {
       "version": "1.0",
       "row_count": 732,
-      "completed_at": "2026-02-06T00:21:00.148234"
+      "completed_at": "2026-11-13T06:05:57.214334"
     },
     "naves": {
+      "version": "1.1",
+      "row_count": 75878,
+      "completed_at": "2026-11-13T06:06:01.087802"
+    },
+    "hymns": {
       "version": "1.0",
-      "row_count": 49399,
-      "completed_at": "2026-02-06T19:03:39.059275"
+      "row_count": 360,
+      "completed_at": "2026-11-13T06:06:07.239314"
+    },
+    "embeddings": {
+      "version": "1.0",
+      "row_count": 31202,
+      "completed_at": "2026-11-13T06:19:52.609940"
+    },
+    "alignments": {
+      "version": "1.2",
+      "row_count": 762504,
+      "completed_at": "2026-11-13T06:53:55.768692"
+    },
+    "alignments_pack": {
+      "version": "1.0",
+      "row_count": 2234276,
+      "completed_at": "2026-11-13T06:55:04.038582"
+    },
+    "word_study": {
+      "version": "1.0",
+      "row_count": 28617,
+      "completed_at": "2026-11-13T06:55:28.503260"
+    },
+    "tidy": {
+      "version": "1.0",
+      "row_count": 0,
+      "completed_at": "2026-11-13T06:55:29.440635"
     }
   }
 }
