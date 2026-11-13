@@ -32,22 +32,91 @@ ANY_TAG = re.compile(r"<[^>]*>")
 REF = re.compile(r"^(.+?) (\d+)(?::(\d+)(?:-(\d+))?)?$")
 FTS_PROBES = ["god", "lord", "faith", "christ", "israel", "grace"]
 
+# Verse-alignment ("shift") checks. "lemma": the entry opens by quoting KJV words, which
+# must appear in its own verse range (or be found in the next/previous verse = shifted).
+# "marker": the entry prints its own verse number ("Verse 16.", "3:16", "16.").
+SHIFT_CHECKS = {
+    "John Gill": ("lemma", r"\s*(.{6,80}?),\.\.\.\."),
+    "John Wesley": ("lemma", r"\s*([^-\n]{4,60}?)\s+-\s"),
+    "Jamieson-Fausset-Brown": ("lemma", r"\s*(?:[A-Z][A-Z ,.;'()\d:-]+\n+)?(?:\d+(?:-\d+)?\.\s*)?([^\n]{4,60}?)--"),
+    "People's New Testament": ("lemma", r"\s*([^.\n]{6,60}?)\.\s"),
+    "Adam Clarke": ("marker", r"\s*Verses?\s+(\d+)"),
+    "Barnes' Notes": ("marker", r"(?:[^\n]*\n+)?\s*Ver(?:se)?s?\.?\s+(\d+)"),
+    "Treasury of David": ("marker", r"\s*Verses?\s+(\d+)"),
+    "Catena Aurea": ("marker", r"\s*Ver\.\s*(\d+)"),
+    "Tyndale Study Notes": ("marker", r"\s*\d+:(\d+)"),
+    "John Calvin": ("marker", r"\s*(\d+)\.\s"),
+    "Keil & Delitzsch": ("selfref", None),
+    "Matthew Henry": ("selfref", None),
+    "Scofield Notes (1917)": ("lemma1", r"\s*([A-Za-z][^\n]{2,40})\n"),
+}
+WORD = re.compile(r"[a-z]+")
+
+
+def shift_check(conn, src, mode, rx, kjv):
+    """Returns Counter of ok / next / prev / unclear (entries without a usable lemma skipped)."""
+    import collections
+    pat = re.compile(rx) if rx else None
+    out = collections.Counter()
+    col = "content" if mode == "selfref" else "searchable_text"
+    for b, ch, s, e, t in conn.execute(
+            "SELECT book, chapter, reference_start, COALESCE(reference_end, reference_start), "
+            f"{col} FROM commentary_entries WHERE source = ?", (src,)):
+        if mode == "selfref":
+            # first link to a verse in the same chapter should fall inside the entry's range
+            m = re.search(rf'data-ref="{re.escape(b)} {ch}:(\d+)', t or "")
+            if m:
+                n = int(m.group(1))
+                out["ok" if s <= n <= e else "next" if n == e + 1 else "prev" if n == s - 1
+                    else "unclear"] += 1
+            continue
+        m = pat.match(t or "")
+        if not m:
+            continue
+        if mode == "marker":
+            n = int(m.group(1))
+            out["ok" if s <= n <= e else "next" if n == e + 1 else "prev" if n == s - 1 else "unclear"] += 1
+            continue
+        words = [w for w in WORD.findall(m.group(1).lower()) if len(w) > 2][:6]
+        if len(words) < (1 if mode == "lemma1" else 2):
+            continue
+
+        def score(v):
+            vt = kjv.get((b, ch, v), ())
+            return sum(w in vt for w in words) / len(words)
+        if max(score(v) for v in range(s, e + 1)) >= 0.6:
+            out["ok"] += 1
+        elif score(e + 1) >= 0.6:
+            out["next"] += 1
+        elif score(s - 1) >= 0.6:
+            out["prev"] += 1
+        else:
+            out["unclear"] += 1
+    return out
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--samples", type=int, default=0)
     args = ap.parse_args()
 
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     v11n = kjv_versification(conn)
     book_names = {r[0] for r in conn.execute("SELECT name FROM books")}
     total_verses = sum(sum(c) for c in v11n.values())
     failures = []
 
-    meta = {r[0]: r for r in conn.execute("SELECT source, short_name, kind, coverage FROM commentary_sources")}
-    sources = [r[0] for r in conn.execute(
-        "SELECT source FROM commentary_entries GROUP BY source "
-        "ORDER BY (SELECT sort_order FROM commentary_sources s WHERE s.source = commentary_entries.source)")]
+    try:
+        meta = {r[0]: r for r in conn.execute(
+            "SELECT source, short_name, kind, coverage FROM commentary_sources")}
+    except sqlite3.OperationalError:
+        meta = {}
+        failures.append("commentary_sources table missing")
+    order = {s: i for i, s in enumerate(meta)}
+    if meta:
+        order = {r[0]: r[1] for r in conn.execute("SELECT source, sort_order FROM commentary_sources")}
+    sources = sorted((r[0] for r in conn.execute("SELECT DISTINCT source FROM commentary_entries")),
+                     key=lambda s: (order.get(s, 0), s))
     for s in sources:
         if s not in meta:
             failures.append(f"{s}: no commentary_sources row")
@@ -136,6 +205,23 @@ def main():
             for r in rnd.sample(rows, min(args.samples, len(rows))):
                 text = ANY_TAG.sub("", r[5]).replace("\n", " ")
                 print(f"    sample {r[1]} {r[2]}:{r[3]}-{r[4]}  {text[:160]}")
+
+    print("\nVerse alignment (shift) check: entries whose lemma/verse marker matches their own "
+          "range (ok), the next verse, or the previous verse")
+    kjv = {(b, ch, v): set(WORD.findall(t.lower())) for b, ch, v, t in conn.execute(
+        "SELECT book, chapter, verse, text FROM verses WHERE translation_id = 'KJV'")}
+    for src in sources:
+        if src not in SHIFT_CHECKS:
+            print(f"  {src:26} (no lemma or verse marker to check)")
+            continue
+        mode, rx = SHIFT_CHECKS[src]
+        r = shift_check(conn, src, mode, rx, kjv)
+        decided = r["ok"] + r["next"] + r["prev"]
+        shifted = (r["next"] + r["prev"]) / decided if decided else 0
+        print(f"  {src:26} {mode:6} ok={r['ok']:6} next={r['next']:5} prev={r['prev']:5} "
+              f"unclear={r['unclear']:5} shifted={shifted:.1%}")
+        if decided >= 50 and shifted > 0.03:
+            failures.append(f"{src}: {shifted:.1%} of checked entries look shifted by one verse")
 
     print(f"\ncoverage = share of all 31,102 KJV verses with at least one entry; "
           f"scope = share of verses in the books the source covers")
