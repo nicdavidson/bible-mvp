@@ -70,7 +70,7 @@ IMPORT_STEPS = [
     {
         "name": "web",
         "description": "WEB translation from seven1m/open-bibles XML (~31K verses)",
-        "version": "1.0",
+        "version": "1.1",  # 1.1: keep poetry lines and words of Jesus (was truncating)
         "script": "import_web_xml.py",
     },
     {

@@ -70,104 +70,82 @@ def download_xml():
     return data
 
 
-def get_text_content(element):
-    """Get all text content from an element, including nested elements."""
-    text_parts = []
-    if element.text:
-        text_parts.append(element.text)
-    for child in element:
-        text_parts.append(get_text_content(child))
-        if child.tail:
-            text_parts.append(child.tail)
-    return ''.join(text_parts)
+# Elements whose content is never verse text: notes, cross-references, book
+# headers, Psalm superscriptions (BSB and KJV rows don't carry them either),
+# published verse/chapter labels.
+SKIP_ELEMENTS = {"f", "x", "id", "ide", "h", "toc", "cl", "d", "vp", "cp", "rem", "fig", "s"}
+# Paragraph styles that are headings or speaker labels, not verse text.
+SKIP_PARAGRAPH_STYLES = {"mt", "mt1", "mt2", "mte", "ms", "ms1", "mr", "s", "s1", "s2", "sp",
+                         "is", "ip", "ili", "imt", "r", "d"}
+
+
+def iter_verse_text(book_elem):
+    """Yield (chapter, verse, text) for every piece of verse text in document order.
+
+    USFX keeps a verse's words in element text and tails at any depth: inside
+    <q> poetry lines, <wj> words of Jesus, <add>, <qs> (Selah), and so on.
+    Before 2026-11 this importer only read the tail of <v> and of a few inline
+    elements, which cut most poetry verses to their first line and dropped
+    every verse that opens inside <wj> or <q>.
+    """
+    state = {"chapter": 0, "verse": None}
+
+    def walk(elem):
+        tag = elem.tag
+        if tag == "c":
+            state["chapter"] = int(elem.get("id", 0))
+            state["verse"] = None
+        elif tag == "v":
+            vid = re.match(r"\d+", elem.get("id", "0"))
+            state["verse"] = int(vid.group()) if vid else None
+        elif tag == "ve":
+            state["verse"] = None
+        skip = tag in SKIP_ELEMENTS or (tag == "p" and elem.get("sfm") in SKIP_PARAGRAPH_STYLES)
+        if not skip:
+            if elem.text and state["verse"]:
+                yield state["chapter"], state["verse"], elem.text
+            for child in elem:
+                yield from walk(child)
+                if child.tail and state["verse"]:
+                    yield state["chapter"], state["verse"], child.tail
+
+    for child in book_elem:
+        yield from walk(child)
+        if child.tail and state["verse"]:
+            yield state["chapter"], state["verse"], child.tail
 
 
 def parse_usfx(xml_content: str, conn: sqlite3.Connection) -> int:
-    """Parse USFX XML and import verses."""
+    """Parse USFX XML and import verses (INSERT OR REPLACE; idempotent)."""
     cursor = conn.cursor()
-
-    # Parse XML
     root = ET.fromstring(xml_content)
 
     total_verses = 0
-    current_book = None
-    current_chapter = 0
-    book_name = None
-    book_order = 0
-
-    # Find all book elements
     for book_elem in root.iter('book'):
-        book_id = book_elem.get('id', '')
-        book_name = BOOK_ID_MAP.get(book_id)
-
-        if not book_name:
-            continue
-
-        book_order = BOOK_ORDER.get(book_name, 0)
+        book_name = BOOK_ID_MAP.get(book_elem.get('id', ''))
+        book_order = BOOK_ORDER.get(book_name, 0) if book_name else 0
         if not book_order:
             continue
 
+        verses = {}
+        for chapter, verse, piece in iter_verse_text(book_elem):
+            if chapter > 0:
+                verses.setdefault((chapter, verse), []).append(piece)
+
         book_verses = 0
-        print(f"  {book_name}...", end=" ", flush=True)
-
-        # Process chapters within this book
-        for chapter_elem in book_elem.iter('c'):
-            current_chapter = int(chapter_elem.get('id', 0))
-
-        # The USFX format has verses as <v> elements
-        # We need to collect text between verse markers
-        current_chapter = 0
-        verses_in_chapter = {}
-
-        for elem in book_elem.iter():
-            if elem.tag == 'c':
-                # Save previous chapter's verses
-                if verses_in_chapter and current_chapter > 0:
-                    for v_num, v_text in verses_in_chapter.items():
-                        text = ' '.join(v_text).strip()
-                        text = re.sub(r'\s+', ' ', text)
-                        if text:
-                            cursor.execute("""
-                                INSERT OR REPLACE INTO verses
-                                (translation_id, book, book_order, chapter, verse, text)
-                                VALUES (?, ?, ?, ?, ?, ?)
-                            """, ("WEB", book_name, book_order, current_chapter, v_num, text))
-                            book_verses += 1
-
-                current_chapter = int(elem.get('id', 0))
-                verses_in_chapter = {}
-
-            elif elem.tag == 'v':
-                verse_num = int(elem.get('id', 0))
-                if verse_num > 0:
-                    verses_in_chapter[verse_num] = []
-                    # Get text that follows this verse marker
-                    if elem.tail:
-                        verses_in_chapter[verse_num].append(elem.tail.strip())
-
-            elif elem.tag in ('ve', 'f', 'x', 'wj', 'add', 'nd', 'qt'):
-                # Verse end, footnote, cross-ref, words of Jesus, added text, etc.
-                # Get tail text and add to current verse
-                if elem.tail and verses_in_chapter:
-                    last_verse = max(verses_in_chapter.keys())
-                    verses_in_chapter[last_verse].append(elem.tail.strip())
-
-        # Save last chapter
-        if verses_in_chapter and current_chapter > 0:
-            for v_num, v_text in verses_in_chapter.items():
-                text = ' '.join(v_text).strip()
-                text = re.sub(r'\s+', ' ', text)
-                if text:
-                    cursor.execute("""
-                        INSERT OR REPLACE INTO verses
-                        (translation_id, book, book_order, chapter, verse, text)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, ("WEB", book_name, book_order, current_chapter, v_num, text))
-                    book_verses += 1
+        for (chapter, verse), pieces in verses.items():
+            text = re.sub(r'\s+', ' ', ''.join(pieces)).strip()
+            if text:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO verses
+                    (translation_id, book, book_order, chapter, verse, text)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, ("WEB", book_name, book_order, chapter, verse, text))
+                book_verses += 1
 
         conn.commit()
         total_verses += book_verses
-        print(f"{book_verses} verses")
+        print(f"  {book_name}... {book_verses} verses")
 
     return total_verses
 
