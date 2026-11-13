@@ -143,7 +143,9 @@ same files from their real URLs.
 | 100 | Mackintosh Notes on the Pentateuch | Mackintosh | passage | C. H. Mackintosh, *Notes on Genesis … Deuteronomy* (1858-1880); PG transcribes Loizeaux reprints (e.g. Exodus "First edition 1880, 27th printing 1965") of the unchanged text | Project Gutenberg `https://www.gutenberg.org/cache/epub/<n>/pg<n>.txt`, n = 37915 Gen, 40596 Exod, 40610 Lev, 76552 Num, 41571 + 41584 Deut | 210 | 5 | 100% | 5.3 |
 | 110 | Larkin on Revelation | Larkin | passage | Clarence Larkin, *The Book of Revelation*, ©1919 (charts not included) | `https://sermonindex.net/modules/sword/silarkinrev.zip`; caps repair from archive.org `bookofrevelation00lark` | 75 | 1 | 100% | 0.5 |
 
-With the second group (below) the library holds 74,659 entries. Every one of the 31,102 verses has at least one entry
+With the second group (below) the library holds 74,659 entries. Database (release
+`2026.11.13.2`, sha256 `07e6e218…f012`): 286,441,472 → 326,320,128 bytes (+39.9 MB; commentary
+tables + FTS 128.6 → 163.8 MB; 1.4% free pages, under the 5% VACUUM threshold). Every one of the 31,102 verses has at least one entry
 (the 119 verses left uncovered by the trim are all covered again: Brooks and Gaebelein cover
 every chapter). Treasury of David moved to `sort_order` 120.
 
