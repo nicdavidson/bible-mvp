@@ -278,3 +278,28 @@ class TestOfflineSources:
         assert by["john-gill"]["bytes"] > 1_000_000
         assert all(s["bytes"] >= 0 and "default" in s for s in srcs)
         assert 1 <= sum(s["default"] for s in srcs) <= 3
+
+
+# ---------- cross-references with text (study view pane) ----------
+
+def test_real_crossrefs_carry_text_and_votes():
+    client = _real_client()
+    r = client.get("/api/passage/john 3:16-18/study/crossrefs")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["reference"] == "John 3:16-18" and "OpenBible.info" in d["credit"]
+    refs = d["cross_references"]
+    assert len(refs) > 40
+    assert {x["source_verse"] for x in refs} <= {16, 17, 18}
+    rom = next(x for x in refs if (x["target_book"], x["target_chapter"], x["target_verse"]) == ("Romans", 5, 8))
+    assert rom["votes"] > 500 and rom["text"].startswith("But God proves His love")
+    assert all(x["text"] for x in refs)
+    # Translation follows the reader
+    kjv = client.get("/api/passage/John 3:16/study/crossrefs?translation=KJV").json()["cross_references"]
+    assert any("commendeth" in (x["text"] or "") for x in kjv)
+
+
+def test_crossrefs_bad_reference_is_an_error():
+    client = _real_client()
+    assert client.get("/api/passage/Nothing 99/study/crossrefs").status_code in (400, 404)
+    assert client.get("/api/passage/John 3:99/study/crossrefs").status_code == 404

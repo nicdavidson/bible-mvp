@@ -15,7 +15,7 @@ import threading
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..core import parse_reference
+from ..core import get_cross_references, parse_reference
 from ..database import DATABASE_PATH, get_db_connection
 
 router = APIRouter()
@@ -268,3 +268,48 @@ def get_commentary(reference: str, source: str | None = Query(default=None, max_
     finally:
         conn.close()
 
+
+
+XREF_CREDIT = "Cross-references: OpenBible.info, CC BY 4.0 (based on the Treasury of Scripture Knowledge)"
+
+
+@router.get("/api/passage/{reference}/study/crossrefs")
+def get_study_crossrefs(reference: str, translation: str = Query(default="BSB", max_length=10)):
+    """Cross-references for a selection with each target verse's text, for the study view.
+
+    Same links as /api/passage/{ref}/crossrefs (both directions), plus `text` in the
+    reader's translation, so the pane can show the verses inline in one request.
+    `votes` is OpenBible.info's count of readers who found the link helpful; the
+    client ranks by it.
+    """
+    book, chapter, vs, ve, has_verse = _parse(reference)
+    conn = get_db_connection()
+    try:
+        last = _last_verse(conn, book, chapter)
+        if not last or vs > last:
+            raise HTTPException(status_code=404, detail=f"Passage not found: {reference}")
+        ve = min(ve, last)
+        refs = get_cross_references(conn, book, chapter, vs, ve)
+        texts = {}
+        keys = sorted({(r["target_book"], r["target_chapter"], r["target_verse"]) for r in refs})
+        for i in range(0, len(keys), 300):   # SQLite's bound-parameter limit
+            chunk = keys[i:i + 300]
+            rows = conn.execute(
+                "SELECT book, chapter, verse, text FROM verses WHERE translation_id = ? AND ("
+                + " OR ".join(["(book = ? AND chapter = ? AND verse = ?)"] * len(chunk)) + ")",
+                (translation, *[x for k in chunk for x in k]))
+            for row in rows:
+                texts[(row["book"], row["chapter"], row["verse"])] = row["text"]
+        out = [{
+            "source_verse": r["source_verse"],
+            "target_book": r["target_book"], "target_chapter": r["target_chapter"],
+            "target_verse": r["target_verse"], "votes": r["votes"] or 0,
+            "text": texts.get((r["target_book"], r["target_chapter"], r["target_verse"])),
+        } for r in refs]
+        return {
+            "reference": _canonical(book, chapter, vs, ve, has_verse),
+            "book": book, "chapter": chapter, "verse_start": vs, "verse_end": ve,
+            "translation": translation, "credit": XREF_CREDIT, "cross_references": out,
+        }
+    finally:
+        conn.close()
