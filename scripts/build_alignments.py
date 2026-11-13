@@ -15,6 +15,7 @@ Deterministic: no random state anywhere. See docs/ALIGNMENT_2026-11.md.
 """
 import argparse
 import json
+from dataclasses import replace
 import os
 import sys
 import time
@@ -74,8 +75,13 @@ def production_predictor(ctx, translation):
             m = train(ctx, splits, with_kjv=False)
             return m if translation == "BSB" else self_train(ctx, m, splits, translation)
         rr = reranker(ctx)
-        calib = fit_calibrator(Predictor(recipe(("train", "test")), rr),
-                               ctx.bsb_clean(("dev",)))
+        held = Predictor(recipe(("train", "test")), rr)
+        calib = fit_calibrator(held, ctx.bsb_clean(("dev",)))
+        if translation == "KJV":
+            # Content words: refit on the KJV's own Strong's tags (dev books), which
+            # removes most of the optimism BSB-fitted confidence has on KJV text.
+            kjv_dev = [e for e in ctx.kjv[0] if split_of(e.key[0]) == "dev"]
+            calib = ClassCalibrator(calib.function, fit_calibrator(held, kjv_dev).content)
         cache[translation] = Predictor(recipe(("train", "dev", "test")), rr, calib)
     return cache[translation]
 
@@ -126,6 +132,12 @@ def _report(exs, preds, srcidx):
         "function": _scores(exs, preds, 0.0, is_function)["all"],
         "function_at_0.5": _scores(exs, preds, 0.5, is_function)["all"],
         "calibration": calibration(exs, preds),
+        "calibration_content": calibration(
+            [replace(e, gold=[g if not is_function(w) else None
+                              for w, g in zip(e.english, e.gold)]) for e in exs], preds),
+        "calibration_function": calibration(
+            [replace(e, gold=[g if is_function(w) else None
+                              for w, g in zip(e.english, e.gold)]) for e in exs], preds),
         "thresholds_content": threshold_curve(exs, preds, word_filter=content),
         "thresholds_function": threshold_curve(exs, preds, word_filter=is_function),
         "thresholds_all": threshold_curve(exs, preds),
