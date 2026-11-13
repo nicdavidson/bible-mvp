@@ -267,3 +267,29 @@ def test_psalm_100_finds_old_hundredth_and_texts_merge(client):
     assert {"ccel-olney", "openhymnal"} <= set(top["sources_for_text"])
     joy = client.get("/api/hymns", params={"key": "Joy to the World"}).json()
     assert joy["total"] >= 2   # title matches the start of the first line
+
+
+@needs_db
+def test_familiar_hymn_first_within_the_same_link_strength(client):
+    """Psalm 100: "All People That On Earth Do Dwell" (Open Hymnal + Scottish Psalter)
+    before the metrical versions found only in one psalter; plain references stay after
+    every paraphrase, however familiar."""
+    d = client.get("/api/hymns/for-passage", params={"ref": "Psalm 100"}).json()
+    assert "familiar" in d["ranking"]
+    hymns = d["hymns"]
+    assert hymns[0]["first_line"] == "All people that on earth do dwell"
+    kinds = [h["links"][0]["kind"] for h in hymns if h["match"] == "passage"]
+    assert kinds == sorted(kinds, key=lambda k: k == "reference")   # strength still leads
+    # Isaiah 6: among plain references, a hymnal text with a tune before one without
+    isa = [h["title"] for h in client.get("/api/hymns/for-passage",
+                                          params={"ref": "Isaiah 6"}).json()["hymns"]]
+    assert isa.index("Holy, Holy, Holy") < isa.index("For The Beauty Of The Earth")
+
+
+@needs_db
+def test_hymn_topics_and_tunes_read_cleanly(client):
+    d = client.get("/api/hymns/oh-28").json()
+    assert "God, Majesty & Power of" in d["topics"]
+    ps23 = client.get("/api/hymns/for-passage", params={"ref": "Psalm 23"}).json()["hymns"][0]
+    assert "`" not in ps23["tune"] and "James’ Air" in ps23["tune"]
+    assert all("`" not in (s["tune"] or "") for s in ps23["settings"])

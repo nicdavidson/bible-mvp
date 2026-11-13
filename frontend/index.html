@@ -2943,7 +2943,7 @@
                     <p class="hymn-first" x-show="hymnFirstLine(hymnSheet.data)" x-text="hymnFirstLine(hymnSheet.data)"></p>
                     <dl class="study-info-facts hymn-facts">
                         <template x-if="hymnWho(hymnSheet.data)"><div><dt>Words</dt><dd x-text="hymnWho(hymnSheet.data)"></dd></div></template>
-                        <template x-if="hymnSheet.data.tune"><div><dt>Tune</dt><dd x-text="hymnDecode(hymnSheet.data.tune).replace(/`/g, '’') + (hymnSheet.data.composer ? ', ' + hymnDecode(hymnSheet.data.composer).replace(/(\d)-(\d)/g, '$1–$2') : '')"></dd></div></template>
+                        <template x-if="hymnSheet.data.tune"><div><dt>Tune</dt><dd x-text="hymnDecode(hymnSheet.data.tune) + (hymnSheet.data.composer ? ', ' + hymnDecode(hymnSheet.data.composer).replace(/(\d)-(\d)/g, '$1–$2') : '')"></dd></div></template>
                         <template x-if="hymnSheet.data.meter"><div><dt>Meter</dt><dd x-text="hymnSheet.data.meter"></dd></div></template>
                         <template x-if="hymnSheet.data.copyright"><div><dt>Copyright</dt><dd x-text="hymnSheet.data.words_public_domain ? 'Words in the public domain' : hymnDecode(hymnSheet.data.copyright)"></dd></div></template>
                     </dl>

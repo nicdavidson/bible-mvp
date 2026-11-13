@@ -89,7 +89,7 @@ window.BibleModules = window.BibleModules || {};
             return who;
         },
         hymnTune(h) {
-            const tune = h.tune ? decode(h.tune).replace(/`/g, '’') : null;
+            const tune = h.tune ? decode(h.tune) : null;
             const meter = h.meter ? decode(h.meter) : null;
             if (tune && meter) return `Tune: ${tune} (${meter})`;
             if (tune) return `Tune: ${tune}`;
