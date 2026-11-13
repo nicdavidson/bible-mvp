@@ -72,3 +72,15 @@ def test_entries_reference_real_verses(conn):
 def test_content_has_only_reference_links(conn):
     for (content,) in conn.execute("SELECT content FROM commentary_entries WHERE content LIKE '%<%'"):
         assert "<" not in ANCHOR.sub("", content)
+
+
+def test_scripts_have_no_shadowed_functions():
+    """Two branches each added source_cache.cached_fetch_bytes with different return types;
+    the later definition silently shadowed the earlier one and broke the Tyndale import."""
+    import ast
+    from pathlib import Path
+
+    for path in (Path(__file__).parent.parent / "scripts").glob("*.py"):
+        names = [n.name for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef)]
+        dupes = {n for n in names if names.count(n) > 1}
+        assert not dupes, f"{path.name} defines {sorted(dupes)} more than once"

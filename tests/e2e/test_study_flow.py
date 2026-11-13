@@ -220,7 +220,8 @@ FIND_CASES = [
     ("Genesis 1:3", "keil-delitzsch", "The word of God then went forth"),
     ("Romans 8:28", "matthew-henry", "II. The concurrence of all providences"),
     ("Psalms 23:4", "matthew-henry", "II. From his performing the office"),
-    ("John 3:16", "matthew-henry", None),          # chapter outline cites v1-21: not a match
+    # Henry was cut at 32K upstream until the CrossWire re-import; his section on v. 16-18 is now there.
+    ("John 3:16", "matthew-henry", "3. Christ here discourses of the great design"),
     ("Matthew 5:2", "catena-aurea", None),         # one "Ver. 1." above a quotation of 1-3
 ]
 

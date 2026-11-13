@@ -34,7 +34,7 @@ from aligner.pipeline import (ClassCalibrator, Context, Predictor,  # noqa: E402
                               train, train_reranker, write_rows)
 from aligner.rerank import is_function  # noqa: E402
 from aligner.renderings import build_renderings  # noqa: E402
-from source_cache import cached_fetch_bytes  # noqa: E402
+from source_cache import cached_fetch_path  # noqa: E402
 
 DB_PATH = Path(os.environ.get("DATABASE_PATH", SCRIPTS.parent / "data" / "bible.db"))
 EVAL_PATH = SCRIPTS.parent / "docs" / "alignment-eval-2026-11.json"
@@ -45,7 +45,7 @@ RENDERING_MIN_CONFIDENCE = 0.5
 
 
 def kjv_zip():
-    path = cached_fetch_bytes(KJV_CACHE_KEY, KJV_USFM_URL)
+    path = cached_fetch_path(KJV_CACHE_KEY, KJV_USFM_URL)
     if path is None:
         sys.exit(f"Could not download {KJV_USFM_URL}")
     return path

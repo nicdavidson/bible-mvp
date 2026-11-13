@@ -166,7 +166,7 @@ def cached_fetch_html(key: str, url: str, timeout: int = 30) -> str | None:
     return cached_fetch(key, url, timeout)
 
 
-def cached_fetch_bytes(key: str, url: str, timeout: int = 120) -> Path | None:
+def cached_fetch_path(key: str, url: str, timeout: int = 120) -> Path | None:
     """Fetch a binary file (e.g. a zip) into the cache and return its local path.
 
     Returns None on failure. The file is written atomically so an interrupted
