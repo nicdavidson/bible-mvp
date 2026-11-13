@@ -34,7 +34,7 @@ from commentary_text import (  # noqa: E402
     RefResolver, markup_to_text, plain_to_text, render, resolve_book,
 )
 from source_cache import cached_fetch_bytes, cached_fetch_json, is_cached  # noqa: E402
-from sword_reader import OSIS_BOOKS, SwordModule, kjv_versification  # noqa: E402
+from sword_reader import OSIS_BOOKS, SwordModule, kjv_versification, module_text_blocks  # noqa: E402
 
 DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", Path(__file__).parent.parent / "data" / "bible.db"))
 
@@ -58,6 +58,9 @@ HELLOAO_BOOKS = {
     "JAS": "James", "1PE": "1 Peter", "2PE": "2 Peter", "1JN": "1 John",
     "2JN": "2 John", "3JN": "3 John", "JUD": "Jude", "REV": "Revelation",
 }
+
+
+CAP = 32600  # HelloAO cuts entries at 32,767 bytes (Henry) or 32,767 characters (K&D)
 
 
 class Stats(dict):
@@ -159,6 +162,8 @@ def load_helloao(cfg, v11n, stats):
                         end = heading_end
                     if skipped:
                         stats.bump("calvin_sections_verse_text_removed")
+                if max(len(text), len(text.encode("utf-8"))) >= CAP:
+                    stats.setdefault("_capped", set()).add((book, ch, start))
                 items.append([start, end, text])
             # HelloAO's chapter "introduction" is either a chapter outline (Henry) or, when
             # the chapter has no verse-1 item, the verse-1 note itself (JFB). Prepend it to
@@ -166,6 +171,8 @@ def load_helloao(cfg, v11n, stats):
             intro = chapter.get("introduction")
             intro = intro if isinstance(intro, str) else ""
             intro = re.sub(r"^\s*(?:[1-3] )?[A-Z][A-Za-z ]+ \d+:\d+(?:-\d+)?\s*\n", "", intro).strip()
+            if intro and max(len(intro), len(intro.encode("utf-8"))) >= CAP:
+                stats.setdefault("_capped", set()).add((book, ch, 1))
             if intro:
                 first = min(items, key=lambda x: x[0]) if items else None
                 if first and first[0] == 1:
@@ -217,13 +224,68 @@ def strip_book_intro(raw: str, book: str) -> tuple[str, int]:
     return raw[cut:], cut
 
 
+_XP_PARA = re.compile(r'<div sID="([^"]+)" type="x-p"\s*/>(.*?)<div eID="\1" type="x-p"\s*/>', re.S)
+_VERSE_NUM = re.compile(r'<hi type="super">\s*\d+\s*</hi>')
+
+
+def drop_verse_text(raw: str, stats) -> str:
+    """Remove paragraphs that quote the Bible text (several <hi type="super">N</hi> verse
+    numbers), as printed before each section in Henry's Complete Commentary."""
+    def repl(m):
+        if len(_VERSE_NUM.findall(m.group(2))) >= 2:
+            stats.bump("verse_text_paragraphs_dropped")
+            return " "
+        return m.group(0)
+    return _XP_PARA.sub(repl, raw)
+
+
+_MHC_BOOK_TITLE = re.compile(r'<title type="x-ms">')
+_MHC_CH_INTRO = re.compile(r'<div sID="[^"]+" type="introduction"\s*/>')
+_MHC_SECTION = re.compile(r'<title type="x-s3">')
+_MHC_COMPLETED = re.compile(r'<title type="x-s4">\s*Completed by.*?</title>', re.S)
+
+
+def strip_mhc_book_intro(raw: str) -> tuple[str, int]:
+    """CrossWire MHC stores the volume preface and the book introduction in front of the
+    first entry of each book: from the <title type="x-ms"> book title up to the chapter-1
+    outline (or the first section title). Drop that span, but keep the "Completed by ..."
+    line naming the minister who finished Henry's work on that book (Romans-Revelation)."""
+    m = _MHC_BOOK_TITLE.search(raw)
+    if not m:
+        return raw, 0
+    end = _MHC_CH_INTRO.search(raw, m.end()) or _MHC_SECTION.search(raw, m.end())
+    if not end:
+        return raw, 0
+    completed = _MHC_COMPLETED.search(raw, m.start(), end.start())
+    keep = (completed.group(0).replace("x-s4", "x-s") + " ") if completed else ""
+    return raw[:m.start()] + keep + raw[end.start():], end.start() - m.start()
+
+
 def load_sword(cfg, v11n, stats, books: list[str] | None = None, module: str | None = None):
     mod = _sword_module(module or cfg["module"])
-    for e in mod.entries(v11n):
+    keep_intros = cfg.get("chapter_intros")
+    pending_intro: dict[tuple, str] = {}
+    for e in mod.entries(v11n, include_intros=bool(keep_intros),
+                         recover_orphans=bool(cfg.get("recover_orphans"))):
         if books and e.book not in books:
             continue
         raw = e.raw
-        if cfg.get("strip_book_intros") and e.chapter == 1 and e.verse_start == 1:
+        if e.verse_start == 0:
+            # chapter == 0 is a book introduction (not representable); chapter > 0 is the
+            # chapter introduction, which goes in front of the chapter's first entry.
+            if e.chapter > 0:
+                pending_intro[(e.book, e.chapter)] = raw
+            else:
+                stats.bump("book_intros_skipped")
+            continue
+        if cfg.get("drop_verse_text"):
+            raw = drop_verse_text(raw, stats)
+        if cfg.get("strip_book_intros") == "mhc" and e.chapter == 1:
+            raw, dropped = strip_mhc_book_intro(raw)
+            if dropped:
+                stats.bump("book_intro_bytes_dropped", dropped)
+                stats.bump("book_intros_dropped")
+        elif cfg.get("strip_book_intros") and e.chapter == 1 and e.verse_start == 1:
             raw, dropped = strip_book_intro(raw, e.book)
             if dropped:
                 stats.bump("book_intro_bytes_dropped", dropped)
@@ -233,6 +295,15 @@ def load_sword(cfg, v11n, stats, books: list[str] | None = None, module: str | N
             if fixed is None:
                 continue
             e, raw = fixed
+        intro = pending_intro.pop((e.book, e.chapter), None)
+        if intro is not None:
+            intro_text = markup_to_text(intro)
+            if intro_text and e.verse_start == 1:
+                raw = intro + "<p/>" + raw
+                stats.bump("chapter_intros_prepended")
+            elif intro_text:
+                yield e.book, e.chapter, 1, e.verse_start - 1, intro_text
+                stats.bump("chapter_intros_as_own_entry")
         yield e.book, e.chapter, e.verse_start, e.verse_end, markup_to_text(raw)
 
 
@@ -363,17 +434,121 @@ def load_tyndale(cfg, v11n, stats):
         start = int(rm.group(3) or 1)
         ch2 = int(rm.group(4)) if rm.group(4) else ch
         v2 = rm.group(5)
+        chapters = v11n[book]
         if rm.group(3) is None:  # chapter-only note
-            end = v11n[book][ch - 1] if ch <= len(v11n[book]) else start
+            spans = [(ch, 1, chapters[ch - 1] if ch <= len(chapters) else 1)]
         elif v2 is None:
-            end = start
-        elif ch2 != ch:
-            stats.bump("cross_chapter_notes_truncated_to_first_chapter")
-            end = v11n[book][ch - 1] if ch <= len(v11n[book]) else start
+            spans = [(ch, start, start)]
+        elif ch2 == ch:
+            spans = [(ch, start, int(v2))]
         else:
-            end = int(v2)
+            # A note on a group of chapters ("Pss 23-28"): attach it to every chapter it
+            # covers, with the verses covered in each, instead of only the first chapter.
+            ch2 = min(ch2, len(chapters))
+            spans = [(c, start if c == ch else 1, int(v2) if c == ch2 else chapters[c - 1])
+                     for c in range(ch, ch2 + 1)]
+            stats.bump("multi_chapter_notes")
+            stats.bump("multi_chapter_note_rows_added", len(spans) - 1)
         body = _TY_LINK.sub(r'<reference osisRef="\1">\2</reference>', m.group(3))
-        yield book, ch, start, end, markup_to_text(body)
+        text = markup_to_text(body)
+        for c, a, b in spans:
+            yield book, c, a, b, text
+
+
+_WORD = re.compile(r"[A-Za-z]+")
+_SENTENCE_END = re.compile(r"""[.!?;:)\]"'”’\u2014-]\s*$""")
+
+
+def looks_truncated(text: str) -> bool:
+    """Ends without sentence-final punctuation. Used together with the length cap."""
+    return not _SENTENCE_END.search(text.rstrip()[-3:] or ".")
+
+
+def _words_with_spans(text):
+    spans = [(m.group(0).lower(), m.start(), m.end()) for m in _WORD.finditer(text)]
+    joined, starts = [], []
+    pos = 0
+    for w, _a, _b in spans:
+        starts.append(pos)
+        joined.append(w)
+        pos += len(w) + 1
+    return spans, " ".join(joined), starts
+
+
+def _find_words(joined, starts, needle_words, from_word=0):
+    needle = " ".join(needle_words)
+    at = joined.find(needle, starts[from_word] if from_word < len(starts) else len(joined))
+    while at != -1 and at not in starts_set(starts):
+        at = joined.find(needle, at + 1)
+    if at == -1:
+        return None
+    import bisect
+    return bisect.bisect_left(starts, at)
+
+
+_STARTS_CACHE: dict[int, set] = {}
+
+
+def starts_set(starts):
+    key = id(starts)
+    if key not in _STARTS_CACHE:
+        _STARTS_CACHE[key] = set(starts)
+    return _STARTS_CACHE[key]
+
+
+def repair_truncated(rows, module, stats):
+    """Complete entries cut at HelloAO's 32K cap from the full text of a CrossWire module.
+
+    For a capped entry, find its last whole words in the module's decompressed blocks
+    (including text the module's verse index never references) and append what follows,
+    up to the opening words of the next entry. Entries whose anchors can't be found are
+    left as they are and counted."""
+    mod = _sword_module(module)
+    plain = []
+    for block in module_text_blocks(mod):
+        t = markup_to_text(block)
+        plain.append(re.sub("\x01[^\x02]*\x02([^\x03]*)\x03", r"\1", t))
+    full = "\n\n".join(plain)
+    spans, joined, starts = _words_with_spans(full)
+    capped = stats.get("_capped", set())
+    order = sorted(range(len(rows)), key=lambda i: (rows[i][0], rows[i][1], rows[i][2]))
+    out = list(rows)
+    for k, i in enumerate(order):
+        book, ch, s, e, text = rows[i]
+        if (book, ch, s) not in capped:
+            continue
+        stats.bump("capped_entries")
+        body = re.sub(r"[A-Za-z]+$", "", text.rstrip()).rstrip()  # drop the cut-off partial word
+        tail = [w.lower() for w in _WORD.findall(body)][-12:]
+        at = _find_words(joined, starts, tail)
+        nxt = rows[order[k + 1]][4] if k + 1 < len(order) else ""
+        head = [w.lower() for w in _WORD.findall(nxt)][:10]
+        stop = None
+        if at is not None and len(head) >= 5:
+            stop = _find_words(joined, starts, head, at + len(tail))
+        if stop is None or stop - (at + len(tail)) > 60000:
+            # Can't complete it: end at the last whole word and say so.
+            out[i] = (book, ch, s, e, body + " [\u2026]")
+            stats.bump("capped_entries_marked_incomplete")
+            print(f"    NOT repaired, marked [\u2026]: {book} {ch}:{s}")
+            continue
+        a = spans[at + len(tail) - 1][2]
+        b = spans[stop][1]
+        continuation = full[a:b].strip()
+        # the stretch before the next entry may end with that entry's heading ("Dan 9:25")
+        lines = continuation.split("\n")
+        while lines and (len(lines[-1].strip()) < 3 or re.fullmatch(
+                r"\s*(?:[1-3] ?)?[A-Z][a-z]+\.? \d+:[\d\-–, ]+(?:\s*\(.*\))?\s*\d*\s*", lines[-1])):
+            lines.pop()
+        continuation = "\n".join(lines).strip()
+        continuation = re.sub(r"\s+(?:[1-3] ?)?[A-Z][a-z]{1,5}\.? \d+:[\d\-–, ]+$", "", continuation)
+        joiner = "" if continuation[:1] in ".,;:!?)" else " "
+        out[i] = (book, ch, s, e, body + joiner + continuation)
+        stats.bump("capped_entries_repaired")
+        stats.bump("capped_chars_restored", len(continuation))
+        print(f"    repaired {book} {ch}:{s}: +{len(continuation)} chars, now ends "
+              f"{continuation[-40:]!r}")
+    return out
 
 
 LOADERS = {"helloao": load_helloao, "sword": load_sword, "tdavid": load_tdavid,
@@ -405,6 +580,25 @@ def infer_ranges(rows, v11n, stats):
     return out
 
 
+# Lines that are page navigation or edition labels from the digitizers, not commentary:
+# HelloAO JFB/K&D "Next: Genesis Chapter 2", CrossWire MHC "Unabridged", Barnes
+# "End of Barnes Notes on Ephesians", "See Chapter Introduction".
+_DEBRIS_LINE = re.compile(
+    r"(?m)^[ \t]*(?:Next: [^\n]{1,60}?(?:Chapter \d+|Introduction)|Previous: [^\n]{1,60}"
+    r"|Unabridged|End of Barnes(?:'|’)? Notes on [^\n]{1,40}|See Chapter Introduction)[ \t]*\.?[ \t]*$\n?")
+
+
+def strip_debris(rows, stats):
+    out = []
+    for b, c, s, e, t in rows:
+        t2 = _DEBRIS_LINE.sub("", t)
+        if t2 != t:
+            stats.bump("navigation_lines_removed", len(_DEBRIS_LINE.findall(t)))
+            t2 = re.sub(r"\n{3,}", "\n\n", t2).strip()
+        out.append((b, c, s, e, t2))
+    return out
+
+
 def validate(rows, v11n, stats):
     out = []
     for book, ch, s, e, t in rows:
@@ -429,16 +623,21 @@ def validate(rows, v11n, stats):
 
 
 def write_source_row(conn, cfg):
+    """Metadata row from the registry, plus size_bytes measured from the rows just written."""
+    size = conn.execute(
+        "SELECT COALESCE(SUM(LENGTH(CAST(content AS BLOB))), 0) FROM commentary_entries "
+        "WHERE source = ?", (cfg["source"],)).fetchone()[0]
+    values = {**cfg, "size_bytes": size}
     cols = ", ".join(SOURCE_COLUMNS)
     marks = ", ".join("?" for _ in SOURCE_COLUMNS)
     conn.execute(f"INSERT OR REPLACE INTO commentary_sources ({cols}) VALUES ({marks})",
-                 [cfg[c] for c in SOURCE_COLUMNS])
+                 [values[c] for c in SOURCE_COLUMNS])
 
 
 def ensure_schema(conn):
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from backend.database import COMMENTARY_SOURCES_DDL
-    conn.executescript(COMMENTARY_SOURCES_DDL)
+    from backend.database import _migrate_commentary_sources
+    _migrate_commentary_sources(conn)
 
 
 def import_commentary(key: str):
@@ -455,6 +654,11 @@ def import_commentary(key: str):
     rows = list(LOADERS[cfg["loader"]](cfg, v11n, stats))
     sup = cfg.get("supplement")
     if sup:
+        if sup.get("replace"):
+            # upstream text for these books is wrong (see registry); drop it first
+            before = len(rows)
+            rows = [r for r in rows if r[0] not in sup["books"]]
+            stats.bump("upstream_entries_replaced", before - len(rows))
         have = {r[0] for r in rows}
         need = [b for b in sup["books"] if b not in have]
         if need:
@@ -462,8 +666,11 @@ def import_commentary(key: str):
             extra = list(load_sword(sup_cfg, v11n, stats, books=need, module=sup["module"]))
             stats.bump(f"supplement_{sup['module']}_entries", len(extra))
             rows.extend(extra)
+    if cfg.get("repair_truncated_from"):
+        rows = repair_truncated(rows, cfg["repair_truncated_from"], stats)
     if cfg.get("infer_ranges"):
         rows = infer_ranges(rows, v11n, stats)
+    rows = strip_debris(rows, stats)
     rows = validate(rows, v11n, stats)
     if not rows:
         raise RuntimeError(f"{source}: no entries produced")
@@ -488,7 +695,8 @@ def import_commentary(key: str):
     conn.close()
     print(f"  books: {books}  links: {links}  time: {time.time() - t0:.0f}s")
     for k, v in sorted(stats.items()):
-        print(f"  {k}: {v}")
+        if not k.startswith("_"):
+            print(f"  {k}: {v}")
     print(f"Imported {len(rows)} entries")
     return len(rows)
 

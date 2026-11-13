@@ -25,17 +25,18 @@ COMMENTARIES = {
         "coverage": "66 books",
         "license": PD,
         "attribution": "Matthew Henry, An Exposition of the Old and New Testaments (1708-1710). "
-                       "Text from the HelloAO Free Use Bible API; Song of Solomon from the "
-                       "CrossWire MHC module (prepared from CCEL).",
-        "source_url": "https://bible.helloao.org/api/c/matthew-henry/books.json",
-        "sort_order": 10,
+                       "CrossWire MHC module, prepared from the CCEL text.",
+        "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=MHC",
         "description": "The complete devotional commentary by the English Nonconformist minister, "
                        "written passage by passage with practical application; Romans to "
                        "Revelation were finished from his notes by other ministers after his death.",
-        "loader": "helloao",
-        "helloao_id": "matthew-henry",
-        "infer_ranges": True,
-        "supplement": {"module": "MHC", "books": ["Song of Solomon"]},
+        # HelloAO's Henry is cut off at 32,767 bytes per entry (36 entries, incl. John 3);
+        # CrossWire MHC is complete (99.8% of CCEL) and carries real verse ranges.
+        "loader": "sword",
+        "module": "MHC",
+        "drop_verse_text": True,
+        "strip_book_intros": "mhc",
+        "chapter_intros": True,
     },
     "john-gill": {
         "source": "John Gill",
@@ -49,7 +50,6 @@ COMMENTARIES = {
         "attribution": "John Gill, Exposition of the Old and New Testaments (1746-1763). "
                        "Text from the HelloAO Free Use Bible API.",
         "source_url": "https://bible.helloao.org/api/c/john-gill/books.json",
-        "sort_order": 20,
         "description": "A London Baptist pastor's verse-by-verse exposition, notable for its use of "
                        "Jewish rabbinic sources and its strongly Calvinist theology.",
         "loader": "helloao",
@@ -68,7 +68,6 @@ COMMENTARIES = {
                        "Whole Bible (1871). Text from the HelloAO Free Use Bible API (matches the "
                        "CCEL edition).",
         "source_url": "https://bible.helloao.org/api/c/jamieson-fausset-brown/books.json",
-        "sort_order": 30,
         "description": "A compact, phrase-by-phrase commentary by two Scottish Presbyterian "
                        "ministers and an Anglican scholar; brief notes on wording, history and "
                        "meaning.",
@@ -86,18 +85,23 @@ COMMENTARIES = {
         "license": PD,
         "attribution": "Keil and Delitzsch, Biblical Commentary on the Old Testament "
                        "(English translation, T. & T. Clark, 1864-1878). Text from the HelloAO "
-                       "Free Use Bible API; Song of Solomon from the CrossWire KD module "
-                       "(Wikisource transcription).",
+                       "Free Use Bible API; 1 Chronicles and Song of Solomon from the CrossWire KD "
+                       "module (Wikisource transcription).",
         "source_url": "https://bible.helloao.org/api/c/keil-delitzsch/books.json",
-        "sort_order": 40,
         "description": "A detailed scholarly commentary on the Hebrew text of the Old Testament "
                        "by two German Lutheran professors; strong on language, history and "
                        "structure, usually by section rather than single verse.",
         "loader": "helloao",
         "helloao_id": "keil-delitzsch",
         "infer_ranges": True,
-        # HelloAO lists Song of Solomon with 0 chapters; CrossWire KD's Song block is intact
-        "supplement": {"module": "KD", "books": ["Song of Solomon"], "strip_book_intros": True},
+        # HelloAO cuts 24 long K&D entries at 32,767 characters; complete them from the
+        # full text of the CrossWire KD module (Wikisource), referenced or not.
+        "repair_truncated_from": "KD",
+        # HelloAO lists Song of Solomon with 0 chapters, and its "K&D" 1 Chronicles is
+        # actually John Gill's text. Both books come from CrossWire KD (Wikisource), reading
+        # the text its verse index skips as well (recover_orphans).
+        "supplement": {"module": "KD", "books": ["1 Chronicles", "Song of Solomon"],
+                       "replace": True, "strip_book_intros": True, "recover_orphans": True},
     },
     "john-calvin": {
         "source": "John Calvin",
@@ -112,7 +116,6 @@ COMMENTARIES = {
                        "Calvin Translation Society, 1843-1855). Text from the HelloAO Free Use "
                        "Bible API (CCEL edition); inline verse text and translator footnotes removed.",
         "source_url": "https://bible.helloao.org/api/c/john-calvin/books.json",
-        "sort_order": 50,
         "description": "The Geneva Reformer's own commentaries, explaining the plain sense of the "
                        "text with doctrinal and pastoral application. Calvin wrote none on Judges "
                        "to Song of Solomon (except Psalms), 2-3 John or Revelation.",
@@ -133,7 +136,6 @@ COMMENTARIES = {
         "attribution": "Adam Clarke, The Holy Bible ... with a Commentary and Critical Notes "
                        "(1810-1826). CrossWire Clarke module, from the Wikisource transcription.",
         "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Clarke",
-        "sort_order": 60,
         "description": "A Methodist scholar's verse-by-verse commentary, written over forty years, "
                        "with much on languages, customs and natural history alongside "
                        "Wesleyan theology.",
@@ -153,7 +155,6 @@ COMMENTARIES = {
         "attribution": "Albert Barnes, Notes, Explanatory and Practical, on the New Testament "
                        "(1832-1851). CrossWire Barnes module.",
         "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Barnes",
-        "sort_order": 70,
         "description": "Notes by a Philadelphia Presbyterian pastor written for Sunday-school "
                        "teachers and families: clear, verse-by-verse explanation of words, "
                        "background and meaning.",
@@ -175,7 +176,6 @@ COMMENTARIES = {
                        "the Old Testament (1765). CrossWire Wesley module (electronic edition by "
                        "Sulu Kelley and Bill Brown).",
         "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Wesley",
-        "sort_order": 80,
         "description": "Short, plain notes by the founder of Methodism, written for ordinary "
                        "readers; often a sentence or two per verse.",
         "loader": "sword",
@@ -194,7 +194,6 @@ COMMENTARIES = {
         "attribution": "B. W. Johnson, The People's New Testament with Explanatory Notes "
                        "(1889-1891). CrossWire PNT module.",
         "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=PNT",
-        "sort_order": 90,
         "description": "Brief popular notes on the New Testament by a teacher in the Disciples of "
                        "Christ (Stone-Campbell) movement.",
         "loader": "sword",
@@ -212,7 +211,6 @@ COMMENTARIES = {
         "attribution": "C. I. Scofield, Scofield Reference Bible notes, 1917 edition. CrossWire "
                        "Scofield module, from the Wikisource transcription.",
         "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Scofield",
-        "sort_order": 100,
         "description": "The study notes of the 1917 Scofield Reference Bible, which spread "
                        "dispensational premillennial teaching; notes are occasional, not on "
                        "every verse.",
@@ -231,7 +229,6 @@ COMMENTARIES = {
         "attribution": "C. H. Spurgeon, The Treasury of David (1869-1885). CrossWire TDavid "
                        "module, from the Spurgeon Archive text. Spurgeon's own exposition only.",
         "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=TDavid",
-        "sort_order": 110,
         "description": "The London Baptist preacher's devotional exposition of the Psalms. Only "
                        "Spurgeon's own overview and verse exposition are included, not the "
                        "collected quotations or sermon hints.",
@@ -251,7 +248,6 @@ COMMENTARIES = {
                        "(Oxford, 1841-1845). CrossWire Catena module, from github.com/lemtom/catena "
                        "(CC0).",
         "source_url": "https://www.crosswire.org/sword/modules/ModInfo.jsp?modName=Catena",
-        "sort_order": 120,
         "description": "A 'golden chain' of quotations from the Church Fathers (Augustine, "
                        "Chrysostom, Jerome and others) arranged passage by passage through the "
                        "four Gospels.",
@@ -268,12 +264,17 @@ COMMENTARIES = {
         "kind": "notes",
         "coverage": "66 books",
         "license": "CC BY-SA 4.0",
+        # CC BY-SA 4.0 s.3(a)(1): creator, copyright notice, license, modification notice;
+        # s.3(a)(2) allows the rest (license URI, full credit) one link away, e.g. the info
+        # sheet showing `attribution`. Wording follows Tyndale's README ("Adapted from ...").
+        "attribution_short": "Adapted from Tyndale Open Study Notes \u00a9 2022 Tyndale House "
+                             "Publishers, CC BY-SA 4.0",
+        "requires_attribution": 1,
         "attribution": "Adapted from Tyndale Open Study Notes. The original work by Tyndale House "
                        "Publishers is available for free at http://www.tyndaleopenresources.com. "
                        "Copyright (C) 2022 by Tyndale House Publishers, CC BY-SA 4.0. Changes: "
                        "converted from XML to plain text with reference links; wording unchanged.",
         "source_url": "https://tyndaleopenresources.com/",
-        "sort_order": 130,
         "description": "Modern evangelical study-Bible notes in clear contemporary English, on "
                        "verses and passages, covering background and meaning.",
         "loader": "tyndale",
@@ -283,4 +284,18 @@ COMMENTARIES = {
 }
 
 SOURCE_COLUMNS = ["source", "short_name", "author", "year", "tradition", "kind", "coverage",
-                  "license", "attribution", "source_url", "sort_order", "description"]
+                  "license", "attribution", "source_url", "sort_order", "description",
+                  "attribution_short", "size_bytes", "requires_attribution"]
+
+# Default order for a first-time reader (agreed with the study-view agent): short modern
+# notes, the best-loved devotional work, brief verse notes, then longer and more technical
+# works, the sparsest last.
+DEFAULT_ORDER = ["tyndale", "matthew-henry", "jamieson-fausset-brown", "treasury-of-david",
+                 "john-calvin", "albert-barnes", "john-wesley", "adam-clarke", "john-gill",
+                 "peoples-nt", "keil-delitzsch", "catena-aurea", "scofield"]
+assert sorted(DEFAULT_ORDER) == sorted(COMMENTARIES)
+for _i, _key in enumerate(DEFAULT_ORDER):
+    _c = COMMENTARIES[_key]
+    _c["sort_order"] = (_i + 1) * 10
+    _c.setdefault("requires_attribution", 0)
+    _c.setdefault("attribution_short", None)
