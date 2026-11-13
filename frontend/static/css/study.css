@@ -926,3 +926,10 @@ dialog.study-sheet[open] { animation: study-sheet-in 0.18s ease-out; }
 }
 .hymn-sheet .study-attribution { padding-inline: 0; }
 
+/* Similar verses under the cross-references: computed, so set apart by a rule and a mark */
+.similar { max-width: 40rem; margin: 20px auto 8px; padding: 16px 20px 0; border-top: 1px solid var(--color-border); }
+.similar-title { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font: 650 1rem var(--font-sans); }
+.similar-mark { font: 700 1.25rem/1 var(--font-verse); color: var(--srch-mark, var(--color-accent)); }
+.similar .study-tool-sub { padding: 0; }
+.similar-load { margin-top: 4px; }
+@media (min-width: 960px) { .similar { padding-inline: 28px; } }

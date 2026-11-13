@@ -2802,6 +2802,33 @@
                             <button type="button" class="study-text-btn" @click="studyXref.key = null; studyLoadXrefs()">Try again</button>
                         </div>
                         <p class="study-attribution" x-show="studyXref.status === 'ready' && studyXref.items.length" x-text="studyXref.credit"></p>
+
+                        <!-- Computed, apart from the editor's list, and only when asked for (modules/study_panes.js) -->
+                        <section class="similar" aria-labelledby="similar-title" x-show="studyXref.status === 'ready' && studySimilarOffered()">
+                            <h4 class="similar-title" id="similar-title"><span class="similar-mark" aria-hidden="true">≈</span> Similar verses</h4>
+                            <p class="study-tool-sub">Found by comparing the wording and meaning of every verse with <span x-text="studySimilarVerse()"></span>. Computed, not chosen by an editor like the cross-references<span x-show="studyXref.items.length"> above</span>.</p>
+                            <button type="button" class="study-text-btn similar-load" x-show="studySimilar.status === 'idle'" @click="studyLoadSimilar()">
+                                <span x-text="study.vs === study.ve ? 'Find similar verses' : 'Find verses similar to verse ' + study.vs"></span>
+                            </button>
+                            <div class="study-pane-state" x-show="studySimilar.status === 'loading'"><div class="loading-spinner"></div></div>
+                            <p class="study-note" x-show="studySimilar.status === 'unavailable'">Finding similar verses isn't available right now.</p>
+                            <p class="study-note" x-show="studySimilar.status === 'limited'">Too many searches in a minute. Try again shortly.</p>
+                            <p class="study-note" x-show="studySimilar.status === 'error'">Couldn't find similar verses. <button type="button" class="study-text-btn" @click="studySimilar.status = 'idle'; studyLoadSimilar()">Try again</button></p>
+                            <p class="study-note" x-show="studySimilar.status === 'ready' && !studySimilar.items.length">No other verses came close.</p>
+                            <ol class="xref-list similar-list" x-show="studySimilar.status === 'ready'">
+                                <template x-for="it in studySimilarShown()" :key="'sim-' + it.ref">
+                                    <li>
+                                        <button type="button" class="xref-item" @click="studyPeek(it.ref, { context: true })">
+                                            <span class="xref-ref" x-text="it.ref"></span>
+                                            <span class="xref-text" x-html="it.text"></span>
+                                        </button>
+                                    </li>
+                                </template>
+                            </ol>
+                            <button type="button" class="xref-more" x-show="studySimilar.status === 'ready' && !studySimilar.showAll && studySimilar.items.length > 6" @click="studySimilar.showAll = true">
+                                Show all <span x-text="studySimilar.items.length"></span>
+                            </button>
+                        </section>
                     </div>
                 </section>
 
