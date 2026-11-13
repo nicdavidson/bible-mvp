@@ -18,7 +18,7 @@ const SHELL = [
     ...[
         '/static/css/style.css', '/static/css/study.css', '/static/css/nav.css', '/static/js/app.js', '/static/js/offline-storage.js',
         '/static/js/supabase-client.js',
-        ...['tts', 'menus', 'share', 'feedback', 'tags', 'selection', 'offline', 'plans', 'study_extras', 'study', 'nav', 'wordlink']
+        ...['tts', 'menus', 'share', 'feedback', 'tags', 'selection', 'offline', 'plans', 'study_extras', 'study', 'study_panes', 'nav', 'wordlink']
             .map(m => `/static/js/modules/${m}.js`),
     ].map(u => u + V),
 ];

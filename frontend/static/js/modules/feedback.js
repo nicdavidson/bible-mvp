@@ -375,15 +375,6 @@ window.BibleModules.feedback = {
             this.rebuildVerseColorMap();
         },
 
-        // Note editing state
-        noteEndVerse: null,
-        showNoteRange: false,
-
-        // Get the current start verse for notes
-        getNoteStartVerse() {
-            return this.highlightedVerses.length > 0 ? this.highlightedVerses[0] : 1;
-        },
-
         // Format note reference display
         formatNoteReference(note) {
             if (note.endVerse && note.endVerse !== note.startVerse) {
@@ -475,63 +466,32 @@ window.BibleModules.feedback = {
             return _relevantNotesCache;
         },
 
-        async saveNote() {
-            if (!this.currentNote.trim() || !this.currentBook) return;
-
-            // Use selected verses if in note edit mode, otherwise use highlighted verse
-            const startVerse = this.noteEditMode && this.selectedVerses.length > 0
-                ? this.getSelectedVerseStart()
-                : this.getNoteStartVerse();
-            const endVerse = this.noteEditMode && this.selectedVerses.length > 0
-                ? this.getSelectedVerseEnd()
-                : (this.showNoteRange && this.noteEndVerse ? parseInt(this.noteEndVerse) : startVerse);
-
-            const noteData = {
-                book: this.currentBook,
-                chapter: this.currentChapter,
-                startVerse: startVerse,
-                endVerse: endVerse,
-                content: this.currentNote
-            };
-
-            try {
-                let savedNoteId;
-                if (this.authUser && window.SupabaseAuth) {
-                    // Save to Supabase
-                    const savedNote = await window.SupabaseAuth.saveUserNote(noteData);
-                    this.notes.unshift(savedNote);
-                    savedNoteId = savedNote.id;
-                } else {
-                    // Save to localStorage (guest mode)
-                    const note = {
-                        id: Date.now(),
-                        ...noteData,
-                        created_at: new Date().toISOString(),
-                        synced: false
-                    };
-                    this.notes.unshift(note);
-                    localStorage.setItem('bible-notes', JSON.stringify(this.notes));
-                    savedNoteId = note.id;
-                }
-                this.rebuildVerseColorMap();
-
-                // Apply pending tags to the new note
-                if (this.pendingNoteTags.length > 0 && savedNoteId) {
-                    for (const tagId of this.pendingNoteTags) {
-                        await this.toggleNoteTag(savedNoteId, tagId);
-                    }
-                }
-
-                this.currentNote = '';
-                this.noteEndVerse = null;
-                this.showNoteRange = false;
-                this.noteEditMode = false;
-                this.selectedVerses = [];
-                this.pendingNoteTags = [];
-            } catch (err) {
-                console.error('Failed to save note:', err);
-                this.showToast('Failed to save note', 'error');
+        // ---- note storage: the one place notes are written ----
+        // Signed in: Supabase (user_notes). Guest: localStorage 'bible-notes'.
+        // Shape: { id, book, chapter, startVerse, endVerse, content, created_at[, synced] }.
+        // Used by the notes sheet, highlights (modules/tags.js) and the study view.
+        async noteCreate(noteData) {
+            let note;
+            if (this.authUser && window.SupabaseAuth) {
+                note = await window.SupabaseAuth.saveUserNote(noteData);
+                this.notes.unshift(note);
+            } else {
+                note = { id: Date.now(), ...noteData, created_at: new Date().toISOString(), synced: false };
+                this.notes.unshift(note);
+                localStorage.setItem('bible-notes', JSON.stringify(this.notes));
             }
+            this.rebuildVerseColorMap();
+            return note;
+        },
+
+        async noteUpdateContent(note, content) {
+            if (this.authUser && window.SupabaseAuth) {
+                await window.SupabaseAuth.updateUserNote(note.id, { content });
+            }
+            const i = this.notes.findIndex(n => n.id === note.id);
+            if (i !== -1) this.notes[i].content = content;
+            this.rebuildVerseColorMap();  // content changes affect getRelevantNotes (empty-note filter)
+            if (!this.authUser) localStorage.setItem('bible-notes', JSON.stringify(this.notes));
         },
 
         // Delete a note
@@ -552,51 +512,6 @@ window.BibleModules.feedback = {
             } catch (err) {
                 console.error('Failed to delete note:', err);
                 this.showToast('Failed to delete note', 'error');
-            }
-        },
-
-        // Start editing a note
-        startEditNote(note) {
-            this.editingNoteId = note.id;
-            this.editingNoteContent = note.content;
-        },
-
-        // Cancel editing a note
-        cancelEditNote() {
-            this.editingNoteId = null;
-            this.editingNoteContent = '';
-        },
-
-        // Save edited note
-        async saveEditNote(note) {
-            if (!this.editingNoteContent.trim()) return;
-
-            try {
-                const updatedContent = this.editingNoteContent.trim();
-
-                if (this.authUser && window.SupabaseAuth) {
-                    // Update in Supabase
-                    await window.SupabaseAuth.updateUserNote(note.id, { content: updatedContent });
-                }
-
-                // Update local state
-                const noteIndex = this.notes.findIndex(n => n.id === note.id);
-                if (noteIndex !== -1) {
-                    this.notes[noteIndex].content = updatedContent;
-                }
-                this.rebuildVerseColorMap();  // content changes affect getRelevantNotes (empty-note filter)
-
-                // Update localStorage for guests
-                if (!this.authUser) {
-                    localStorage.setItem('bible-notes', JSON.stringify(this.notes));
-                }
-
-                // Clear editing state
-                this.editingNoteId = null;
-                this.editingNoteContent = '';
-            } catch (err) {
-                console.error('Failed to update note:', err);
-                this.showToast('Failed to update note', 'error');
             }
         },
 

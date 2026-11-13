@@ -291,17 +291,6 @@
                     <div class="home-picker" data-picker-slot></div>
                 </div>
 
-                <!-- Share mode toolbar -->
-                <div class="share-mode-bar" x-show="verses.length > 0 && currentReference">
-                    <button @click="toggleShareMode()" class="btn-share-toggle" :class="{ active: shareMode }">
-                        <span x-show="!shareMode">Share</span>
-                        <span x-show="shareMode">Cancel</span>
-                    </button>
-                    <span x-show="shareMode && shareSelectedVerses.length === 0" class="share-hint">Tap verses to select</span>
-                    <span x-show="shareMode && shareSelectedVerses.length > 0" class="share-hint" x-text="shareSelectedVerses.length + ' verse' + (shareSelectedVerses.length === 1 ? '' : 's') + ' selected'"></span>
-                    <button x-show="shareMode && shareSelectedVerses.length > 0" @click="openShareModal()" class="btn-share-action">Share Selected</button>
-                </div>
-
                 <!-- Parallel Translation View -->
                 <div x-show="!loading && !error && parallelMode && Object.keys(parallelData).length > 0" class="parallel-view">
                     <div class="parallel-translation-toggles">
@@ -338,7 +327,7 @@
                     </template>
                 </div>
 
-                <div x-show="!loading && !error && verses.length > 0 && !parallelMode" class="verses" :class="{ 'selection-mode': noteEditMode || shareMode }" @touchstart="readingTouchStart($event)" @touchend="readingTouchEnd($event)">
+                <div x-show="!loading && !error && verses.length > 0 && !parallelMode" class="verses" @touchstart="readingTouchStart($event)" @touchend="readingTouchEnd($event)">
                     <template x-for="(verse, verseIdx) in verses" :key="'v-' + verseIdx">
                         <div class="verse-wrapper" :class="{ 'has-section-header': verse._chapterStart && combinedPlanReading }">
                             <!-- Section/Chapter header for combined plan reading -->
@@ -353,12 +342,10 @@
                                     'verse-highlighted': isVerseHighlighted(verse.verse, verse),
                                     'verse-speaking': ttsCurrentVerse === verse.verse,
                                     'has-interlinear': showInterlinear && hasInterlinear(verse.verse, verseIdx),
-                                    'verse-selected-for-note': noteEditMode && isVerseSelectedForNote(verse.verse) && verseInSelectionScope(verse),
-                                    'verse-selected-for-share': shareMode && shareSelectedVerses.includes(verse.verse) && verseInSelectionScope(verse),
                                     'verse-color-highlighted': !!getVerseHighlightColor(verse.verse, verse)
                                 }"
                                 :style="getVerseHighlightColor(verse.verse, verse) ? 'background-color: ' + getVerseHighlightColor(verse.verse, verse) : ''"
-                                @click="shareMode ? toggleShareVerse(verse.verse) : handleVerseBoxClick($event, verse.verse, verseIdx)"
+                                @click="handleVerseBoxClick($event, verse.verse, verseIdx)"
                                 @touchstart="startLongPress(verse.verse, verseIdx)"
                                 @touchmove="cancelLongPress()"
                                 @touchend="cancelLongPress()"
@@ -423,48 +410,68 @@
                 x-transition:leave="action-bar-leave"
                 x-transition:leave-start="action-bar-leave-start"
                 x-transition:leave-end="action-bar-leave-end"
-                @click.outside="if (!$event.target.closest('.verse-box, .highlight-picker, .study-peek, .panel-resources, .return-chip, .nav-buttons, .header, dialog')) clearVerseSelection()"
+                @click.outside="if (!$event.target.closest('.verse-box, .highlight-picker, .panel-resources, .return-chip, .nav-buttons, .reading-bar, .header, dialog')) { actionMore = false; clearVerseSelection() }"
+                @keydown.escape="actionMore = false"
                 x-ref="actionBar"
+                role="toolbar" :aria-label="'Selected: ' + getSelectionLabel()"
             >
                 <div class="action-bar-label" x-text="getSelectionLabel()"></div>
                 <div class="action-bar-buttons">
-                    <!-- Highlight: highlighter marker -->
-                    <button class="action-bar-btn" @click.stop="toggleHighlightPicker(highlightedVerses[0])" title="Highlight">
-                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5l4 4L8 20H4v-4L15.5 4.5z"/><path d="M4 22h16" stroke-width="2.5"/><path d="M12.5 7.5l4 4" opacity="0.5"/></svg>
-                        <span class="action-bar-text">Highlight</span>
-                    </button>
-                    <!-- Note: chat bubble with pen -->
-                    <button class="action-bar-btn" @click.stop="openNoteForSelected()" title="Note">
-                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg>
-                        <span class="action-bar-text">Note</span>
-                    </button>
-                    <!-- Study: open the study view (commentary) for the selected verses -->
                     <button class="action-bar-btn action-bar-study" @click.stop="openStudy()" title="Study with commentary">
                         <span class="action-bar-count" x-show="studyHint?.withComment.length" x-text="studyHint?.withComment.length" aria-hidden="true"></span>
-                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
                         <span class="action-bar-text">Study</span>
                     </button>
-                    <!-- Memorize: heart with plus (commit to heart) -->
-                    <button class="action-bar-btn" @click.stop="memorizeSelected()" title="Memorize">
-                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.3l7.8-7.8 1-1.1a5.5 5.5 0 0 0 0-7.8z"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
+                    <button class="action-bar-btn action-bar-xrefs" @click.stop="openStudy(null, { source: 'cross-references' })" title="Cross-references">
+                        <span class="action-bar-count" x-show="crossRefs.length" x-text="crossRefs.length" aria-hidden="true"></span>
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+                        <span class="action-bar-text">Refs</span>
+                    </button>
+                    <button class="action-bar-btn action-bar-note" @click.stop="openStudy(null, { source: 'notes' })" title="Write a note">
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/></svg>
+                        <span class="action-bar-text">Note</span>
+                    </button>
+                    <button class="action-bar-btn" @click.stop="toggleHighlightPicker(highlightedVerses[0])" title="Highlight">
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 4.5l4 4L8 20H4v-4L15.5 4.5z"/><path d="M4 22h16" stroke-width="2.5"/><path d="M12.5 7.5l4 4" opacity="0.5"/></svg>
+                        <span class="action-bar-text">Highlight</span>
+                    </button>
+                    <button class="action-bar-btn action-bar-share" @click.stop="shareSelection()" title="Share">
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>
+                        <span class="action-bar-text">Share</span>
+                    </button>
+                    <button class="action-bar-btn action-bar-wide" @click.stop="memorizeSelected()" title="Memorize">
+                        <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.3l7.8-7.8 1-1.1a5.5 5.5 0 0 0 0-7.8z"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
                         <span class="action-bar-text">Memorize</span>
                     </button>
-                    <!-- Copy: two pages -->
-                    <button class="action-bar-btn" @click.stop="copySelected()" :title="copyFeedback ? 'Copied!' : 'Copy'">
-                        <svg x-show="!copyFeedback" class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                        <svg x-show="copyFeedback" class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <button class="action-bar-btn action-bar-wide" @click.stop="copySelected()" :title="copyFeedback ? 'Copied!' : 'Copy'">
+                        <svg x-show="!copyFeedback" class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <svg x-show="copyFeedback" class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                         <span class="action-bar-text" x-text="copyFeedback ? 'Copied!' : 'Copy'"></span>
                     </button>
-                    <!-- Dismiss -->
-                    <button class="action-bar-btn action-bar-dismiss" @click.stop="clearVerseSelection()" title="Dismiss">
-                        <svg class="action-bar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <!-- Phones: Copy, Memorize and the verse's topics behind More -->
+                    <div class="action-more-wrap">
+                        <button class="action-bar-btn action-bar-more" @click.stop="actionMore = !actionMore" :aria-expanded="actionMore ? 'true' : 'false'" aria-controls="action-more" title="More">
+                            <svg class="action-bar-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                            <span class="action-bar-text">More</span>
+                        </button>
+                        <div class="action-more" id="action-more" x-show="actionMore" x-cloak @click.outside="actionMore = false">
+                            <button type="button" @click.stop="actionMore = false; copySelected()" x-text="copyFeedback ? 'Copied' : 'Copy'"></button>
+                            <button type="button" @click.stop="actionMore = false; memorizeSelected()">Memorize</button>
+                            <button type="button" x-show="verseTopics.length" @click.stop="actionMore = false; openSheet('topics')">
+                                Topics <span class="action-more-count" x-text="verseTopics.length"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="action-bar-btn action-bar-dismiss" @click.stop="actionMore = false; clearVerseSelection()" title="Clear selection" aria-label="Clear selection">
+                        <svg class="action-bar-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
                 </div>
             </div>
+
         </section>
 
         <!-- Resources Panel -->
-        <section class="panel panel-resources" :class="{ 'is-home': verses.length === 0 && !loading, 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed, 'peeking': !resourcesPanelExpanded && highlightedVerses.length > 0 && (studyHint?.withComment.length > 0 || crossRefs.length > 0 || verseTopics.length > 0 || getRelevantNotes().length > 0) }" :style="sheetDragStyle" x-ref="resourcesPanel">
+        <section class="panel panel-resources" :class="{ 'is-home': verses.length === 0 && !loading, 'expanded': resourcesPanelExpanded, 'collapsed': sidebarCollapsed }" :style="sheetDragStyle" x-ref="resourcesPanel">
             <!-- Sidebar toggle button (tablet/desktop only) -->
             <button
                 class="btn-sidebar-toggle"
@@ -474,69 +481,21 @@
             >
                 <span x-text="sidebarCollapsed ? '&#x00BB;' : '&#x00AB;'"></span>
             </button>
-            <div class="study-peek" x-show="!resourcesPanelExpanded && highlightedVerses.length > 0">
-                <span class="study-peek-label">Study</span>
-                <button class="peek-chip" x-show="studyHint?.withComment.length > 0" @click="openStudy()">
-                    Commentary <span class="peek-count" x-text="studyHint?.withComment.length"></span>
-                </button>
-                <button class="peek-chip" x-show="crossRefs.length > 0" @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true; sheetExpand()">
-                    Cross-refs <span class="peek-count" x-text="crossRefs.length"></span>
-                </button>
-                <button class="peek-chip" x-show="verseTopics.length > 0" @click="activeTab = 'topics'; resourcesPanelExpanded = true; sheetExpand(); initTopicSections()">
-                    Topics <span class="peek-count" x-text="verseTopics.length"></span>
-                </button>
-                <button class="peek-chip" x-show="getRelevantNotes().length > 0" @click="activeTab = 'notes'; resourcesPanelExpanded = true; sheetExpand()">
-                    Notes <span class="peek-count" x-text="getRelevantNotes().length"></span>
-                </button>
-            </div>
             <div class="panel-tabs" @touchstart="sheetTouchStart($event)" @touchmove.prevent="sheetTouchMove($event)" @touchend="sheetTouchEnd($event)">
-                <button
-                    class="tab-drag-handle"
-                    @click="sheetToggle()"
-                    aria-label="Toggle resources panel"
-                >
+                <button class="tab-drag-handle" @click="sheetToggle()" aria-label="Resize panel">
                     <span class="drag-indicator"></span>
                 </button>
-                <button
-                    class="btn-close-panel"
-                    @click="resourcesPanelExpanded = false"
-                    x-show="resourcesPanelExpanded"
-                    aria-label="Close panel"
-                >×</button>
-                <button
-                    @click="activeTab = 'study'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
-                    :class="{ 'active': activeTab === 'study', 'has-content': crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0 }"
-                    class="tab-btn"
-                >Study<span x-show="crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0" class="tab-indicator">&#x25CF;</span></button>
-                <button
-                    @click="activeTab = 'notes'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
-                    :class="{ 'active': activeTab === 'notes', 'has-content': getRelevantNotes().length > 0 }"
-                    class="tab-btn"
+                <button class="btn-close-panel" @click="closeSheet()" x-show="resourcesPanelExpanded" aria-label="Close panel">×</button>
+                <button @click="openSheet('notes')" :class="{ 'active': activeTab === 'notes', 'has-content': getRelevantNotes().length > 0 }" class="tab-btn"
                 >Notes<span x-show="getRelevantNotes().length > 0" class="tab-indicator" x-text="'(' + getRelevantNotes().length + ')'"></span></button>
-                <button
-                    @click="activeTab = 'crossrefs'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar()"
-                    :class="{ 'active': activeTab === 'crossrefs', 'has-content': crossRefs.length > 0 }"
-                    class="tab-btn"
-                >Cross-Refs<span x-show="crossRefs.length > 0" class="tab-indicator" x-text="'(' + crossRefs.length + ')'"></span></button>
-                <button
-                    @click="activeTab = 'topics'; resourcesPanelExpanded = true; sheetExpand(); sidebarCollapsed && toggleSidebar(); initTopicSections()"
-                    :class="{ 'active': activeTab === 'topics', 'has-content': verseTopics.length > 0 }"
-                    class="tab-btn"
+                <button @click="openSheet('topics')" :class="{ 'active': activeTab === 'topics', 'has-content': verseTopics.length > 0 }" class="tab-btn"
                 >Topics<span x-show="verseTopics.length > 0" class="tab-indicator" x-text="'(' + verseTopics.length + ')'"></span></button>
             </div>
             <!-- Collapsed sidebar icons (tablet/desktop only) -->
             <div class="sidebar-collapsed-icons">
-                <button @click="activeTab = 'study'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'study' }" title="Study">
-                    <span class="collapsed-icon-label">S</span>
-                    <span class="collapsed-icon-dot" x-show="crossRefs.length > 0 || getRelevantNotes().length > 0 || verseTopics.length > 0"></span>
-                </button>
                 <button @click="activeTab = 'notes'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'notes' }" title="Notes">
                     <span class="collapsed-icon-label">N</span>
                     <span class="collapsed-icon-dot" x-show="getRelevantNotes().length > 0"></span>
-                </button>
-                <button @click="activeTab = 'crossrefs'; toggleSidebar()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'crossrefs' }" title="Cross-Refs">
-                    <span class="collapsed-icon-label">X</span>
-                    <span class="collapsed-icon-dot" x-show="crossRefs.length > 0"></span>
                 </button>
                 <button @click="activeTab = 'topics'; toggleSidebar(); initTopicSections()" class="collapsed-icon-btn" :class="{ 'active': activeTab === 'topics' }" title="Topics">
                     <span class="collapsed-icon-label">T</span>
@@ -544,197 +503,22 @@
                 </button>
             </div>
             <div class="panel-body">
-                <!-- Study Tab -->
-                <div x-show="activeTab === 'study'" class="tab-content study-tab">
-                    <template x-if="!currentReference">
-                        <div class="empty-state">
-                            <span class="empty-state-icon">📖</span>
-                            <span class="empty-state-title">Select a passage</span>
-                            <span class="empty-state-hint">Study resources will appear here</span>
-                        </div>
-                    </template>
-
-                    <template x-if="currentReference">
-                        <div class="study-stack">
-                            <div class="study-heading">
-                                <span class="study-heading-label" x-text="getStudyReferenceLabel()"></span>
-                            </div>
-
-                            <section class="study-section study-commentary-open">
-                                <div class="study-section-header">
-                                    <h3>Commentary</h3>
-                                </div>
-                                <p class="study-commentary-hint" x-show="studyHint">
-                                    <span x-text="studyHint?.withComment.length ? studyHint.withComment.length + ' of ' + studyHint.total + ' sources comment on ' + getStudyReferenceLabel() : 'No commentary on ' + getStudyReferenceLabel() + ' yet'"></span>
-                                </p>
-                                <p class="study-commentary-hint" x-show="!studyHint">Select verses to see which commentaries cover them.</p>
-                                <button class="study-open-btn" @click="openStudy()" x-show="highlightedVerses.length > 0">Read commentary on <span x-text="getStudyReferenceLabel()"></span></button>
-                            </section>
-
-                            <section class="study-section" x-show="getRelevantNotes().length > 0">
-                                <div class="study-section-header">
-                                    <h3>Notes</h3>
-                                    <button class="study-link-btn" @click="openStudySection('notes')">Edit</button>
-                                </div>
-                                <template x-for="note in getRelevantNotes().slice(0, 3)" :key="'study-note-' + note.id">
-                                    <div class="study-note-card">
-                                        <button class="note-verse-ref" @click="selectVerseFromRef(note.startVerse)" x-text="formatNoteReference(note)"></button>
-                                        <div class="note-content" x-html="formatNoteContent(note.content)" @click="handleNoteRefClick($event)"></div>
-                                    </div>
-                                </template>
-                            </section>
-
-                            <section class="study-section" x-show="crossRefs.length > 0 || verseTopics.length > 0">
-                                <div class="study-section-header">
-                                    <h3>Links</h3>
-                                    <button class="study-link-btn" @click="openStudySection('crossrefs')" x-show="crossRefs.length > 0">Cross-Refs</button>
-                                </div>
-                                <div class="study-ref-grid" x-show="crossRefs.length > 0">
-                                    <template x-for="(ref, idx) in getStudyCrossRefs()" :key="'study-xref-' + idx">
-                                        <a href="#"
-                                           @click.prevent="navigate(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, { kind: 'jump' })"
-                                           x-text="ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse"></a>
-                                    </template>
-                                </div>
-                                <div class="topic-chip-list study-topic-list" x-show="verseTopics.length > 0">
-                                    <template x-for="t in verseTopics.slice(0, 8)" :key="'study-topic-' + t.id">
-                                        <button class="topic-chip" @click="openStudySection('topics'); viewTopic(t.id)" x-text="t.topic"></button>
-                                    </template>
-                                </div>
-                            </section>
-
-                            <div class="empty-state" x-show="crossRefs.length === 0 && getRelevantNotes().length === 0 && verseTopics.length === 0">
-                                <span class="empty-state-hint">No linked study resources for this selection yet</span>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-
-                <!-- Notes Tab -->
+                <!-- Notes: this chapter's, as an overview. Written and edited in the study view. -->
                 <div x-show="activeTab === 'notes'" class="tab-content">
-                    <template x-if="!currentBook && !combinedPlanReading">
-                        <div class="empty-state">
-                            <span class="empty-state-icon">✏️</span>
-                            <span class="empty-state-title">Select a passage</span>
-                            <span class="empty-state-hint">Add your study notes here</span>
-                        </div>
-                    </template>
-                    <!-- Combined reading mode note about adding notes -->
                     <template x-if="combinedPlanReading">
                         <div class="combined-notes-header">
-                            <span class="combined-notes-hint">Viewing notes from today's readings. Click a verse reference to edit notes for that passage.</span>
+                            <span class="combined-notes-hint">Your notes on today's readings.</span>
                         </div>
                     </template>
-                    <template x-if="currentBook">
-                        <div class="notes-editor">
-                            <!-- Verse selection mode toggle -->
-                            <div class="note-mode-row">
-                                <button
-                                    @click="toggleNoteEditMode()"
-                                    class="btn-select-verses"
-                                    :class="{ active: noteEditMode }"
-                                >
-                                    <span x-show="!noteEditMode">Select Verses</span>
-                                    <span x-show="noteEditMode">Done Selecting</span>
-                                </button>
-                                <span x-show="noteEditMode" class="select-hint">Tap verses to add them to this note</span>
-                            </div>
-
-                            <!-- Reference display -->
-                            <div class="note-reference-row">
-                                <span class="note-for">Note for:</span>
-                                <template x-if="noteEditMode && selectedVerses.length > 0">
-                                    <span class="note-ref" x-text="currentBook + ' ' + currentChapter + ':' + getSelectedVerseRange()"></span>
-                                </template>
-                                <template x-if="!noteEditMode || selectedVerses.length === 0">
-                                    <span class="note-ref" x-text="currentBook + ' ' + currentChapter + ':' + getNoteStartVerse()"></span>
-                                </template>
-                                <template x-if="!noteEditMode && !showNoteRange">
-                                    <button
-                                        @click="showNoteRange = true"
-                                        class="btn-range-toggle"
-                                        title="Add verse range"
-                                    >+</button>
-                                </template>
-                                <template x-if="!noteEditMode && showNoteRange">
-                                    <span class="note-range-to">
-                                        -<input
-                                            type="number"
-                                            x-model="noteEndVerse"
-                                            :min="getNoteStartVerse()"
-                                            :max="verses.length"
-                                            class="input-end-verse"
-                                            placeholder="end"
-                                        >
-                                        <button
-                                            @click="showNoteRange = false; noteEndVerse = null"
-                                            class="btn-range-toggle"
-                                            title="Single verse"
-                                        >−</button>
-                                    </span>
-                                </template>
-                            </div>
-
-                            <textarea
-                                x-model="currentNote"
-                                placeholder="Add your notes for this passage..."
-                                class="note-textarea"
-                            ></textarea>
-
-                            <!-- Tag picker for new notes -->
-                            <div class="note-tag-section" x-show="tags.length > 0">
-                                <span class="note-tag-label">Tags:</span>
-                                <div class="note-tag-list">
-                                    <template x-for="tag in tags" :key="'pick-' + tag.id">
-                                        <button
-                                            type="button"
-                                            class="note-tag-chip selectable"
-                                            :class="{ selected: isPendingTag(tag.id) }"
-                                            :style="'background-color: ' + tag.color"
-                                            @click="togglePendingTag(tag.id)"
-                                            x-text="tag.name"
-                                        ></button>
-                                    </template>
-                                </div>
-                                <span class="note-tag-hint" x-show="pendingNoteTags.length === 0">Click tags to select</span>
-                                <span class="note-tag-hint" x-show="pendingNoteTags.length > 0" x-text="pendingNoteTags.length + ' tag' + (pendingNoteTags.length === 1 ? '' : 's') + ' selected'"></span>
-                            </div>
-
-                            <button @click="saveNote" class="btn-save" :disabled="!currentNote.trim()">
-                                Save Note
-                            </button>
-                        </div>
-                    </template>
-                    <div class="notes-export-row" x-show="getRelevantNotes().length > 0">
-                        <button @click="exportNotes()" class="btn-export-notes" title="Copy all notes to clipboard">Export Notes</button>
-                    </div>
                     <div class="saved-notes">
                         <template x-for="note in getRelevantNotes()" :key="note.id">
-                            <div class="note-card" :class="{ 'note-active': noteMatchesActiveVerse(note), 'note-editing': editingNoteId === note.id }">
+                            <div class="note-card" :class="{ 'note-active': noteMatchesActiveVerse(note) }">
                                 <div class="note-meta">
-                                    <button class="note-verse-ref" @click="selectVerseFromRef(note.startVerse)" x-text="formatNoteReference(note)"></button>
+                                    <button class="note-verse-ref" @click="openStudy(formatNoteReference(note), { source: 'notes' })"
+                                            :aria-label="'Open your note on ' + formatNoteReference(note)" x-text="formatNoteReference(note)"></button>
                                     <span x-text="formatDate(note.created_at)"></span>
-                                    <button @click="startEditNote(note)" class="btn-edit-note" title="Edit note" x-show="editingNoteId !== note.id">✎</button>
-                                    <button @click="deleteNote(note.id)" class="btn-delete-note" title="Delete note" x-show="editingNoteId !== note.id">×</button>
                                 </div>
-                                <!-- View mode -->
-                                <template x-if="editingNoteId !== note.id">
-                                    <div class="note-content" x-html="formatNoteContent(note.content)" @click="handleNoteRefClick($event)"></div>
-                                </template>
-                                <!-- Edit mode -->
-                                <template x-if="editingNoteId === note.id">
-                                    <div class="note-edit-form">
-                                        <textarea
-                                            x-model="editingNoteContent"
-                                            class="note-textarea"
-                                            @keydown.escape="cancelEditNote()"
-                                        ></textarea>
-                                        <div class="note-edit-actions">
-                                            <button @click="saveEditNote(note)" class="btn-save-edit" :disabled="!editingNoteContent.trim()">Save</button>
-                                            <button @click="cancelEditNote()" class="btn-cancel-edit">Cancel</button>
-                                        </div>
-                                    </div>
-                                </template>
+                                <div class="note-content" x-html="formatNoteContent(note.content)" @click="handleNoteRefClick($event)"></div>
                                 <!-- Tags on this note -->
                                 <div class="note-tags" x-show="getNoteTagObjects(note.id).length > 0 || tags.length > 0">
                                     <template x-for="tag in getNoteTagObjects(note.id)" :key="'nt-' + note.id + '-' + tag.id">
@@ -746,15 +530,11 @@
                                             x-text="tag.name"
                                         ></span>
                                     </template>
-                                    <!-- Add tag button -->
                                     <div class="add-tag-dropdown" x-data="{ open: false }">
                                         <button @click="open = !open" class="btn-add-tag" title="Add tag">+</button>
                                         <div class="tag-dropdown-menu" x-show="open" @click.outside="open = false" x-transition>
                                             <template x-for="tag in tags.filter(t => !noteHasTag(note.id, t.id))" :key="'add-' + note.id + '-' + tag.id">
-                                                <button
-                                                    class="tag-dropdown-item"
-                                                    @click="toggleNoteTag(note.id, tag.id); open = false"
-                                                >
+                                                <button class="tag-dropdown-item" @click="toggleNoteTag(note.id, tag.id); open = false">
                                                     <span class="tag-color-dot" :style="'background-color: ' + tag.color"></span>
                                                     <span x-text="tag.name"></span>
                                                 </button>
@@ -767,65 +547,13 @@
                                 </div>
                             </div>
                         </template>
-                        <template x-if="getRelevantNotes().length === 0 && (currentBook || combinedPlanReading)">
-                            <div class="empty-state" style="padding: 1rem;">
-                                <span class="empty-state-hint" x-text="combinedPlanReading ? 'No notes for these readings yet' : 'No notes for this passage yet'"></span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <!-- Cross-References Tab -->
-                <div x-show="activeTab === 'crossrefs'" class="tab-content">
-                    <template x-if="!currentReference">
-                        <div class="empty-state">
-                            <span class="empty-state-icon">🔗</span>
-                            <span class="empty-state-title">Select a verse</span>
-                            <span class="empty-state-hint">Related passages will appear here</span>
+                        <div class="empty-state" x-show="getRelevantNotes().length === 0">
+                            <span class="empty-state-title" x-text="currentBook ? 'No notes in ' + currentBook + ' ' + currentChapter + ' yet' : (combinedPlanReading ? 'No notes on these readings yet' : 'No passage open')"></span>
+                            <span class="empty-state-hint">Tap a verse, then Note, to write one.</span>
                         </div>
-                    </template>
-                    <template x-if="crossRefs.length === 0 && currentReference">
-                        <div class="empty-state">
-                            <span class="empty-state-icon">🔗</span>
-                            <span class="empty-state-title">No cross-references</span>
-                            <span class="empty-state-hint">This verse has no linked references</span>
-                        </div>
-                    </template>
-                    <p class="crossref-for" x-show="crossRefs.length > 0 && !combinedPlanReading">Cross-references for <span x-text="getStudyReferenceLabel()"></span></p>
-                    <!-- Sort & Filter controls -->
-                    <div class="crossref-controls" x-show="crossRefs.length > 0">
-                        <div class="crossref-sort-btns">
-                            <button class="crossref-sort-btn" :class="{ active: crossRefSort === 'biblical' }" @click="crossRefSort = 'biblical'">Biblical Order</button>
-                            <button class="crossref-sort-btn" :class="{ active: crossRefSort === 'relevance' }" @click="crossRefSort = 'relevance'">Relevance</button>
-                        </div>
-                        <input type="text" class="crossref-filter-input" placeholder="Filter by book..." x-model="crossRefFilter" @input="crossRefFilter = $event.target.value">
                     </div>
-                    <ul class="crossref-list">
-                        <template x-for="(ref, idx) in getFilteredCrossRefs()" :key="'xref-' + idx">
-                            <li class="crossref-item"
-                                @mouseenter="previewVerse(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, $event)"
-                                @mouseleave="hidePreview()"
-                            >
-                                <span class="crossref-source" x-show="combinedPlanReading && ref._sourceRef" x-text="ref._sourceBook + ' ' + ref._sourceChapter + ':' + ref.source_verse + ' →'"></span>
-                                <a
-                                    href="#"
-                                    @click.prevent="navigate(ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse, { kind: 'jump' })"
-                                    x-text="ref.target_book + ' ' + ref.target_chapter + ':' + ref.target_verse"
-                                ></a>
-                                <span class="crossref-votes" x-show="crossRefSort === 'relevance' && ref.votes" x-text="ref.votes"></span>
-                            </li>
-                        </template>
-                    </ul>
-                    <div class="crossref-filter-count" x-show="crossRefFilter && crossRefs.length > 0">
-                        <span x-text="getFilteredCrossRefs().length + ' of ' + crossRefs.length + ' references'"></span>
-                    </div>
-                    <!-- Path to Christ button -->
-                    <div class="path-to-christ-trigger" x-show="highlightedVerses.length > 0">
-                        <button @click="findPathToChrist()" class="btn-path-to-christ" :disabled="pathToChristLoading">
-                            <span class="ptc-icon">&#10013;</span>
-                            <span x-text="pathToChristLoading ? 'Searching...' : 'Path to Christ'"></span>
-                        </button>
-                        <span class="ptc-hint">Trace cross-references to a christological verse</span>
+                    <div class="notes-export-row" x-show="getRelevantNotes().length > 0">
+                        <button @click="exportNotes()" class="btn-export-notes" title="Copy all notes to clipboard">Copy all notes</button>
                     </div>
                 </div>
 
@@ -2449,7 +2177,7 @@
 
     <!-- Study view: a verse or range with commentary (modules/study.js, css/study.css) -->
     <dialog id="study-view" class="study-view" aria-labelledby="study-title"
-            :class="{ 'is-strip-collapsed': study.stripCollapsed, 'is-single': studyTrack().length < 2 }">
+            :class="{ 'is-strip-collapsed': study.stripCollapsed, 'is-writing': studyWriting }">
         <div class="study-shell" x-show="study.open">
             <header class="study-bar">
                 <button type="button" class="study-icon-btn" @click="studyClose()" aria-label="Close study and return to reading">
@@ -2520,14 +2248,34 @@
                             <span class="study-chip-name" x-text="src.short_name"></span>
                         </button>
                     </template>
+                    <button type="button" class="study-icon-btn study-manage-btn" @click="studyOpenManage()" aria-label="Choose and order commentary sources">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+                    </button>
                 </div>
-                <button type="button" class="study-icon-btn study-manage-btn" @click="studyOpenManage()" aria-label="Choose and order sources">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
-                </button>
+                <!-- Pinned at the thumb end: Scripture's own links and the reader's notes (modules/study_panes.js) -->
+                <div class="study-tools" role="group" aria-label="Cross-references and your notes">
+                    <button type="button" class="study-tool" data-slug="cross-references" :aria-pressed="study.active === 'cross-references' ? 'true' : 'false'"
+                            @click="studySelect('cross-references')"
+                            :aria-label="'Cross-references' + (studyXrefCount() !== null ? ': ' + studyXrefCount() : '')">
+                        <span class="study-tool-top">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+                            <span class="study-tool-count" x-text="studyXrefCount() ?? ''"></span>
+                        </span>
+                        <span class="study-tool-label">Cross-refs</span>
+                    </button>
+                    <button type="button" class="study-tool" data-slug="notes" :aria-pressed="study.active === 'notes' ? 'true' : 'false'"
+                            @click="studySelect('notes')" :aria-label="'Your notes' + (studyNoteCount() ? ': ' + studyNoteCount() : '')">
+                        <span class="study-tool-top">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                            <span class="study-tool-count" x-text="studyNoteCount() || ''"></span>
+                        </span>
+                        <span class="study-tool-label">Notes</span>
+                    </button>
+                </div>
             </nav>
 
-            <div class="study-track" @keydown.left.prevent="studySelect(studyTrack()[Math.max(0, studyTrack().findIndex(s => s.slug === study.active) - 1)]?.slug)"
-                 @keydown.right.prevent="studySelect(studyTrack()[Math.min(studyTrack().length - 1, studyTrack().findIndex(s => s.slug === study.active) + 1)]?.slug)">
+            <div class="study-track" @keydown.left="!$event.target.closest('textarea') && ($event.preventDefault(), studyStepPane(-1))"
+                 @keydown.right="!$event.target.closest('textarea') && ($event.preventDefault(), studyStepPane(1))">
                 <template x-for="src in studyTrack()" :key="'pane-' + src.slug">
                     <section class="study-pane" :data-slug="src.slug" :aria-label="src.source" :class="{ 'is-active': study.active === src.slug }">
                         <div class="study-pane-scroll" tabindex="0" @scroll.passive="studyPaneScrolled($event)">
@@ -2571,6 +2319,131 @@
                     <p class="study-empty-title" x-text="study.error"></p>
                     <button type="button" class="study-text-btn" @click="studyClose()">Back to reading</button>
                 </div>
+
+                <!-- Cross-references: the verses themselves, strongest first (modules/study_panes.js) -->
+                <section class="study-pane study-pane-tool" data-slug="cross-references" aria-labelledby="xref-title"
+                         x-show="!study.loading && !study.error" :class="{ 'is-active': study.active === 'cross-references' }">
+                    <div class="study-pane-scroll" tabindex="0" @scroll.passive="studyPaneScrolled($event)">
+                        <div class="study-pane-head">
+                            <h3 class="study-tool-title" id="xref-title">Cross-references</h3>
+                            <p class="study-tool-sub" x-show="studyXref.status === 'ready' && studyXref.items.length">
+                                <span x-text="studyXref.items.length === 1 ? 'One passage that speaks to ' : studyXref.items.length + ' passages that speak to '"></span><span x-text="studyRefLabel()"></span>.
+                                <span x-text="studyXref.showAll && studyXref.order === 'bible' ? 'In Bible order.' : 'The most helpful first, as rated by readers.'"></span>
+                            </p>
+                            <div class="xref-order" role="group" aria-label="Order" x-show="studyXref.showAll && studyXref.items.length > 1">
+                                <button type="button" :aria-pressed="studyXref.order === 'rank' ? 'true' : 'false'" @click="studyXref.order = 'rank'">Most helpful</button>
+                                <button type="button" :aria-pressed="studyXref.order === 'bible' ? 'true' : 'false'" @click="studyXref.order = 'bible'">Bible order</button>
+                            </div>
+                            <p class="study-note" x-show="studyXref.offline && studyXref.missing">
+                                <span x-text="studyXref.missing === studyXref.items.length ? 'Offline: the text of these verses isn\'t saved on this device, so only their references show.' : 'Offline: ' + studyXref.missing + ' of these verses aren\'t saved on this device, so only their references show.'"></span>
+                            </p>
+                        </div>
+                        <div class="xref-body" @click="studyContentClick($event)">
+                            <template x-for="g in studyXrefGroups()" :key="'xg-' + g.verse">
+                                <section class="xref-group">
+                                    <h4 class="study-entry-range" x-show="g.label" x-text="g.label"></h4>
+                                    <ol class="xref-list">
+                                        <template x-for="it in g.items" :key="'x-' + g.verse + '-' + it.ref">
+                                            <li>
+                                                <button type="button" class="xref-item" @click="studyPeek(it.ref, { context: true })">
+                                                    <span class="xref-ref" x-text="it.ref"></span>
+                                                    <span class="xref-text" x-show="it.text" x-text="it.text"></span>
+                                                </button>
+                                            </li>
+                                        </template>
+                                    </ol>
+                                </section>
+                            </template>
+                            <button type="button" class="xref-more" x-show="studyXrefHidden() > 0" @click="studyXrefShowAll()">
+                                Show all <span x-text="studyXref.items.length"></span>
+                            </button>
+                            <div class="xref-ptc" x-show="studyXref.status === 'ready' && studyXref.items.length && !studyXref.offline">
+                                <button type="button" class="study-text-btn" @click="studyPathToChrist()" :disabled="pathToChristLoading">
+                                    <span x-text="pathToChristLoading ? 'Tracing…' : 'Trace a path to Christ'"></span>
+                                </button>
+                                <span class="xref-ptc-hint">Follows cross-references from verse <span x-text="study.vs"></span> to a verse about Christ.</span>
+                            </div>
+                        </div>
+                        <div class="study-pane-state" x-show="studyXref.status === 'loading'"><div class="loading-spinner"></div></div>
+                        <div class="study-pane-state" x-show="studyXref.status === 'ready' && !studyXref.items.length">
+                            <p class="study-empty-title">No cross-references for <span x-text="studyRefLabel()"></span></p>
+                            <p>Try adding a verse before or after.</p>
+                        </div>
+                        <div class="study-pane-state" x-show="studyXref.status === 'error'">
+                            <p>Couldn't load the cross-references. Check your connection and try again.</p>
+                            <button type="button" class="study-text-btn" @click="studyXref.key = null; studyLoadXrefs()">Try again</button>
+                        </div>
+                        <p class="study-attribution" x-show="studyXref.status === 'ready' && studyXref.items.length" x-text="studyXref.credit"></p>
+                    </div>
+                </section>
+
+                <!-- The reader's own notes on these verses (modules/study_panes.js) -->
+                <section class="study-pane study-pane-tool" data-slug="notes" aria-labelledby="snotes-title"
+                         x-show="!study.loading && !study.error" :class="{ 'is-active': study.active === 'notes' }">
+                    <div class="study-pane-scroll" tabindex="0">
+                        <div class="study-pane-head">
+                            <h3 class="study-tool-title" id="snotes-title">Your notes</h3>
+                            <p class="study-tool-sub">
+                                <span x-show="studyNotesExact().length === 0">Write down what you notice in <span x-text="studyRefLabel()"></span>, a question to come back to, or how it speaks to you.</span>
+                                <span x-show="studyNotesExact().length > 0">On <span x-text="studyRefLabel()"></span>.</span>
+                                <span x-text="authUser ? 'Saved to your account; only you can see them.' : 'Saved on this device; only you can see them. Sign in to keep them on all your devices.'"></span>
+                            </p>
+                        </div>
+                        <div class="snotes">
+                            <template x-for="note in studyNotesExact()" :key="'sn-' + note.id">
+                                <article class="snote">
+                                    <template x-if="studyNote.editing !== note.id">
+                                        <div>
+                                            <div class="snote-text" x-html="formatNoteContent(note.content)" @click="handleNoteRefClick($event)"></div>
+                                            <div class="snote-actions">
+                                                <span class="snote-date" x-text="formatDate(note.created_at)"></span>
+                                                <button type="button" class="study-text-btn snote-edit" @click="studyNoteEdit(note)">Edit</button>
+                                                <button type="button" class="study-text-btn snote-delete" @click="studyNoteDelete(note)">Delete</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="studyNote.editing === note.id">
+                                        <form class="snote-form" @submit.prevent="studyNoteSave()">
+                                            <label class="sr-only" :for="'snote-ta-' + note.id">Your note on <span x-text="studyRefLabel()"></span></label>
+                                            <textarea :id="'snote-ta-' + note.id" x-model="studyNote.text" rows="5"
+                                                      @focus="studyWritingStart()" @blur="studyWritingEnd()" @keydown.escape.stop.prevent="studyNoteCancel()"></textarea>
+                                            <div class="snote-actions">
+                                                <button type="submit" class="study-primary-btn note-save" :disabled="!studyNote.text.trim() || studyNote.saving">Save</button>
+                                                <button type="button" class="study-text-btn" @click="studyNoteCancel()">Cancel</button>
+                                            </div>
+                                        </form>
+                                    </template>
+                                </article>
+                            </template>
+
+                            <form class="snote-form snote-new" x-show="studyNoteComposing()" @submit.prevent="studyNoteSave()">
+                                <label class="sr-only" for="snote-new-ta">New note on <span x-text="studyRefLabel()"></span></label>
+                                <textarea id="snote-new-ta" x-model="studyNote.text" rows="5"
+                                          :placeholder="'What do you notice in ' + studyRefLabel() + '?'"
+                                          @focus="studyWritingStart()" @blur="studyWritingEnd()"
+                                          @input="studyNote.editing = studyNote.editing ?? 'new'"
+                                          @keydown.escape.stop.prevent="studyNoteCancel(); $event.target.blur()"></textarea>
+                                <div class="snote-actions">
+                                    <button type="submit" class="study-primary-btn note-save" :disabled="!studyNote.text.trim() || studyNote.saving">Save note</button>
+                                    <button type="button" class="study-text-btn" x-show="studyNote.editing === 'new' && studyNotesExact().length" @click="studyNoteCancel()">Cancel</button>
+                                </div>
+                            </form>
+                            <button type="button" class="study-text-btn snote-add" x-show="!studyNoteComposing() && studyNote.editing === null"
+                                    @click="studyNote.editing = 'new'; $nextTick(() => document.getElementById('snote-new-ta')?.focus())">Add another note</button>
+
+                            <section class="snotes-nearby" x-show="studyNotesNearby().length">
+                                <h4 class="study-entry-range">Your notes on overlapping verses</h4>
+                                <template x-for="note in studyNotesNearby()" :key="'snn-' + note.id">
+                                    <article class="snote is-nearby">
+                                        <button type="button" class="snote-ref" @click="studyNoteOpenVerses(note)" x-text="studyNoteLabel(note)"
+                                                :aria-label="'Study ' + studyNoteLabel(note) + ' and edit this note'"></button>
+                                        <div class="snote-text" x-html="formatNoteContent(note.content)" @click="handleNoteRefClick($event)"></div>
+                                    </article>
+                                </template>
+                            </section>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
 
@@ -2628,7 +2501,7 @@
                     <p class="study-peek-error" x-show="study.peek.error" x-text="study.peek.error"></p>
                     <p class="study-verses" x-show="study.peek.text.length">
                         <template x-for="v in study.peek.text" :key="'pv-' + v.verse">
-                            <span class="study-verse"><sup x-text="v.verse"></sup><span x-text="v.text"></span> </span>
+                            <span class="study-verse" :class="{ 'is-context': study.peek.focus && (v.verse < study.peek.focus[0] || v.verse > study.peek.focus[1]) }"><sup x-text="v.verse"></sup><span x-text="v.text"></span> </span>
                         </template>
                     </p>
                     <div class="study-sheet-actions" x-show="!study.peek.loading && !study.peek.error">
@@ -2810,6 +2683,7 @@
     <script src="/static/js/modules/plans.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study_extras.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/study_panes.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/nav.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/wordlink.js?v=__SW_VERSION__"></script>
     <script src="/static/js/app.js?v=__SW_VERSION__"></script>

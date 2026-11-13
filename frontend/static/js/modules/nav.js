@@ -228,7 +228,8 @@ window.BibleModules = window.BibleModules || {};
         navHere() {
             const idx = this._navIdx;
             if (this.study?.open && this.study.book) {
-                return { study: true, ref: this.studyRefLabel().replace('–', '-'), label: `commentary on ${this.studyRefLabel()}`, idx };
+                const what = { 'cross-references': 'cross-references', notes: 'your notes' }[this.study.active] || 'commentary';
+                return { study: true, ref: this.studyRefLabel().replace('–', '-'), label: `${what} on ${this.studyRefLabel()}`, idx };
             }
             if (this.combinedPlanReading && this.currentPlan) {
                 return { plan: { id: this.currentPlan.id, day: this.planDay }, label: `Day ${this.planDay} reading`, idx };
@@ -365,6 +366,7 @@ window.BibleModules = window.BibleModules || {};
             this.showShareJesus = false;
             this.showReadingPlan = false;
             this.selectedWord = null;
+            this.actionMore = false;
             this.closePicker();
             if (this.study?.open) this.studyHide();   // "Read the chapter" from the study view
             // After a jump on a phone, fold the sheet so the verse and the chip both show (P1-10)

@@ -147,21 +147,6 @@ window.BibleModules.tags = {
             return (this.noteTags[noteId] || []).includes(tagId);
         },
 
-        // Toggle a pending tag for new note creation
-        togglePendingTag(tagId) {
-            const idx = this.pendingNoteTags.indexOf(tagId);
-            if (idx >= 0) {
-                this.pendingNoteTags.splice(idx, 1);
-            } else {
-                this.pendingNoteTags.push(tagId);
-            }
-        },
-
-        // Check if a tag is pending for new note
-        isPendingTag(tagId) {
-            return this.pendingNoteTags.includes(tagId);
-        },
-
         // Rebuild the precomputed verse -> tag colors map. Must be called after
         // any note/tag/note-tag mutation (and on passage/plan load for safety).
         // Keys are always 'Book|Chapter|Verse' so combined plan mode (verses
@@ -287,22 +272,7 @@ window.BibleModules.tags = {
                 content: ''
             };
             try {
-                let savedNoteId;
-                if (this.authUser && window.SupabaseAuth) {
-                    const savedNote = await window.SupabaseAuth.saveUserNote(noteData);
-                    this.notes.unshift(savedNote);
-                    savedNoteId = savedNote.id;
-                } else {
-                    const note = {
-                        id: Date.now(),
-                        ...noteData,
-                        created_at: new Date().toISOString(),
-                        synced: false
-                    };
-                    this.notes.unshift(note);
-                    localStorage.setItem('bible-notes', JSON.stringify(this.notes));
-                    savedNoteId = note.id;
-                }
+                const savedNoteId = (await this.noteCreate(noteData)).id;
                 await this.toggleNoteTag(savedNoteId, tag.id);
             } catch (err) {
                 console.error('Failed to create highlight:', err);

@@ -95,7 +95,7 @@ class TestJS:
         for method in [
             "clearVerseSelection",
             "getSelectionLabel",
-            "openNoteForSelected",
+            "openSheet",
             "memorizeSelected",
             "copySelected",
             "highlightSelectedVerses",
@@ -144,18 +144,20 @@ class TestJS:
         """Long press should trigger vibration."""
         assert "navigator.vibrate" in js
 
-    def test_study_tab_methods_exist(self, js):
-        assert "activeTab: 'study'" in js
-        # Commentary moved to the study view module; the old tab helpers are gone
-        assert "getStudyCommentaryGroups" not in js
-        assert "loadCommentary" not in js
+    def test_old_sheet_study_helpers_gone(self, js):
+        # Commentary, cross-references and note writing live in the study view; the
+        # reader's sheet keeps this chapter's notes and Topics
+        assert "activeTab: 'notes'" in js
+        for gone in ("getStudyCommentaryGroups", "loadCommentary", "getFilteredCrossRefs",
+                     "openNoteForSelected", "noteEditMode", "toggleShareMode"):
+            assert gone not in js, gone
 
     def test_study_view_module(self):
         study = (FRONTEND / "static" / "js" / "modules" / "study.js").read_text()
         for name in ("openStudy(", "studyHandlePop(", "studyLoadAvailability(", "sanitize("):
             assert name in study
         sw = SW_PATH.read_text()
-        assert "'study'" in sw and "/static/css/study.css" in sw
+        assert "'study'" in sw and "'study_panes'" in sw and "/static/css/study.css" in sw
 
 
 # ========== HTML INTEGRITY ==========
@@ -203,9 +205,13 @@ class TestHTML:
     def test_manifest_link(self, html):
         assert 'rel="manifest"' in html
 
-    def test_study_tab_markup_exists(self, html):
-        assert "activeTab === 'study'" in html
+    def test_study_view_markup_exists(self, html):
+        # The sheet has two tabs left: this chapter's notes, and Topics
+        assert "activeTab === 'study'" not in html and "activeTab === 'crossrefs'" not in html
+        assert "activeTab === 'notes'" in html and "activeTab === 'topics'" in html
         assert '<dialog id="study-view"' in html
+        assert 'data-slug="cross-references"' in html and 'data-slug="notes"' in html
+        assert "modules/study_panes.js" in html
         assert "modules/study.js" in html and "css/study.css" in html
         # One way to read commentary: the old Commentary tab is gone
         assert "activeTab === 'commentary'" not in html

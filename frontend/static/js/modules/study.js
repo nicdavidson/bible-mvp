@@ -365,6 +365,9 @@ window.BibleModules = window.BibleModules || {};
                 this._studyOpener = document.activeElement;
                 if (this.ttsPlaying) this.ttsStop();
             }
+            // Writing in progress is kept (saved for the verses it was written on; not awaited,
+            // so nothing else can run between here and the new location's state)
+            if (wasOpen) this.studyNotesFlush();
             const prevLabel = wasOpen && history === 'push' ? this.studyRefLabel() : null;
             const keepSource = source || (wasOpen ? this.study.active : null);
 
@@ -399,12 +402,19 @@ window.BibleModules = window.BibleModules || {};
             const track = this.studyTrack();
             const prefs = this.studyPrefs();
             const want = [keepSource, prefs.last].map(x => x && slugify(x));
-            const active = want.find(w => w && track.some(t => t.slug === w)) || track[0]?.slug || null;
+            // Cross-references and Notes open by name (deep link, the reader's Refs/Note
+            // buttons); otherwise the remembered or first commentary source
+            const active = (this.studyIsTool(want[0]) && want[0])
+                || want.find(w => w && track.some(t => t.slug === w)) || track[0]?.slug || null;
             if (active !== this.study.active) this.study.previous = this.study.active || this.study.previous;
             this.study.active = active;
 
-            // Selection changed: rebuild panes (cached chapter data makes this instant)
+            // Selection changed: rebuild panes (cached chapter data makes this instant).
+            // The track re-renders with other panes before it is scrolled to the active
+            // one; that isn't the reader swiping.
+            this._studyProgrammatic = Date.now();
             this.studyPanes = {};
+            this.studyPanesReset();
             const url = this.studyURL(active);
             const depth = this._studyDepth;
             if (history === 'push') {
@@ -418,7 +428,7 @@ window.BibleModules = window.BibleModules || {};
                 this.studyObservePanes();
                 this.studyScrollToSource(active, false);
                 if (active) {
-                    this.studyLoadPane(active);
+                    if (!this.studyIsTool(active)) this.studyLoadPane(active);
                     document.querySelector(`.study-chip[data-slug="${CSS.escape(active)}"]`)
                         ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
                 }
@@ -445,6 +455,8 @@ window.BibleModules = window.BibleModules || {};
         },
 
         studyHide() {
+            this.studyNotesFlush();
+            this.studyWritingEnd();
             const dlg = document.getElementById('study-view');
             this.study.open = false;
             this.study.peek = null;
@@ -715,19 +727,20 @@ window.BibleModules = window.BibleModules || {};
 
         studySelect(slug, { scroll = true } = {}) {
             if (!slug) return;
-            const src = this.studySourceBySlug(slug);
-            if (!src) return;
-            if (!(src.selection_entries > 0)) { this.studyShowInfo(slug); return; }
+            const tool = this.studyIsTool(slug);
+            const src = tool ? null : this.studySourceBySlug(slug);
+            if (!tool && !src) return;
+            if (src && !(src.selection_entries > 0)) { this.studyShowInfo(slug); return; }
             if (slug !== this.study.active) {
-                this.study.previous = this.study.active;
+                // The swap button goes back to the last commentary source
+                if (!this.studyIsTool(this.study.active)) this.study.previous = this.study.active;
                 this.study.active = slug;
-                const prefs = this.studyPrefs();
-                this.studySavePrefs({ ...prefs, last: slug });
+                if (!tool) this.studySavePrefs({ ...this.studyPrefs(), last: slug });
                 if (this.study.open) this.navReplaceState({ ...(window.history.state || {}), study: true }, this.studyURL(slug));
             }
             this.studyLoadPane(slug);
             if (scroll) this.studyScrollToSource(slug, true);
-            this.$nextTick(() => document.querySelector(`.study-chip[data-slug="${CSS.escape(slug)}"]`)
+            this.$nextTick(() => document.querySelector(`.study-chip[data-slug="${CSS.escape(slug)}"], .study-tool[data-slug="${CSS.escape(slug)}"]`)
                 ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' }));
         },
 
@@ -755,7 +768,9 @@ window.BibleModules = window.BibleModules || {};
                     const slug = en.target.dataset.slug;
                     if (en.isIntersecting) this.studyLoadPane(slug);
                     // Leftmost (mostly) visible pane is the active one
-                    if (en.intersectionRatio >= 0.6 && Date.now() - (this._studyProgrammatic || 0) > 600) {
+                    // Not while a new location loads or the view places itself: panes come and
+                    // go then, and the scroll position moves without the reader swiping
+                    if (en.intersectionRatio >= 0.6 && !this.study.loading && Date.now() - (this._studyProgrammatic || 0) > 600) {
                         const visible = [...track.querySelectorAll('.study-pane')].filter(p => {
                             const r = p.getBoundingClientRect(); const t = track.getBoundingClientRect();
                             return r.left >= t.left - 4 && r.left < t.right - 40;
@@ -865,19 +880,30 @@ window.BibleModules = window.BibleModules || {};
             const link = event.target.closest('.commentary-ref');
             if (!link) return;
             event.preventDefault();
-            const ref = link.dataset.ref;
+            this.studyPeek(link.dataset.ref);
+        },
+
+        // A reference in a sheet over the study view: read it, study it, or go and read it.
+        // context: also show two verses either side, dimmed (cross-references: the verse
+        // itself is already on screen, what the reader lacks is where it sits).
+        async studyPeek(ref, { context = false } = {}) {
             const parsed = this.studyParseRef(ref);
             if (!parsed) return;
             const token = Symbol('peek');
-            this.study.peek = { ref, token, text: [], loading: true, error: null };
+            this.study.peek = { ref, token, text: [], loading: true, error: null, focus: null };
             this.$nextTick(() => document.getElementById('study-peek')?.showModal());
-            const { book, chapter, vs, ve } = parsed;
+            const { book, chapter } = parsed;
+            let { vs, ve } = parsed;
+            const ask = context && vs
+                ? `${book} ${chapter}:${Math.max(1, vs - 2)}-${ve + 2}` : ref;
+            if (context && vs) this.study.peek.focus = [vs, ve];
+            if (context && vs) { vs = Math.max(1, vs - 2); ve += 2; }
             const inRange = v => !vs || (v.verse >= vs && v.verse <= ve);
             let verses = null;
             try {
-                const data = await this.studyFetch(`/api/passage/${encodeURIComponent(ref)}/study?translation=${encodeURIComponent(this.translation)}`);
+                const data = await this.studyFetch(`/api/passage/${encodeURIComponent(ask)}/study?translation=${encodeURIComponent(this.translation)}`);
                 verses = data.verses;
-                if (this.study.peek?.token === token) this.study.peek.ref = data.reference;
+                if (this.study.peek?.token === token && !context) this.study.peek.ref = data.reference;
             } catch {
                 try {
                     const cached = await window.offlineStorage?.getChapterVerses(this.translation, book, chapter);

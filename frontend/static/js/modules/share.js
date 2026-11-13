@@ -47,16 +47,11 @@ window.BibleModules.share = {
             { name: 'Light', colors: ['#f5f7fa', '#c3cfe2'] },
         ],
 
-        toggleShareMode() {
-            this.shareMode = !this.shareMode;
-            this.shareSelectedVerses = [];
-        },
-
-        toggleShareVerse(verseNum) {
-            const idx = this.shareSelectedVerses.indexOf(verseNum);
-            if (idx > -1) this.shareSelectedVerses.splice(idx, 1);
-            else this.shareSelectedVerses.push(verseNum);
-            this.shareSelectedVerses.sort((a, b) => a - b);
+        // Share the reader's selection (the action bar's Share button)
+        shareSelection() {
+            this.shareSelectedVerses = [...this.highlightedVerses].sort((a, b) => a - b);
+            this.actionMore = false;
+            this.openShareModal();
         },
 
         getShareVerseText() {

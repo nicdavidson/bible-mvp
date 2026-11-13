@@ -1048,102 +1048,6 @@ textarea:focus:not(:focus-visible) {
 }
 
 /* Unified Study Tab */
-.study-tab {
-    overflow-y: auto;
-}
-
-.study-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1rem;
-}
-
-.study-heading {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.study-heading-label {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--color-text);
-}
-
-.study-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.study-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-.study-section-header h3 {
-    font-size: 0.8125rem;
-    font-weight: 700;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.study-link-btn {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    background: var(--color-surface);
-    color: var(--color-primary);
-    cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 0.25rem 0.5rem;
-}
-
-.study-link-btn:hover {
-    background: var(--color-primary-bg);
-    border-color: var(--color-primary);
-}
-
-.study-note-card {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    background: var(--color-surface);
-    padding: 0.875rem;
-}
-
-.study-ref-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 0.5rem;
-}
-
-.study-ref-grid a {
-    display: block;
-    padding: 0.5rem 0.625rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    background: var(--color-surface);
-    color: var(--color-primary);
-    font-size: 0.8125rem;
-    font-weight: 600;
-    text-decoration: none;
-}
-
-.study-ref-grid a:hover {
-    background: var(--color-primary-bg);
-    border-color: var(--color-primary);
-}
-
-.study-topic-list {
-    margin-top: 0.25rem;
-}
 
 /* Clickable Bible reference links in notes */
 .note-ref {
@@ -1165,17 +1069,6 @@ textarea:focus:not(:focus-visible) {
 }
 
 /* Notes */
-.notes-editor {
-    margin-bottom: 1.5rem;
-}
-
-.note-reference-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-}
 
 .note-for {
     color: var(--color-text-secondary);
@@ -1184,51 +1077,6 @@ textarea:focus:not(:focus-visible) {
 .note-ref {
     font-weight: 600;
     color: var(--color-primary);
-}
-
-.note-range-to {
-    display: flex;
-    align-items: center;
-}
-
-.input-end-verse {
-    width: 50px;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    background: var(--color-bg);
-    color: var(--color-text);
-    font-size: 0.875rem;
-    text-align: center;
-}
-
-.btn-range-toggle {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    transition: all 0.15s;
-}
-
-.note-textarea {
-    width: 100%;
-    min-height: 100px;
-    padding: 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    background: var(--color-bg);
-    color: var(--color-text);
-    font-family: var(--font-sans);
-    font-size: 0.9375rem;
-    resize: vertical;
 }
 
 .btn-save {
@@ -1308,183 +1156,13 @@ textarea:focus:not(:focus-visible) {
     flex: 1;
 }
 
-.btn-edit-note,
-.btn-delete-note {
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-    opacity: 0.5;
-    transition: all 0.15s;
-}
-
-.btn-edit-note:hover {
-    opacity: 1;
-    color: var(--color-primary);
-    background: var(--color-primary-bg);
-}
-
-.btn-delete-note:hover {
-    opacity: 1;
-    color: #dc2626;
-    background: rgba(220, 38, 38, 0.1);
-}
-
 /* Note editing */
-.note-card.note-editing {
-    background: var(--color-surface);
-}
-
-.note-edit-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.note-edit-actions {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-}
-
-.btn-save-edit,
-.btn-cancel-edit {
-    padding: 0.375rem 0.75rem;
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.btn-save-edit {
-    background: var(--color-primary);
-    color: white;
-    border: none;
-}
-
-.btn-save-edit:hover {
-    background: var(--color-primary-dark, #1d4ed8);
-}
-
-.btn-save-edit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.btn-cancel-edit {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
-}
-
-.btn-cancel-edit:hover {
-    background: var(--color-bg);
-}
 
 /* Cross-Reference Controls */
-.crossref-controls {
-    padding: 0.5rem 0;
-    margin-bottom: 0.5rem;
-    border-bottom: 1px solid var(--color-border);
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.crossref-sort-btns {
-    display: flex;
-    gap: 0.25rem;
-}
-
-.crossref-sort-btn {
-    flex: 1;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.8rem;
-    border: 1px solid var(--color-border);
-    background: var(--color-bg);
-    color: var(--color-text-secondary);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.crossref-sort-btn:hover {
-    background: var(--color-surface);
-}
-
-.crossref-filter-input {
-    width: 100%;
-    padding: 0.35rem 0.5rem;
-    font-size: 0.8rem;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-bg);
-    color: var(--color-text);
-    box-sizing: border-box;
-}
-
-.crossref-votes {
-    display: inline-block;
-    font-size: 0.7rem;
-    padding: 0.1rem 0.4rem;
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-    color: var(--color-text-secondary);
-    margin-left: 0.3rem;
-}
-
-.crossref-filter-count {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    padding: 0.25rem 0;
-}
 
 /* Cross-References */
-.crossref-list {
-    list-style: none;
-}
-
-.crossref-item {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--color-border);
-    transition: background var(--transition-fast);
-}
-
-.crossref-item:hover {
-    background: var(--color-primary-bg);
-}
-
-.crossref-item:last-child {
-    border-bottom: none;
-}
-
-.crossref-item a {
-    color: var(--color-primary);
-    text-decoration: none;
-}
-
-.parchment .crossref-item a {
-    color: var(--color-primary);
-}
-
-.crossref-item a:hover {
-    text-decoration: underline;
-}
 
 /* Cross-ref source reference in combined plan reading mode */
-.crossref-source {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    margin-right: 0.3rem;
-}
 
 /* Combined notes header for plan reading mode */
 .combined-notes-header {
@@ -2406,9 +2084,6 @@ textarea:focus:not(:focus-visible) {
         padding: 0.75rem;
     }
 
-    .study-section-header h3 {
-        font-size: 0.8125rem;
-    }
 }
 
 /* Extra small screens */
@@ -3554,107 +3229,10 @@ textarea:focus:not(:focus-visible) {
 }
 
 /* Multi-verse selection mode */
-.verses.selection-mode .verse-box {
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-}
-
-.verses.selection-mode .verse-box:hover {
-    background: rgba(37, 99, 235, 0.05);
-}
-
-.verse-box.verse-selected-for-note {
-    background: rgba(37, 99, 235, 0.12);
-    box-shadow: inset 4px 0 0 var(--color-primary);
-}
-
-.dark .verse-box.verse-selected-for-note {
-    background: rgba(37, 99, 235, 0.2);
-}
 
 /* Note mode toggle row */
-.note-mode-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.btn-select-verses {
-    padding: 0.375rem 0.75rem;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 0.8125rem;
-    color: var(--color-text);
-    transition: all 0.15s;
-}
-
-.select-hint {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    font-style: italic;
-}
 
 /* Tag section in note editor */
-.note-tag-section {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-    padding: 0.5rem;
-    background: var(--color-bg);
-    border-radius: var(--radius);
-    font-size: 0.8125rem;
-}
-
-.note-tag-label {
-    color: var(--color-text-secondary);
-}
-
-.note-tag-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-}
-
-.note-tag-chip {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    border-radius: 9999px;
-    color: white;
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
-    border: none;
-    font-family: inherit;
-}
-
-.note-tag-chip.selectable {
-    cursor: pointer;
-    opacity: 0.5;
-    transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-
-.note-tag-chip.selectable:hover {
-    opacity: 0.75;
-}
-
-.note-tag-chip.selectable.selected {
-    opacity: 1;
-    box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px currentColor;
-    transform: scale(1.05);
-}
-
-.note-tag-hint {
-    font-size: 0.6875rem;
-    color: var(--color-text-secondary);
-    font-style: italic;
-}
 
 /* Tags on saved notes */
 .note-tags {
@@ -3805,9 +3383,6 @@ textarea:focus:not(:focus-visible) {
 }
 
 /* Shared input focus ring (consolidated from 5 identical copies) */
-.input-end-verse:focus,
-.note-textarea:focus,
-.crossref-filter-input:focus,
 .setting-select:focus,
 .tag-name-input:focus {
     outline: none;
@@ -5587,53 +5162,8 @@ textarea:focus:not(:focus-visible) {
 /* ========== VERSE SHARING STYLES ========== */
 
 /* Share mode bar */
-.share-mode-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.375rem 0.75rem;
-}
-
-.btn-share-toggle {
-    background: none;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: 0.25rem 0.75rem;
-    font-size: 0.8125rem;
-    color: var(--color-text);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.share-hint {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-}
-
-.btn-share-action {
-    margin-left: auto;
-    background: var(--color-primary);
-    border: none;
-    border-radius: var(--radius);
-    padding: 0.25rem 0.75rem;
-    font-size: 0.8125rem;
-    color: white;
-    cursor: pointer;
-}
-
-.btn-share-action:hover {
-    background: var(--color-primary-hover);
-}
 
 /* Verse selected for sharing */
-.verse-box.verse-selected-for-share {
-    background: rgba(37, 99, 235, 0.12);
-    box-shadow: inset 4px 0 0 var(--color-primary);
-}
-
-.dark .verse-box.verse-selected-for-share {
-    background: rgba(37, 99, 235, 0.2);
-}
 
 /* ========== FLOATING VERSE ACTION BAR ========== */
 .verse-action-bar {
@@ -5758,51 +5288,9 @@ svg.action-bar-icon {
         width: 20px;
         height: 20px;
     }
-
-    .action-bar-buttons {
-        gap: 0.25rem;
-        justify-content: space-evenly;
-        flex: 1;
-    }
 }
 
 /* ==================== Path to Christ ==================== */
-
-/* Trigger button in cross-refs tab */
-.path-to-christ-trigger {
-    padding: 0.75rem 0;
-    border-top: 1px solid var(--color-border);
-    margin-top: 0.75rem;
-    text-align: center;
-}
-.btn-path-to-christ {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 1rem;
-    background: linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(245,158,11,0.1) 100%);
-    color: #fbbf24;
-    border: 1px solid rgba(251,191,36,0.4);
-    border-radius: 20px;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: var(--font-sans);
-}
-.btn-path-to-christ:hover {
-    background: linear-gradient(135deg, rgba(251,191,36,0.25) 0%, rgba(245,158,11,0.18) 100%);
-    border-color: #fbbf24;
-    box-shadow: 0 0 12px rgba(251,191,36,0.2);
-}
-.btn-path-to-christ:disabled { opacity: 0.6; cursor: wait; }
-.ptc-icon { font-size: 1rem; }
-.ptc-hint {
-    display: block;
-    margin-top: 0.25rem;
-    font-size: 0.6875rem;
-    color: var(--color-text-muted);
-}
 
 /* Modal */
 .ptc-modal { max-width: 540px; }
@@ -5920,11 +5408,7 @@ svg.action-bar-icon {
 }
 
 /* Parchment overrides */
-.parchment .btn-path-to-christ {
-    background: linear-gradient(135deg, rgba(139,105,20,0.15) 0%, rgba(139,105,20,0.1) 100%);
-    color: #8b6914;
-    border-color: rgba(139,105,20,0.4);
-}
+
 .parchment .ptc-dot { background: #8b6914; box-shadow: 0 0 0 2px #8b6914; }
 .parchment .ptc-dot-seed { background: #2d6a4f; box-shadow: 0 0 0 2px #2d6a4f; }
 .parchment .ptc-ref { color: #8b6914; }
@@ -6348,9 +5832,7 @@ svg.action-bar-icon {
 /* Shared primary hover state (consolidated from 7 identical copies) */
 .interlinear-toggle-header:hover,
 .download-actions .btn-secondary:hover:not(:disabled),
-.btn-select-verses:hover,
 .btn-edit-tag:hover,
-.btn-share-toggle:hover,
 .btn-share-option:hover,
 .btn-parallel:hover {
     border-color: var(--color-primary);
@@ -6590,15 +6072,6 @@ svg.action-bar-icon {
 }
 
 /* Parchment: Verse selected states */
-.parchment .verse-box.verse-selected-for-note {
-    background: rgba(184, 134, 11, 0.1);
-    box-shadow: inset 4px 0 0 var(--color-primary);
-}
-
-.parchment .verse-box.verse-selected-for-share {
-    background: rgba(184, 134, 11, 0.1);
-    box-shadow: inset 4px 0 0 var(--color-primary);
-}
 
 /* Parchment: Search */
 .parchment .strongs-word-card {
@@ -6702,12 +6175,8 @@ svg.action-bar-icon {
 .btn-nav:hover:not(:disabled),
 .btn-tts-play,
 .book-btn:hover,
-.btn-range-toggle:hover,
-.crossref-sort-btn.active,
-.btn-select-verses.active,
 .btn-day-nav:hover:not(:disabled),
 .category-btn.active,
-.btn-share-toggle.active,
 .btn-parallel.active,
 .topic-az-btn:hover:not(:disabled),
 .topic-az-btn.active {
@@ -7506,63 +6975,6 @@ svg.action-bar-icon {
     background: var(--color-primary);
     border-radius: 0 2px 2px 0;
     transition: width 0.3s ease;
-}
-
-/* Study peek chips: hidden on desktop (panel is always visible there) */
-.study-peek { display: none; }
-
-@media (max-width: 900px) {
-    /* Collapsed sheet rises to show the peek row when a verse is selected */
-    /* The peek row (96px) used to cover the action bar's buttons (P0-3) */
-    body:has(.panel-resources.peeking) .verse-action-bar {
-        bottom: calc(96px + 8px);
-    }
-
-    .panel-resources.peeking {
-        transform: translateY(calc(100% - 96px));
-    }
-    .study-peek {
-        display: flex;
-        align-items: center;
-        gap: 0.375rem;
-        padding: 0.5rem 0.75rem 0.25rem;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-    }
-    .study-peek::-webkit-scrollbar { display: none; }
-    .study-peek-label {
-        font-size: 0.6875rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--color-text-muted);
-        flex-shrink: 0;
-    }
-    .peek-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        padding: 0.3rem 0.625rem;
-        border: 1px solid var(--color-border);
-        border-radius: 999px;
-        background: var(--color-bg);
-        color: var(--color-text);
-        font-size: 0.8125rem;
-        font-weight: 500;
-        white-space: nowrap;
-        cursor: pointer;
-        flex-shrink: 0;
-    }
-    .peek-chip:active { background: var(--color-surface-hover); }
-    .peek-count {
-        font-size: 0.6875rem;
-        font-weight: 700;
-        color: var(--color-primary);
-        background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-        border-radius: 999px;
-        padding: 0.05rem 0.4rem;
-    }
 }
 
 @media (max-width: 600px) {

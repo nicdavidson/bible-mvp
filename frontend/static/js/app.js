@@ -273,8 +273,6 @@ function bibleApp() {
         verses: [],
         highlightedVerses: [],
         crossRefs: [],
-        crossRefSort: 'biblical',  // 'biblical' or 'relevance'
-        crossRefFilter: '',        // book name filter
         // Nave's Topical Index
         verseTopics: [],           // topics for current verse
         topicSearchQuery: '',
@@ -285,14 +283,13 @@ function bibleApp() {
         topicSections: {},         // { A: 123, B: 45, ... }
         topicLoading: false,
         notes: [],
-        currentNote: '',
         selectedWord: null,
         showAllOccurrences: false,
         loading: false,
         error: null,
         darkMode: false,
         currentTheme: 'light',
-        activeTab: 'study',
+        activeTab: 'notes',        // the reader's sheet: 'notes' (this chapter's) | 'topics'
         showSearch: false,
         searchQuery: '',
         searchScope: 'all',
@@ -349,7 +346,7 @@ function bibleApp() {
         sourceTextWarningDismissed: localStorage.getItem('sourceTextWarningDismissed') === 'true',
 
         // Verse sharing state
-        shareMode: false,
+        actionMore: false,  // the action bar's More menu (phones)
         shareSelectedVerses: [],
         showShareModal: false,
         shareBackgroundIndex: 0,
@@ -439,14 +436,6 @@ function bibleApp() {
         showHighlightPicker: null,  // verse number showing color picker
         highlightColors: ['#fef08a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#fed7aa', '#e9d5ff'],
 
-        // Multi-verse selection state
-        noteEditMode: false,  // When true, taps select verses instead of word lookup
-        selectedVerses: [],  // Verses selected for note (numbers)
-        pendingNoteTags: [],  // Tag IDs to apply when creating a new note
-
-        // Note editing state
-        editingNoteId: null,  // ID of note being edited
-        editingNoteContent: '',  // Content of note being edited
 
         // Scroll-based active verse tracking (for chapter-wide content display)
         scrollActiveVerse: null,  // Verse number most visible in viewport
@@ -928,11 +917,22 @@ function bibleApp() {
             }
         },
 
-        sheetExpand() {
+        // The reader's sheet (phones) / sidebar (wide): this chapter's notes, or topics
+        openSheet(tab) {
+            this.activeTab = tab;
+            if (tab === 'topics') this.initTopicSections();
+            if (this.sidebarCollapsed) this.toggleSidebar();
+            this.resourcesPanelExpanded = true;
             if (window.innerWidth <= 600) {
                 this.sheetSnap = 'half';
-                this.sheetDragStyle = 'max-height: 50vh; transform: translateY(0)';
+                this.sheetDragStyle = 'max-height: 62dvh; transform: translateY(0)';
+                this.$nextTick(() => this.$refs.resourcesPanel?.querySelector('.tab-btn.active')?.focus({ preventScroll: true }));
             }
+        },
+        closeSheet() {
+            this.resourcesPanelExpanded = false;
+            this.sheetSnap = 'collapsed';
+            this.sheetDragStyle = '';
         },
 
         sheetToggle() {
@@ -1193,31 +1193,6 @@ function bibleApp() {
             }
         },
 
-        // Get sorted and filtered cross-references
-        getFilteredCrossRefs() {
-            let refs = [...this.crossRefs];
-
-            // Filter by book name
-            if (this.crossRefFilter) {
-                const filter = this.crossRefFilter.toLowerCase();
-                refs = refs.filter(r => r.target_book.toLowerCase().includes(filter));
-            }
-
-            // Sort
-            if (this.crossRefSort === 'relevance') {
-                refs.sort((a, b) => (b.votes || 0) - (a.votes || 0));
-            }
-            // 'biblical' is the default order from API (target_book_order, chapter, verse)
-
-            return refs;
-        },
-
-        // Get unique book names from current cross-refs (for filter suggestions)
-        getCrossRefBooks() {
-            const books = new Set(this.crossRefs.map(r => r.target_book));
-            return [...books].sort();
-        },
-
         // === Nave's Topical Index ===
 
         async loadTopicsForVerse(verseNum) {
@@ -1383,7 +1358,7 @@ function bibleApp() {
 
         // Navigate to previous verse (within same chapter - no reload)
         previousVerse() {
-            const currentVerse = this.getNoteStartVerse();
+            const currentVerse = this.highlightedVerses[0] || 1;
             if (currentVerse > 1) {
                 this.navigateToVerse(currentVerse - 1);
             }
@@ -1430,16 +1405,6 @@ function bibleApp() {
                 return;
             }
 
-            // In note edit mode, handle verse selection for multi-verse notes
-            if (this.noteEditMode) {
-                // Combined plan mode: notes anchor to one chapter — ignore
-                // clicks on verses outside the selection's chapter
-                if (this.combinedPlanReading && verseIdx !== undefined
-                    && !this.verseInSelectionScope(this.verses[verseIdx])) return;
-                this.handleVerseSelection(verseNum, event);
-                return;
-            }
-
             // On touch: if this verse is already selected, check for word tap
             if (this.isTouchDevice) {
                 if (this.highlightedVerses.length === 1 && this.highlightedVerses[0] === verseNum) {
@@ -1478,17 +1443,9 @@ function bibleApp() {
                 : `${this.currentBook} ${this.currentChapter}`;
         },
 
-        getStudyCrossRefs(limit = 6) {
-            return this.getFilteredCrossRefs().slice(0, limit);
-        },
-
-        openStudySection(tab) {
-            this.activeTab = tab;
-            if (tab === 'topics') this.initTopicSections();
-        },
-
         // Clear verse selection (dismiss action bar)
         clearVerseSelection() {
+            this.actionMore = false;
             if (this.highlightedVerses.length === 0) return;
             this.highlightedVerses = [];
             this.selectionContext = null;
@@ -1518,25 +1475,6 @@ function bibleApp() {
             return vv.map(v => `v${v}`).join(', ');
         },
 
-        // Open the notes panel with selected verses pre-filled
-        openNoteForSelected() {
-            const vv = [...this.highlightedVerses].sort((a, b) => a - b);
-            if (vv.length === 0) return;
-
-            // Switch to notes tab and expand the resources panel
-            this.activeTab = 'notes';
-            this.resourcesPanelExpanded = true;
-
-            // Pre-fill the verse selection for the note
-            this.noteEditMode = true;
-            this.selectedVerses = vv;
-
-            // Focus the textarea after panel animates open
-            this.$nextTick(() => {
-                const ta = document.querySelector('.note-textarea');
-                if (ta) ta.focus();
-            });
-        },
 
         memorizeSelected() {
             let added = 0;
@@ -1699,10 +1637,12 @@ function bibleApp() {
             if (verseNum == null) this.crossRefs = [];
         },
 
-        async findPathToChrist() {
-            if (!this.currentBook || !this.highlightedVerses.length) return;
-            const verseNum = this.highlightedVerses[0];
-            const ref = `${this.currentBook} ${this.currentChapter}:${verseNum}`;
+        // ref: a verse ("John 3:16"); default the reader's first selected verse
+        async findPathToChrist(ref = null) {
+            if (!ref) {
+                if (!this.currentBook || !this.highlightedVerses.length) return;
+                ref = `${this.currentBook} ${this.currentChapter}:${this.highlightedVerses[0]}`;
+            }
 
             this.pathToChristLoading = true;
             this.pathToChristError = null;
