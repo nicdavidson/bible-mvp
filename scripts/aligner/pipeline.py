@@ -231,6 +231,19 @@ def ensure_table(conn):
     conn.commit()
 
 
+def discard_legacy_table(conn):
+    """Remove the per-word table without converting it.
+
+    For a full alignment build: on a from-scratch database the only per-word rows are the
+    ones import_bsb.py writes with the pre-2026-11 tokenizer ("Abrahams" for "Abraham's").
+    They are about to be replaced for every translation, and they cannot pass the
+    conversion check in ensure_table(), which exists for databases whose per-word rows
+    this aligner built.
+    """
+    conn.execute(f"DROP TABLE IF EXISTS {store.LEGACY_TABLE}")
+    conn.commit()
+
+
 def write_rows(conn, translation: str, rows):
     """Replace all rows of one translation. rows: (key, pos, word, orig_pos, conf, method)."""
     ensure_table(conn)

@@ -31,7 +31,8 @@ from aligner.kjv import KJV_CACHE_KEY, KJV_USFM_URL  # noqa: E402
 from aligner.metrics import (calibration, error_classes, score_examples,  # noqa: E402
                              threshold_curve)
 from aligner.pipeline import (ClassCalibrator, Context, Predictor,  # noqa: E402
-                              bsb_rows, ensure_table, fit_calibrator, kjv_rows, model_rows,
+                              bsb_rows, discard_legacy_table, ensure_table, fit_calibrator,
+                              kjv_rows, model_rows,
                               self_train, train, train_reranker, write_rows)
 from aligner.rerank import is_function  # noqa: E402
 from aligner.renderings import build_renderings  # noqa: E402
@@ -224,6 +225,12 @@ def main():
         n = conn.execute("SELECT COALESCE(SUM(n_links), 0) FROM english_alignment_verses").fetchone()[0]
         print(f"english_alignment_verses: {n} aligned words")
         return
+    if args.step == "all":
+        # Every translation is rebuilt below; do not convert import_bsb.py's obsolete rows.
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH)
+        discard_legacy_table(conn)
+        conn.close()
     ctx = Context(DB_PATH, kjv_zip())
     steps = ["bsb", "kjv", "web", "index"] if args.step == "all" else [args.step]
     for name in steps:
