@@ -48,21 +48,38 @@ Recommended rule: **show content-word links at ≥ 0.5 and function-word links a
 ≥ 0.7.** On BSB that hides 19% of function-word links for +5.3 points of
 precision on them, and changes nothing for content words. YLT function words
 (archaic English) are 8–10 points less accurate than stated, so for KJV and
-WEB the 0.7 function cut is the minimum. `lemma_renderings` keeps one 0.5 cut
-(it counts content words in practice).
+WEB the 0.7 function cut is the minimum. `lemma_renderings` and the
+renderings verse lists apply the same rule (content words ≥ 0.5, function
+words ≥ 0.7; `backend.alignment_store.rendering_link_ok`, since 2026-11-13).
 
 Shipped coverage in the combined database (share of tappable words with a
-link) and confidence:
+link) and confidence, alignments step 1.2 (2026-11-13; previous build in
+brackets where it changed):
 
 | Translation | Tappable words | Linked | conf ≥ 0.9 | 0.7–0.9 | 0.5–0.7 | < 0.5 | Shown under the recommended rule |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| BSB | 726,093 | 721,560 (99.4%) | 703,533 | 9,670 | 6,745 | 1,612 | 99.0% |
-| KJV | 789,633 | 762,603 (96.6%) | 537,859 | 135,090 | 66,108 | 23,546 | 86.6% |
-| WEB | 750,447 | 750,318 (100%) | 431,671 | 197,695 | 75,363 | 45,589 | 87.2% |
+| BSB | 726,093 | 721,574 (99.4%) | 704,789 | 8,020 | 6,954 | 1,811 | 98.9% (99.0%) |
+| KJV | 789,633 | 762,504 (96.6%) | 545,520 | 119,529 | 69,731 | 27,724 | 85.4% (86.6%) |
+| WEB | 750,447 | 750,198 (100%) | 418,313 | 194,962 | 82,961 | 53,962 | 85.6% (87.2%) |
 
-BSB: 692,981 human links + 28,579 aligner links (shifted verses and isolated
-bad gold). KJV: 354,443 from Strong's tags + 408,160 aligner links; the 26,988
-italic words have no link by design.
+BSB: 693,052 human links + 28,522 aligner links (shifted verses and isolated
+bad gold). KJV: 355,557 from Strong's tags (was 354,443) + 406,947 aligner
+links; the 26,988 italic words have no link by design.
+
+**Step 1.2: displaced words are in their edition.** TAGNT lists editions that
+have a word in a different order with the displacement ("TR«3": in the TR,
+three words earlier; the file header: "Editions that have words in a different
+order are listed with the amount of displacement"). `SourceToken.in_edition`
+compared exact strings, so 482 TR, 507 Byzantine and 27 SBL words could not be
+candidates for KJV, WEB and BSB links. Fixed; it needs the full rebuild
+(candidates change self-training, calibration and KJV tag resolution, so a
+patch of the affected verses would not equal a fresh build). Effect: KJV tags
+that resolve to no source word 6,638 → 5,524 (+691 unique, +542 by order);
+held-out scores unchanged within ±0.04 points (BSB F1 84.05, KJV 86.93, YLT
+83.59; `docs/alignment-eval-2026-11.json` re-run); calibrated KJV/WEB
+confidences moved down a little, so the share shown under the rule fell by
+1.2 (KJV) and 1.6 (WEB) points. Rebuild 30.7 min, 2.77 GB peak; evaluation
+11.3 min, 1.87 GB.
 
 ## Round two changes and measurements
 
@@ -248,9 +265,9 @@ Hebrew: one Masoretic text for all three; LXX-reconstructed rows (`=X`) are excl
   tagged spans as occurrences, otherwise *ambiguous*. Strong's 1890 gives some
   inflected forms their own numbers (ὑμῖν G5213, ἐστί G2076); 20 lemma classes
   map these to STEPBible's lemma (from the lexicon's own "dative case of
-  G4771" derivations and from data). Of 787,634 tappable KJV words: 283,021
-  unique, 61,814 ordered, 7,629 ambiguous, 6,629 unresolvable, 26,988 italic,
-  401,553 untagged (mostly function words: the KJV tagging skips "the", "of",
+  G4771" derivations and from data). Of the tappable KJV words (step 1.2):
+  285,126 unique, 63,352 ordered, 7,079 ambiguous, 5,524 unresolvable, 26,997
+  italic, 401,555 untagged (mostly function words: the KJV tagging skips "the", "of",
   "unto"...).
 - **YLT (Clear-Bible manual alignment).** Used only as a second evaluation set
   (YLT is not in the app).
@@ -496,6 +513,7 @@ Measured on the integration database of 2026-11-13 (bytes; MiB in brackets):
 | whole file, as built | 830,648,320 | |
 | whole file after `VACUUM` | 809,684,992 (772.2 MiB) | 742,715,392 (708.3 MiB) |
 | + `tidy` step (two redundant indexes), after `VACUUM` | | 728,936,448 (695.2 MiB) |
+| round two, final (adds word-study, lexicon and hymn tables, ~13 MB; commentary search text derived instead of stored, −228 MB; see docs/COMMENTARY_LIBRARY_2026-11.md), after `VACUUM` | | 514,793,472 (490.9 MiB) |
 
 So packing saves 67.0 MB and the index cleanup another 13.8 MB: 80.7 MB in all
 (10%). Per added translation the packed table costs about 5 MB instead of ~25.
