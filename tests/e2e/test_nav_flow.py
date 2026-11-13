@@ -594,3 +594,58 @@ def test_init_runs_once(server, browser):
     assert len(requests) == 1, requests
     ctx.close()
     assert not errors, errors
+
+
+# ---------- word links: show a weak link as uncertain ----------
+
+def _tap_word(pg, verse, position):
+    pg.click(f'#verse-{verse} .word[data-position="{position}"]')
+    pg.wait_for_selector(".panel-word:visible")
+    pg.wait_for_function("Alpine.$data(document.body).selectedWord && Alpine.$data(document.body).selectedWord.text")
+
+
+def test_word_link_confidence(server, desktop):
+    pg = desktop
+    pg.goto(f"{server}/John/3")
+    _wait_ref(pg, "John 3")
+    pg.evaluate("Alpine.$data(document.body).translation = 'WEB'")
+    pg.wait_for_function("document.querySelector('#verse-3').textContent.includes('certainly')")
+    # Weak content word (confidence 0.44 < 0.5): not stated as fact
+    _tap_word(pg, 3, 5)
+    assert _app(pg, "a.selectedWord.text") == "certainly"
+    assert pg.is_visible(".word-unsure")
+    assert "We aren't sure which Greek word" in pg.inner_text(".word-unsure")
+    assert not pg.is_visible(".panel-word .word-original")
+    pg.click(".word-reveal")
+    assert pg.inner_text(".panel-word .word-original") == "ἀμὴν"
+    assert "Not certain" in pg.inner_text(".word-unsure-note")
+    # Function word at 0.66: shown for content words, but under the 0.7 bar for "the"
+    _tap_word(pg, 2, 1)
+    assert _app(pg, "a.selectedWord.text") == "The"
+    assert "Small words like this" in pg.inner_text(".word-unsure")
+    # Strong link (0.98): shown straight away
+    _tap_word(pg, 1, 5)
+    assert _app(pg, "a.selectedWord.text") == "man"
+    assert not pg.is_visible(".word-unsure")
+    assert not pg.is_visible(".word-unsure-note")
+    assert pg.inner_text(".panel-word .word-original") == "ἄνθρωπος"
+    # BSB human alignment always shows, whatever the word
+    pg.evaluate("Alpine.$data(document.body).translation = 'BSB'")
+    pg.wait_for_function("document.querySelector('#verse-1').textContent.includes('Nicodemus') && !document.querySelector('#verse-3').textContent.includes('certainly')")
+    _tap_word(pg, 1, 4)
+    assert _app(pg, "a.selectedWord.text") == "a"
+    assert not pg.is_visible(".word-unsure")
+
+
+def test_word_link_rule_offline_rows(server, desktop):
+    """The same rule applies to links saved for offline use (confidence/method saved too)."""
+    desktop.goto(f"{server}/")
+    desktop.wait_for_function("window.BibleWordLink")
+    s = lambda w, c, m: desktop.evaluate("([w, c, m]) => BibleWordLink.strength(w, c, m)", [w, c, m])
+    assert s("certainly", 0.44, 2) == "unsure"
+    assert s("love", 0.5, 2) == "sure"
+    assert s("of", 0.69, 2) == "unsure"
+    assert s("Of", 0.7, 1) == "sure"
+    assert s("it's", 0.6, 2) == "unsure"      # straight apostrophe matches the curly list entry
+    assert s("the", 0.1, 0) == "sure"         # human alignment
+    assert s("the", None, None) == "sure"     # saved by an older version (BSB human links)

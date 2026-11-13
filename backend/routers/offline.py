@@ -70,7 +70,7 @@ def get_chapter_offline_data(
         # Get word alignments for this chapter (BSB only has deterministic alignments)
         cursor = conn.execute("""
             SELECT e.verse, e.english_word_position as position,
-                   e.english_word as word, e.original_word_position,
+                   e.english_word as word, e.original_word_position, e.confidence, e.method,
                    w.hebrew_text as original_text, w.transliteration,
                    w.english_gloss as gloss, w.strong_number, w.grammar,
                    l.definition, l.extended_definition, l.language
@@ -195,7 +195,7 @@ def get_book_offline_data(
         if include_alignments:
             cursor = conn.execute("""
                 SELECT e.chapter, e.verse, e.english_word_position as position,
-                       e.english_word as word, e.original_word_position,
+                       e.english_word as word, e.original_word_position, e.confidence, e.method,
                        w.hebrew_text as original_text, w.strong_number,
                        l.definition, l.language
                 FROM english_word_alignments e

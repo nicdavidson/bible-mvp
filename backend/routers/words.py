@@ -31,7 +31,7 @@ def get_word_alignment(
     try:
         # Look up the alignment
         cursor = conn.execute("""
-            SELECT ea.english_word, ea.original_word_position, ea.confidence,
+            SELECT ea.english_word, ea.original_word_position, ea.confidence, ea.method,
                    wa.hebrew_text as original_text, wa.transliteration, wa.english_gloss,
                    wa.grammar as parsing,
                    CASE WHEN wa.strong_number LIKE 'H0%' THEN 'H' || CAST(CAST(SUBSTR(wa.strong_number, 2) AS INTEGER) AS TEXT)

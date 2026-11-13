@@ -482,6 +482,29 @@ dialog.picker-sheet::backdrop {
 }
 .search-goto span { font-family: var(--font-verse); }
 
+/* ---------- a weak word link ---------- */
+.word-unsure p { line-height: 1.55; color: var(--color-text-secondary); }
+.word-reveal {
+    min-height: 44px;
+    padding: 0 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.word-unsure-note {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid var(--study-focus-rule, #a96a12);
+    background: var(--study-focus-bg, #fdf0c4);
+    color: var(--color-text);
+    font-size: 0.875rem;
+    border-radius: 0 var(--radius) var(--radius) 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .return-chip, dialog.picker-sheet[open] { animation: none; }
 }

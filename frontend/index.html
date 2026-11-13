@@ -933,9 +933,19 @@
                 <button @click="selectedWord = null" class="btn-close">×</button>
             </div>
             <div class="panel-body" x-show="selectedWord">
+                <!-- A weak link (BibleWordLink): say we aren't sure, offer the closest match -->
+                <template x-if="selectedWord?.unsure && !selectedWord?.revealed">
+                    <div class="word-unsure">
+                        <div class="word-hint-title">“<span x-text="selectedWord?.text"></span>”</div>
+                        <p x-show="selectedWord?.functionWord">Small words like this often have no word of their own in the <span x-text="selectedWord?.language === 'hebrew' ? 'Hebrew' : 'Greek'"></span>. They come from the grammar of the words around them, so we can't say for sure which word this one goes with.</p>
+                        <p x-show="!selectedWord?.functionWord">We aren't sure which <span x-text="selectedWord?.language === 'hebrew' ? 'Hebrew' : 'Greek'"></span> word “<span x-text="selectedWord?.text"></span>” translates here.</p>
+                        <button type="button" class="word-reveal" @click="revealWordLink()">Show the closest match</button>
+                    </div>
+                </template>
                 <!-- Show full word details when we have original language data -->
-                <template x-if="selectedWord?.original || selectedWord?.strong_number">
+                <template x-if="(selectedWord?.original || selectedWord?.strong_number) && !(selectedWord?.unsure && !selectedWord?.revealed)">
                     <div>
+                        <p class="word-unsure-note" x-show="selectedWord?.unsure">Closest match. Not certain: the link between these words is weak.</p>
                         <div class="word-header">
                             <span class="word-original" :class="selectedWord?.language" x-text="selectedWord?.original || selectedWord?.text"></span>
                             <span class="word-transliteration" x-text="selectedWord?.transliteration || '—'"></span>
@@ -966,7 +976,7 @@
                         <p x-text="selectedWord?.definition"></p>
                     </div>
                 </template>
-                <div class="word-extended" x-show="selectedWord?.extended_definition">
+                <div class="word-extended" x-show="selectedWord?.extended_definition && !(selectedWord?.unsure && !selectedWord?.revealed)">
                     <strong>KJV Usage:</strong>
                     <p x-text="selectedWord?.extended_definition"></p>
                 </div>
@@ -2801,6 +2811,7 @@
     <script src="/static/js/modules/study_extras.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/study.js?v=__SW_VERSION__"></script>
     <script src="/static/js/modules/nav.js?v=__SW_VERSION__"></script>
+    <script src="/static/js/modules/wordlink.js?v=__SW_VERSION__"></script>
     <script src="/static/js/app.js?v=__SW_VERSION__"></script>
     <script>
         // Show cache toast notification

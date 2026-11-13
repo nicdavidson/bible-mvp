@@ -1980,8 +1980,7 @@ function bibleApp() {
 
                     if (data.found && data.alignment) {
                         const align = data.alignment;
-                        this.selectedWord = {
-                            text: word,
+                        this._showWordLink(word, verseBox, {
                             original: align.original_text,
                             transliteration: align.transliteration,
                             strong_number: align.strong_number,
@@ -1989,11 +1988,7 @@ function bibleApp() {
                             definition: align.definition || align.english_gloss,
                             extended_definition: align.extended_definition,
                             language: align.language,
-                            occurrences: [],
-                            count: 0
-                        };
-
-                        this._highlightInterlinearWord(verseBox, align.original_word_position);
+                        }, align);
                         return;
                     }
                 } catch (err) {
@@ -2011,8 +2006,7 @@ function bibleApp() {
                         const lex = align.strong_number
                             ? await window.offlineStorage.getLexiconEntry(align.strong_number).catch(() => null)
                             : null;
-                        this.selectedWord = {
-                            text: word,
+                        this._showWordLink(word, verseBox, {
                             original: align.original_text || lex?.original,
                             transliteration: lex?.transliteration,
                             strong_number: align.strong_number,
@@ -2020,10 +2014,7 @@ function bibleApp() {
                             definition: align.definition || lex?.definition,
                             extended_definition: lex?.extended_definition,
                             language: align.language || lex?.language,
-                            occurrences: [],
-                            count: 0
-                        };
-                        this._highlightInterlinearWord(verseBox, align.original_word_position);
+                        }, align);
                         return;
                     }
                 } catch (err) {
@@ -2047,6 +2038,26 @@ function bibleApp() {
                 occurrences: [],
                 count: 0
             };
+        },
+
+        // Show a tapped word's source word. A weak link (BibleWordLink: confidence under
+        // 0.5, or 0.7 for words like "the", "of", "he") is not shown as fact: the panel
+        // says we aren't sure and offers the closest match behind one more tap.
+        _showWordLink(word, verseBox, info, align) {
+            const unsure = BibleWordLink.strength(word, align.confidence, align.method) === 'unsure';
+            this.selectedWord = {
+                text: word, ...info, occurrences: [], count: 0,
+                unsure, revealed: !unsure, functionWord: BibleWordLink.isFunctionWord(word),
+                _verseId: verseBox?.id || null, _origPos: align.original_word_position,
+            };
+            if (!unsure) this._highlightInterlinearWord(verseBox, align.original_word_position);
+        },
+
+        revealWordLink() {
+            if (!this.selectedWord) return;
+            this.selectedWord.revealed = true;
+            const w = this.selectedWord;
+            this._highlightInterlinearWord(w._verseId && document.getElementById(w._verseId), w._origPos);
         },
 
         // Handle interlinear word click
