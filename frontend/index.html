@@ -176,7 +176,7 @@
     <!-- Main Content -->
     <main class="main-content" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
         <!-- Bible Text Panel -->
-        <section class="panel panel-text" :class="{ 'is-home': verses.length === 0 && !loading && !error }">
+        <section class="panel panel-text" :class="{ 'is-home': verses.length === 0 && !loading && !error, 'has-return': !!navReturn }">
             <div class="panel-header" x-show="verses.length > 0 || loading || error">
                 <h2 class="passage-title">
                     <button type="button" class="passage-title-btn" x-show="currentBook && !combinedPlanReading"

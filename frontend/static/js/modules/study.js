@@ -736,6 +736,7 @@ window.BibleModules = window.BibleModules || {};
                 if (!this.studyIsTool(this.study.active)) this.study.previous = this.study.active;
                 this.study.active = slug;
                 if (!tool) this.studySavePrefs({ ...this.studyPrefs(), last: slug });
+                if (slug === 'notes') this.study.stripCollapsed = false;   // write with the verses in view
                 if (this.study.open) this.navReplaceState({ ...(window.history.state || {}), study: true }, this.studyURL(slug));
             }
             this.studyLoadPane(slug);

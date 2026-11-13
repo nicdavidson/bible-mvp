@@ -97,6 +97,13 @@ def test_chip_never_covers_a_control(server, browser):
         overlap = not (b["x"] + b["width"] <= chip["x"] or chip["x"] + chip["width"] <= b["x"]
                        or b["y"] + b["height"] <= chip["y"] or chip["y"] + chip["height"] <= b["y"])
         assert not overlap, el.evaluate("e => e.outerHTML.slice(0, 120)")
+    # ...also at the end of the chapter, where the Next chapter button is
+    for _ in range(2):
+        pg.evaluate("document.querySelector('.panel-text .panel-body').scrollTo(0, 1e6)")
+        pg.wait_for_timeout(600)
+    nxt = pg.locator(".chapter-end-next").bounding_box()
+    chip = pg.locator(".return-chip").bounding_box()
+    assert nxt["y"] + nxt["height"] <= chip["y"], (nxt, chip)
     ctx.close()
     assert not errors, errors
 

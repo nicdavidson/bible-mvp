@@ -266,3 +266,54 @@ canonicalized before anything changes (`BibleRef.parse`). Flow tests are in
 | P2-9, P2-10 | Already fixed. |
 | P2-11 note-mode copy | Fixed ("Tap verses to add them to this note"). |
 | P2-12 double fetch on cached chapters | **Left:** the background refresh is what brings cross-refs and red-letter data for cached chapters; skipping it needs those cached too. |
+
+---
+
+## Status after `v2/study2` (2026-11-13)
+
+**The study view is the one place to study a passage.** After the commentary sources it
+now has two more panes, Cross-references and Notes (`modules/study_panes.js`). Their
+buttons are pinned at the thumb end of the source rail, after a rule, styled as tabs
+(icon, count, short label). Commentary chips stay pills, so commentary still leads the
+view: it is the default pane, and the reader's saved order and hidden sources apply
+only to it. Deep links: `?study=cross-references` and `?study=notes`.
+
+- *Cross-references* show the verse text inline (`GET /api/passage/{ref}/study/crossrefs`,
+  one request). They are grouped by selected verse and ranked by OpenBible.info reader
+  votes. The first screen shows 6 for one verse, or 3 per verse of a range; "Show all N"
+  shows the rest, with a Most helpful / Bible order switch. Tapping one opens the peek
+  with two verses of context either side, then "Study" or "Read the chapter". The return
+  chip comes back to this pane. Path to Christ moved here from the sheet. CC BY credit is
+  shown. Offline: links come from IndexedDB and text from any saved chapter; links
+  without saved text say so.
+- *Notes* show the reader's note on exactly this selection, written and edited in place.
+  Notes on overlapping verses are listed, labelled with their own verses; tapping one
+  studies those verses. Storage is unchanged (same keys and format, localStorage or
+  Supabase). Unsaved text is saved when the view closes or the selection moves. With the
+  phone keyboard up, the dialog follows the visual viewport, the rail folds, and the
+  verses stay above the field.
+- *The reader's sheet* has two tabs left: Notes (this chapter's notes as an overview,
+  with tags and Copy all) and Topics. Its Study tab, Cross-Refs tab, note editor, peek
+  row, and share mode are gone. The quick path to cross-references is the action bar's
+  **Refs** button, which opens the study view at that pane: the verses with text, one tap.
+
+**Phone reading chrome** (≤600px). Only the app header is above the text, and it hides
+while scrolling down. Previous and next chapter are named in a bottom reading bar, with
+Notes and Topics between them. A named "Next chapter" button sits at the end of the
+chapter. Original Language moved to the menu. Share is on the selection's action bar.
+← V / V → are dropped on phones (the study view steps verse by verse). The action bar
+takes the reading bar's place, so there is only ever one bottom bar. It shows labelled
+icons: Study, Refs, Note, Highlight, Share, More (Copy, Memorize, Topics). The way-back
+chip floats above the bottom bar and no longer covers Share. Desktop keeps its passage
+header and sidebar.
+
+| Measured (`tests/e2e/chrome_shots.py`, pinned in `test_chrome_layout.py`) | before | after |
+|---|---|---|
+| 360x740: first verse top / Scripture share of the first screen | 267px / 51% | 82px / 81% |
+| 360x740 with a verse selected | 45–51% | 81% |
+| 390x844: first verse top / Scripture share | 267px / 57% | 82px / 83% |
+| 390x844 with a verse selected | 49% | 83% |
+| 1280x800: first verse top / Scripture share | 220px / 71% | 183px / 76% |
+
+Screenshots: `docs/nav/chrome-{before,after}-*.png`, `docs/study-view/panes-{before,after}-*.png`.
+Flow tests: `tests/e2e/test_study_panes.py`, `tests/e2e/test_chrome_layout.py`.

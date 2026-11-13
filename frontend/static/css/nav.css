@@ -198,6 +198,7 @@ body {
     .panel-text { max-height: calc(100dvh - var(--header-h, 61px)); }
     body.reading-immersed .panel-text { max-height: 100dvh; }
     .panel-text .panel-body { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
+    .panel-text.has-return .panel-body { padding-bottom: calc(10rem + env(safe-area-inset-bottom, 0px)); }
     .reading-bar {
         position: fixed;
         left: 0;
