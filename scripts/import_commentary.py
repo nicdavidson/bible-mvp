@@ -241,8 +241,276 @@ def load_tyndale(cfg, v11n, stats):
             yield book, c, a, b, text
 
 
+# ---------------------------------------------------------------------------
+# SermonIndex SWORD modules and Project Gutenberg texts (dispensational sources, 2026-11)
+# ---------------------------------------------------------------------------
+
+SERMONINDEX = "https://sermonindex.net/modules/sword/{module}.zip"
+ARCHIVE_TEXT = "https://archive.org/download/{id}/{id}_djvu.txt"
+GUTENBERG_TEXT = "https://www.gutenberg.org/cache/epub/{n}/pg{n}.txt"
+
+
+def _sermonindex_module(name) -> SwordModule:
+    key = f"sermonindex/{name}.zip"
+    if cached_fetch_bytes(key, SERMONINDEX.format(module=name)) is None:
+        raise RuntimeError(f"could not download SermonIndex module {name}")
+    from source_cache import SOURCES_DIR
+    return SwordModule(SOURCES_DIR / key)
+
+
+def _fetch_text(key, url) -> str:
+    data = cached_fetch_bytes(key, url)
+    if data is None:
+        raise RuntimeError(f"could not download {url}")
+    return data.decode("utf-8", errors="replace")
+
+
+def archive_text(identifier: str) -> str:
+    """archive.org full text (djvu OCR) of one scanned book."""
+    return _fetch_text(f"archive/{identifier}_djvu.txt", ARCHIVE_TEXT.format(id=identifier))
+
+
+def chapter_rows(starts, v11n, stats):
+    """Rows for commentary keyed by where each section starts.
+
+    starts: [(book, chapter, verse, text)] in reading order; text None marks a section that
+    is left out (it still ends the section before it). A section runs until the next
+    section of the same book starts (or the book ends). A section that runs on into
+    following chapters is stored once per chapter it covers, with the verses it covers
+    there (as Tyndale's chapter-group notes are), so every chapter leads to it."""
+    out = []
+    for i, (book, ch, v, text) in enumerate(starts):
+        if text is None:     # a dropped section: nothing stored, and nothing runs into it
+            continue
+        nxt = starts[i + 1] if i + 1 < len(starts) and starts[i + 1][0] == book else None
+        chapters = v11n[book]
+        if nxt is None:
+            end_ch, end_v = len(chapters), chapters[-1]
+        elif nxt[2] > 1:
+            end_ch, end_v = nxt[1], nxt[2] - 1
+        else:
+            end_ch, end_v = nxt[1] - 1, chapters[nxt[1] - 2] if nxt[1] > 1 else 0
+        if (end_ch, end_v) < (ch, v):      # two sections start at the same verse
+            end_ch, end_v = ch, v
+        for c in range(ch, end_ch + 1):
+            s = v if c == ch else 1
+            e = end_v if c == end_ch else chapters[c - 1]
+            out.append((book, c, s, max(s, e), text))
+        if end_ch > ch:
+            stats.bump("sections_over_several_chapters")
+            stats.bump("rows_added_for_later_chapters", end_ch - ch)
+    return out
+
+
+def _repair_texts(cfg, items, stats):
+    """items: [[book, ch, v, text]] -> same, with SermonIndex conversion damage repaired."""
+    from commentary_repair import restore_caps, fix_is_isaiah, tidy_spacing, GAP_SIGNATURE
+    texts = [it[3] for it in items]
+    scans = cfg.get("caps_from_scans")
+    if scans:
+        scan = "\n".join(archive_text(s) for s in scans)
+        texts, st = restore_caps(texts, scan)
+        for k, n in st.items():
+            stats.bump(k, n)
+    examples = stats.setdefault("_is_isaiah_examples", [])
+    counter = __import__("collections").Counter()
+    texts = [tidy_spacing(fix_is_isaiah(t, counter, examples)) for t in texts]
+    stats.bump("is_isaiah_fixed", counter["is_isaiah_fixed"])
+    stats.bump("deleted_caps_traces_left", sum(len(GAP_SIGNATURE.findall(t)) for t in texts))
+    for it, t in zip(items, texts):
+        it[3] = t
+    return items
+
+
+# Web-page debris inside some SermonIndex entries ("Submitted by H A Ironside on Tue, ...")
+_SI_DEBRIS = re.compile(r"(?m)^(?:Submitted by [^\n]{0,60}? on [A-Z][a-z]{2}, \d\d/\d\d/\d{4} - \d\d:\d\d"
+                        r"|\* [1-3]?[A-Z][a-z]+(?: [A-Z][a-z]+)*|~ end of [^~\n]{1,30}~)[ \t]*\n?")
+
+
+_SI_CUT_NOTE = re.compile(r"\s*This entry is longer than a Bible module can hold\. The rest is at \S+\s*$")
+
+
+def load_sermonindex(cfg, v11n, stats):
+    """SermonIndex zCom module: one entry per section, stored at the verse it starts on
+    (whole-chapter notes at verse 1). Entries over 64 KB are cut off by the module's index;
+    recover_orphans restores them from the compressed blocks."""
+    mod = _sermonindex_module(cfg["module"])
+    allow = cfg.get("books")
+    items = []
+    for e in mod.entries(v11n, include_intros=True, recover_orphans=True):
+        text = markup_to_text(e.raw)
+        if e.verse_start == 0:
+            if text:
+                stats.bump("intro_text_dropped")
+            continue
+        if allow is not None and e.book not in allow:
+            stats.bump("entries_outside_book_list_skipped")
+            continue
+        text, n = _SI_DEBRIS.subn("", text)
+        stats.bump("web_debris_lines_removed", n)
+        # SermonIndex cut its longest entries itself and says so; the rest is not in the
+        # module. Mark them the library's way (" […]", counted by check_commentary.py).
+        text, n = _SI_CUT_NOTE.subn(" [\u2026]", text)
+        stats.bump("entries_cut_by_sermonindex_marked_incomplete", n)
+        if cfg.get("strip_lead_digit"):
+            # Larkin: every section opens with a stray page/figure digit ("3Rev 1:1-3.",
+            # "62. THE THRONE" for "2. THE THRONE")
+            text, n = re.subn(r"^\d\xad?(?=\d|[A-Z“]|\n)\n?", "", text)
+            stats.bump("stray_lead_digits_removed", n)
+        items.append([e.book, e.chapter, e.verse_start, text.strip()])
+    items = _repair_texts(cfg, items, stats)
+    for (book, ch, v, old, new) in cfg.get("patches", []):
+        # hand-checked against the scan; fail loudly if the module text changes upstream.
+        # new=None cuts the entry at `old` (text of another chapter appended to it).
+        hit = [it for it in items if it[:3] == [book, ch, v] and old in it[3]]
+        if len(hit) != 1:
+            raise RuntimeError(f"{cfg['source']}: patch for {book} {ch}:{v} {old!r} does not apply")
+        t = hit[0][3]
+        hit[0][3] = t[:t.index(old)].rstrip(" \n\"“") if new is None else t.replace(old, new, 1)
+        stats.bump("patched_from_scan" if new is not None else "appended_text_cut")
+    drop = set(cfg.get("drop_sections", []))
+    for it in items:
+        if tuple(it[:3]) in drop:
+            # text from another (later) work appended by SermonIndex; see the registry
+            it[3] = None
+            stats.bump("sections_dropped")
+    for it in items:   # Markdown bold markers left by the converter ("**Summary\n\n**")
+        if it[3] is None:
+            continue
+        t = re.sub(r"(?m)^[ \t]*\*[ *]*$\n?", "", it[3].replace("**", ""))
+        if t != it[3]:
+            stats.bump("markdown_markers_removed")
+            it[3] = t.strip()
+    if cfg.get("kind") == "chapter":
+        last = {}
+        for book, ch, v, text in items:
+            if (book, ch) in last or v != 1:
+                raise RuntimeError(f"{cfg['source']}: not one entry per chapter at {book} {ch}:{v}")
+            last[(book, ch)] = 1
+    yield from chapter_rows([tuple(it) for it in items], v11n, stats)
+
+
+# Project Gutenberg: C. H. Mackintosh, Notes on the Pentateuch (one ebook per volume).
+_ROMAN = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
+
+
+def _roman(s: str) -> int:
+    s = s.upper().strip(". ,")
+    total = 0
+    for i, ch in enumerate(s):
+        val = _ROMAN[ch]
+        total += -val if i + 1 < len(s) and _ROMAN[s[i + 1]] > val else val
+    return total
+
+
+_PG_HEADING = re.compile(r"(?m)^CHAPTERS? ([IVXLC][IVXLC.,&\- \d]*?)\s*$")
+
+
+def parse_pg_heading(spec: str):
+    """'XII.' -> (12,None,12,None); 'II. 1-10.' -> (2,1,2,10); 'V. & VI.' -> (5,None,6,None);
+    'VII.-XI.' -> (7,None,11,None); 'IV.-V. 13' -> (4,None,5,13); 'V. 14-VI. 7' -> (5,14,6,7)."""
+    s = re.sub(r"\s+", " ", spec.strip())
+    m = re.match(r"^([IVXLC]+)\.? (\d+)-(\d+)\.?$", s)            # II. 1-10.
+    if m:
+        c = _roman(m.group(1))
+        return c, int(m.group(2)), c, int(m.group(3))
+    m = re.match(r"^([IVXLC]+)\.?(?: (\d+))?\s*(?:-|&|,)?\s*(?:([IVXLC]+)\.?(?: (\d+))?)?\.?,?$", s)
+    if not m:
+        return None
+    c1 = _roman(m.group(1))
+    v1 = int(m.group(2)) if m.group(2) else None
+    c2 = _roman(m.group(3)) if m.group(3) else c1
+    v2 = int(m.group(4)) if m.group(4) else None
+    return c1, v1, c2, v2
+
+
+def _pg_body(raw: str) -> str:
+    body = raw.split("*** START OF", 1)[1].split("\n", 1)[1]
+    body = body.split("*** END OF", 1)[0]
+    body = re.split(r"(?im)^Transcriber'?s'? notes?:?\s*$|^End of Project Gutenberg", body)[0]
+    return body.replace("\r", "")
+
+
+def _pg_paragraphs(text: str) -> list[str]:
+    paras = []
+    for block in re.split(r"\n\s*\n", text):
+        lines = [ln.strip() for ln in block.split("\n") if ln.strip()]
+        if not lines:
+            continue
+        p = " ".join(lines)
+        if re.fullmatch(r"(?:\*\s*)+|\[Illustration\]|FOOTNOTES:?", p):
+            continue
+        p = re.sub(r"\[(?:Greek|Hebrew): ?([^\]]*)\]", r"\1", p)
+        p = re.sub(r"(?<![\w_])_([^_]+?)_(?![\w_])", r"\1", p)       # _italics_
+        p = re.sub(r"(?<![\w=])=([^=]+?)=(?![\w=])", r"\1", p)       # =bold=
+        paras.append(p)
+    return paras
+
+
+def load_gutenberg_mackintosh(cfg, v11n, stats):
+    """Each volume's essays start at a "CHAPTER XII." / "CHAPTERS VII.-XI." heading. An
+    essay covers the chapters its heading names and, when the next heading starts later,
+    the chapters in between (Genesis "CHAPTER XXXIX.-XLV." runs to the end of the book).
+    Footnotes ("[3] ...") move to the end of the essay that cites them."""
+    for book, ebooks in cfg["volumes"]:
+        heads = []      # (c1, v1, c2, v2, paragraphs)
+        for n in ebooks:
+            body = _pg_body(_fetch_text(f"gutenberg/pg{n}.txt", GUTENBERG_TEXT.format(n=n)))
+            parts = _PG_HEADING.split(body)
+            # parts: [front, spec, text, spec, text, ...]; the front matter (title page,
+            # preface, contents) is not commentary on a chapter
+            for spec, text in zip(parts[1::2], parts[2::2]):
+                parsed = parse_pg_heading(spec)
+                if not parsed:
+                    raise RuntimeError(f"Mackintosh {book}: unparsed heading {spec!r}")
+                heads.append([*parsed, _pg_paragraphs(text)])
+        # footnotes: paragraphs "[n] ..." anywhere, attached to the essay citing "[n]"
+        notes = {}
+        for h in heads:
+            keep = []
+            for p in h[4]:
+                m = re.match(r"^\[(\d+)\]\s*(.*)$", p)
+                if m:
+                    notes[m.group(1)] = m.group(2)
+                else:
+                    keep.append(p)
+            h[4] = keep
+        for h in heads:
+            cited = []
+            for p in h[4]:
+                cited += [n for n in re.findall(r"\[(\d+)\]", p) if n in notes and n not in cited]
+            h[4] += [f"[{n}] {notes.pop(n)}" for n in cited]
+            stats.bump("footnotes_attached", len(cited))
+        stats.bump("footnotes_without_citation_dropped", len(notes))
+        chapters = v11n[book]
+        for i, (c1, v1, c2, v2, paras) in enumerate(heads):
+            start_v = v1 or 1
+            end_c, end_v = c2, v2 or chapters[c2 - 1]
+            nxt = heads[i + 1] if i + 1 < len(heads) else None
+            # extend over chapters no heading claims (Lev 6:8-7:38, Gen 46-50)
+            nxt_start = (nxt[0], nxt[1] or 1) if nxt else (len(chapters) + 1, 1)
+            after = (end_c + 1, 1) if end_v >= chapters[end_c - 1] else (end_c, end_v + 1)
+            if nxt_start > after and nxt_start > (c1, start_v):
+                gap_c, gap_v = nxt_start
+                if gap_v > 1:
+                    end_c, end_v = gap_c, gap_v - 1
+                else:
+                    end_c, end_v = gap_c - 1, chapters[gap_c - 2]
+                stats.bump("essays_extended_to_next_heading")
+            text = "\n\n".join(paras)
+            text = plain_to_text(text)
+            for c in range(c1, end_c + 1):
+                s = start_v if c == c1 else 1
+                e = end_v if c == end_c else chapters[c - 1]
+                yield book, c, s, e, text
+            if end_c > c1:
+                stats.bump("essays_over_several_chapters")
+                stats.bump("rows_added_for_later_chapters", end_c - c1)
+
+
 LOADERS = {"helloao": load_helloao, "sword": load_sword, "tdavid": load_tdavid,
-           "tyndale": load_tyndale}
+           "tyndale": load_tyndale, "sermonindex": load_sermonindex,
+           "gutenberg_mackintosh": load_gutenberg_mackintosh}
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +621,8 @@ def import_commentary(key: str):
     for k, v in sorted(stats.items()):
         if not k.startswith("_"):
             print(f"  {k}: {v}")
+    for before, reason in stats.get("_is_isaiah_examples", []):
+        print(f"  is<-Isaiah ({reason}): {before!r}".replace("\\n", " "))
     print(f"Imported {len(rows)} entries")
     return len(rows)
 
