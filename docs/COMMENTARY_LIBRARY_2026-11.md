@@ -3,7 +3,9 @@
 Branch `v2/commentary` expanded the commentary library from 2 to 13 sources, added the
 `commentary_sources` metadata table, and made every import reproducible through
 `scripts/build_db.py`. On 2026-11-13 the library was cut to the **five sources** below
-(`feat/commentary-trim`). Not legal advice.
+(`feat/commentary-trim`), and the same day a first wave of public-domain **dispensational
+sources** was added (`feat/disp-sources`; section "Dispensational sources" below). Not legal
+advice.
 
 **Removed 2026-11-13, at the owner's decision.** The site owner reviewed the commentators
 against his church's doctrine (conservative, dispensational, Baptist-leaning) and had eight
@@ -122,6 +124,154 @@ complete end with " […]" and are counted separately.
 | Gill | 167 (0.56%) | 0 | 0 | 80 end "it follows,": Gill's own lead-in to the next verse; 63 footnote lines ("(c) In voce"); a few "see Gill on" whose target was dropped upstream |
 | Scofield | 1 (0.03%) | 0 | 0 | Authentic |
 
+## Dispensational sources (2026-11-13, `feat/disp-sources`)
+
+The owner approved adding the free (public-domain) dispensational commentaries first. Six were
+imported; Gray was left out (below). Build steps `commentary_gaebelein`, `commentary_ironside`,
+`commentary_darby`, `commentary_brooks`, `commentary_mackintosh`, `commentary_larkin`; registry
+entries in `scripts/commentary_registry.py`; SermonIndex repairs in
+`scripts/commentary_repair.py`. Every download goes through `source_cache`
+(`data/sources/sermonindex/`, `archive/`, `gutenberg/`), so a from-scratch build fetches the
+same files from their real URLs.
+
+| Order | Source (`source`) | Chip | Kind | Text shipped (edition, year) | Downloaded from | Entries | Books | Coverage | Text MB |
+|---:|---|---|---|---|---|---:|---:|---|---:|
+| 50 | Gaebelein Annotated Bible | Gaebelein | passage | A. C. Gaebelein, *The Annotated Bible*, 9 vols, Our Hope, New York, ©1913-1921; **Matthew** is his *The Gospel of Matthew: An Exposition* (vol. 1 1903; 2-vol. edition ©1910) | `https://sermonindex.net/modules/sword/siannbible.zip`; caps repair from archive.org `annotatedbibleho01gaeb`…`09gaeb`, `gospelofmatthewe01gaeb`, `gospelofmatthewe02gaeb` | 1,291 | 66 | 100% | 7.0 |
+| 60 | Ironside Expositions | Ironside | passage | H. A. Ironside: Notes on Nehemiah (2nd ed. 1925), Esther (1921 rev. ed. of 1905), Jeremiah and Lamentations (1928 ed. of 1906), Minor Prophets (1909; 1928 printing), Lectures on Romans (1928), Colossians (Jan. 1929) | `https://sermonindex.net/modules/sword/siiron.zip`, books on `IRONSIDE_PRE1931` only; caps repair from archive.org `notesonbookofneh0000iron`, `notesonbookofest0000unse`, `notesonprophecyl0000hair`, `bwb_T5-CWQ-371`, `lecturesonepistl0000hair_u7v0`, `bwb_S0-BLY-002` | 184 | 18 | 99.6% of those books | 1.8 |
+| 70 | Darby Synopsis | Darby | chapter | J. N. Darby, *Synopsis of the Books of the Bible*, New Testament (first ed. 1857-1867) | `https://sermonindex.net/modules/sword/sidarbysyn.zip` | 260 | 27 | NT 100% | 3.0 |
+| 80 | Brooks Summarized Bible | Brooks | chapter | Keith L. Brooks, *The Summarized Bible*, Bible Institute of Los Angeles, ©1919 | `https://sermonindex.net/modules/sword/sitsb.zip` | 1,189 | 66 | 100% | 1.3 |
+| 90 | Mackintosh Notes on the Pentateuch | Mackintosh | passage | C. H. Mackintosh, *Notes on Genesis … Deuteronomy* (1858-1880); PG transcribes Loizeaux reprints (e.g. Exodus "First edition 1880, 27th printing 1965") of the unchanged text | Project Gutenberg `https://www.gutenberg.org/cache/epub/<n>/pg<n>.txt`, n = 37915 Gen, 40596 Exod, 40610 Lev, 76552 Num, 41571 + 41584 Deut | 210 | 5 | 100% | 5.3 |
+| 100 | Larkin on Revelation | Larkin | passage | Clarence Larkin, *The Book of Revelation*, ©1919 (charts not included) | `https://sermonindex.net/modules/sword/silarkinrev.zip`; caps repair from archive.org `bookofrevelation00lark` | 75 | 1 | 100% | 0.5 |
+
+The library now holds 73,993 entries. Every one of the 31,102 verses has at least one entry
+(the 119 verses left uncovered by the trim are all covered again: Brooks and Gaebelein cover
+every chapter). Treasury of David moved to `sort_order` 110.
+
+**Order.** Verse-level whole-Bible sources first (Scofield, Gill, JFB, Tyndale), then the
+chapter-level ones (Gaebelein, Ironside, Darby, Brooks, Mackintosh, Larkin), Treasury of David
+last, as the owner proposed. Brooks is whole-Bible but a short digest, so it sits after the
+expositions; Ironside sits high although it covers 18 books because the view skips a source
+with nothing on the selection.
+
+### How they are stored
+
+- SermonIndex modules store each section at the verse it starts on (whole-chapter notes at
+  verse 1). The importer stores each section with its real range: it runs until the next section
+  of the same book starts. A section that runs on into chapters with no section of their own
+  (Gaebelein's Genesis 1:1-2:3, Mackintosh's Joseph essay on Genesis 39-50, Darby's Acts 24-25)
+  is stored once per chapter it covers, with the verses it covers there, exactly as Tyndale's
+  chapter-group notes are. The schema has no way to point one row at another, so the text is
+  repeated: 173 extra rows, 2.3 MB (Mackintosh 72 rows/1.6 MB, Gaebelein 98/0.7 MB, Darby 3). Entries never cross a
+  chapter.
+- `kind`: Brooks and Darby `chapter` (exactly one note per chapter, enforced at import);
+  Gaebelein, Ironside, Mackintosh, Larkin `passage` with explicit ends. The study view's
+  "find my verses inside a passage note" works as for Tyndale: Gaebelein and Larkin open their
+  sub-sections with a reference ("Revelation 20:4-6.", "Genesis 2:4-6"), which the importer
+  links, and a link into the chapter at the start of a paragraph is a verse marker for the view.
+- Mackintosh: essays start at the volume's "CHAPTER XII." / "CHAPTERS VII.-XI." / "CHAPTER
+  V. 14-VI. 7" headings; an essay covers what its heading names and, where the next heading
+  starts later, the chapters in between (Lev 6:8-7:38, Gen 46-50). Footnotes ("[3] …") move to
+  the end of the essay that cites them (108); PG front matter and transcriber notes are dropped.
+
+### SermonIndex conversion damage, and the repairs
+
+1. **Every ALL-CAPS word of 8+ letters was deleted.** No SermonIndex module holds a single
+   all-caps word of that length while 7-letter ones are common (Larkin: 399), so the rule is
+   exact. Example: "THE REVELATION OF JESUS CHRIST" became "THE OF JESUS CHRIST", "companion in
+   TRIBULATION" became "companion in .". Repair (`restore_caps`): align the module with an
+   archive.org OCR of the same edition on 5-word sequences that occur once in each, diff the
+   stretches between, and insert only words the scan has, the module lacks, and that are
+   themselves 8+ letters and ALL-CAPS (or small capitals inside an all-caps heading).
+   Restored: Larkin 526 words in 59 sections, plus 12 section headings read off the scan by hand
+   (`patches` in the registry; the import fails if one stops applying); Gaebelein 111;
+   Ironside 13. Visible traces left (`check_commentary.py` reports them): Gaebelein 27, Larkin 12,
+   Ironside 5, Darby 1, Brooks 0 — mostly section headings, e.g. Gaebelein "II. THE OF THE
+   HEAVENS AND THE EARTH" (GENERATIONS). There are surely others with no visible trace;
+   Larkin, with caps on most pages, was the worst hit and is now close to the printed text.
+2. **"is" became "Isaiah"** before numbers. Rule (`fix_is_isaiah`): "Isaiah N" with no ":verse"
+   is "is N" when N has a thousands separator, decimal or fraction, or N > 66; when the next
+   word is a quantity ("6 cubits", "8 times", "3 x 6", "766 to 679"); or when the word before is
+   a number or date ("30 A. D. Isaiah 34"); and "Isaiah" directly before another book's
+   reference is "is". Never after a label colon (Brooks: "Writer of the Book: Isaiah 766 to
+   679 B. C." is left as it is, ambiguous). Changed: Larkin 9, Gaebelein 6, Brooks 2,
+   Ironside 0, Darby 0. Examples: "(Daniel 9:25) Isaiah 476 years" → "is 476 years"; "30 A. D.
+   Isaiah 34." → "is 34."; "the specific gravity of gold Isaiah 19.5" → "is 19.5"; "which
+   Isaiah 6 times 7" → "is 6 times 7"; "This Exodus of the Psalms Isaiah 72, the great Kingdom
+   Psalm" → "is 72". Real references ("(Isaiah 4)", "read Isaiah 53") are untouched; the test
+   suite fails if any text the rule would still change is stored.
+3. **Spacing**: "God’ s" → "God’s", "“ Elohim”" → "“Elohim”", "Israel , as" → "Israel, as".
+4. **Entries over 64 KB**: the module index cuts them; `recover_orphans=True` restores the text
+   from the compressed blocks (Gaebelein Matthew 13, 24, 26 grew from ~6 KB to ~70 KB). Those
+   three Gaebelein entries still end with SermonIndex's own note "This entry is longer than a
+   Bible module can hold. The rest is at …": the rest of those chapters is not in the module.
+   They end with " […]" (counted as marked-incomplete). Ironside's three such notes are in
+   books not imported.
+5. Debris removed: "Submitted by H A Ironside on Tue, 03/11/2008", "~ end of chapter 16 ~",
+   Markdown "**", Larkin's stray page digit at the start of every section ("62. THE THRONE").
+   Brooks's James 5 entry carried a second copy of 1 Peter 1; it is cut.
+
+Truncation check after import: mid-sentence endings Gaebelein 1, Ironside 1, Darby 1, Brooks
+0, Mackintosh 0, Larkin 1 (all authentic or a closing quotation), none cap-truncated.
+
+### Licence evidence, per source (what was checked, what remains unverified)
+
+US rule as above: first published before 1931 = public domain. SermonIndex's module pages say
+"Free to copy and pass on" and label the modules "Public Domain"; that label was **not** relied
+on. Checked means compared on 2026-11-13 by word similarity against archive.org scans.
+
+- **Gaebelein.** Checked: the module's books match *The Annotated Bible* volumes (Genesis 0.87,
+  Job 0.92, Psalms 0.87, Daniel 0.91, Romans 0.91, Revelation 0.91; next-best volume always under
+  0.11). Volume title pages: OT I ©1913, OT II ©1915, OT III ©1916, OT IV ©1921, NT I ©1913,
+  NT II ©1916, NT III ©1917. Matthew: 92% of the module's Matthew is *The Gospel of Matthew: An
+  Exposition* (scans `thegospelofmatth00gaebuoft`, title pages "Copyright 1910"; vol. 1 first
+  printed 1903), only 33% of the Annotated Bible's own Matthew. Unverified: OT V (Daniel-Malachi)
+  and NT IV (James-Revelation) carry no date in any scan; internal evidence ("the late great war",
+  "parlor-bolshevists") and the same Our Hope imprint put them 1919-1922, and University of
+  Wisconsin copies bear a 7 Nov 1928 accession stamp. The module also leaves out each book's
+  introduction (e.g. Genesis "Revelation or Myth?"): what it has is 66-81% of each volume.
+- **Ironside.** Checked per book against scans (5-word overlap / aligned share): Esther .94/.99
+  (1921 revised ed.), Nehemiah .95/.99 (1925 ed.), Jeremiah .92/.99 and Lamentations .92/.99 (1928
+  ed.), Minor Prophets .95-.97/≥.99 (1928 printing of 1909), Romans .96/.99 (1928), Colossians
+  .94/.93 (1929; light editorial touches: "King James Version" for "Authorized", "(author's
+  translation)" tags). Left out inside allowed books, because SermonIndex appended later works:
+  Jeremiah 30 from about its middle and Hosea 3:4- ("Not Wrath But Rapture", in *Miscellaneous
+  Papers*, 1941), Romans 11:25- (*The Great Parenthesis*, 1943, ch. VIII). Unverified: no 1905
+  Esther, 1906 Jeremiah or 1909 Minor Prophets first edition is on archive.org; the scans are the
+  pre-1931 revised editions named above, and the module matches those.
+- **Darby.** First published 1857-1867, Darby d. 1882; nothing later could be in copyright.
+  Unverified: the module conf names no printed source, and its text was not compared with a
+  scan (it reads as the standard Morrish text).
+- **Brooks.** Checked: 99.7% of module words match the first edition (archive.org
+  `summarizedbible00broorich` OT and `summarizedbiblec00broorich` NT, title pages "Copyright 1919
+  Keith L. Brooks", BIOLA); 1,121 of 1,189 chapters ≥0.95 similarity (the rest OCR splits). Three
+  readings (1 Sam 27 Striking Facts, a sentence in Rev 17, "Promise: 20:6" in Rev 20) follow
+  BIOLA's undated "Second Edition", which carries only the 1919 notice; the 1966 revision was
+  not used. Unverified: the Second Edition's printing date (any US publication before 1978
+  without a notice for new matter left that matter in the public domain).
+- **Mackintosh.** Published 1858-1880, Mackintosh d. 1896. Project Gutenberg cleared the
+  ebooks as US public domain; PG's licence is honoured by using only the text.
+- **Larkin.** Scan `bookofrevelation00lark`: "Copyrighted 1919 By Clarence Larkin" (a later
+  printing by the Rev. Clarence Larkin Estate, Glenside, Pa.). The module's text matches it apart
+  from the deleted caps (above). Larkin d. 1924. The Estate still sells the books and charts;
+  the 1919 text is public domain, the charts are not included.
+
+### Not imported, and why
+
+| Work | Why |
+|---|---|
+| James M. Gray, *Christian Workers' Commentary* (1915), SermonIndex `siconcise` | The module is an edited later version: book introductions and citations of other authors removed, phrasing modernised, and some new sentences added (e.g. Acts 2, Matt 1, Gen 12:10 "Group leaders may want to review…", 2 Kgs 15 "Local librarians will give further help"); about 98% of its words are Gray's but the added text is not 1915 and its date is unknown. The 1915 text exists only as archive.org OCR (`christianworkers00gray`, two columns, diagrams as garbage); keying it to lessons is a separate job |
+| Darby, Synopsis, Old Testament | STEM Publishing and CCEL ask for permission; Project Gutenberg and Wikisource have nothing; SermonIndex has the NT only. archive.org has Morrish printings (`synopsisofbookso01darb`, `02darb`) but the OCR has no chapter divisions and 1-2% word errors: days of keying |
+| Ironside, Daniel | The module's Daniel is the 1996 edited Loizeaux text (no chapter matches the 1911/1920 *Lectures on Daniel*), and Daniel 9 includes *The Great Parenthesis* (1943). The 1920 edition exists as OCR (`lecturesondaniel0000hair_d9x0`) with reference misreadings ("Mark 18" for 13) and page furniture; not imported from it in this wave |
+| Ironside, Proverbs, Revelation, Philippians | Pre-1931 books, but the module has later edited wording (Revelation mentions "World War I"; Philippians cites a 1976 book) |
+| Ironside, all other books in `siiron` | Later volumes; some renewed (Isaiah "Copyright @ 1952") |
+| Gaebelein's book introductions; Matthew 13, 24, 26 after ~70 KB | Not in the module |
+
+### Takedown
+
+If a rights holder believes something here should not be published, the app's About ›
+Sources and rights page says how to reach us; the claim is reviewed and the text removed if it
+holds (LICENSES.md, top).
+
 ## Notes for the study view (UI)
 
 - Read `commentary_sources` for chips (`short_name`), ordering (`sort_order`), `kind`, `coverage`,
@@ -131,8 +281,8 @@ complete end with " […]" and are counted separately.
   written by the build; tested to match). Under CC BY-SA 4.0 s.3(a)(2) the short line may stand
   in for the full credit if the full one (`attribution`, which also names the license and states
   the changes) is a tap away, e.g. on the info sheet.
-- Default order (`sort_order` 10..50, set by the owner): Scofield, Gill, JFB, Tyndale, Treasury
-  of David. The same order is `DEFAULT_ORDER` in `scripts/commentary_registry.py` (keys) and
+- Default order (`sort_order` 10..110, set by the owner): Scofield, Gill, JFB, Tyndale,
+  Gaebelein, Ironside, Darby, Brooks, Mackintosh, Larkin, Treasury of David. The same order is `DEFAULT_ORDER` in `scripts/commentary_registry.py` (keys) and
   `frontend/static/js/modules/study.js` (slugs); keep them in step.
 - Which source the view opens on: the one asked for (deep link `?study=`, or the reader's last
   choice) if it has something on the selection, else the first source in the order that does.
