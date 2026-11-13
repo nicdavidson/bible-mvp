@@ -137,9 +137,9 @@ def test_rendering_and_collocate_verses_out_and_back(server, phone):
     pg.wait_for_function("Alpine.$data(document.body).ws.open && Alpine.$data(document.body).ws.list")
     assert _path(pg) == "/word/G26?list=with:G4102"
     # Close: back through the study's entries to where the word was tapped
-    pg.tap("#word-study .ws-bar button:visible")   # back from the list
+    pg.tap('#word-study .ws-bar button[aria-label^="Back to the study"]')   # back from the list
     pg.wait_for_function("!Alpine.$data(document.body).ws.list")
-    pg.tap("#word-study .ws-bar button:visible")   # close
+    pg.tap('#word-study .ws-bar button[aria-label="Close the word study"]')   # close
     pg.wait_for_function("!Alpine.$data(document.body).ws.open")
     pg.wait_for_function("location.pathname === '/1-John/4/8'")
     assert _app(pg, "a.currentBook") == "1 John"
