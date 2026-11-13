@@ -33,11 +33,11 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.search_text import unit_texts  # noqa: E402
 from backend.semantic import (  # noqa: E402
-    CANDIDATES,
     SHIPPED_MODEL,
     VECTOR_DDL,
     Encoder,
     fetch_model,
+    get_spec,
     meta_json,
     model_fingerprint,
     pack_binary,
@@ -52,7 +52,7 @@ BATCH = 32
 
 def build(db_path: Path, model_key: str, limit: int | None = None, threads: int = 1) -> dict:
 
-    spec = CANDIDATES[model_key]
+    spec = get_spec(model_key)
     directory = fetch_model(spec)
     enc = Encoder(spec, directory, threads=threads)
 
@@ -124,7 +124,7 @@ def export_browser(db_path: Path, out_dir: Path) -> dict:
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    p.add_argument("--model", default=SHIPPED_MODEL, choices=sorted(CANDIDATES))
+    p.add_argument("--model", default=SHIPPED_MODEL, help="CANDIDATES key or local data/models/<key>@*/spec.json")
     p.add_argument("--limit", type=int, help="only the first N verses (tests)")
     p.add_argument("--threads", type=int, default=1,
                    help="ONNX threads; 1 is the reproducible default")

@@ -43,6 +43,12 @@ class ModelSpec:
     doc_prefix: str = ""
     max_tokens: int = 256
     extra_files: tuple = field(default_factory=tuple)
+    # Pinned file hashes, (filename, sha256) pairs; fetch_model refuses anything else.
+    sha256: tuple = field(default_factory=tuple)
+    # "" = huggingface.co/<repo>/resolve/<revision>/. "bucket:<prefix>" = the project's
+    # Tigris release bucket (BUCKET_NAME + AWS_* env, like scripts/fetch_db.py), used for
+    # weights we trained; objects live under <prefix>/<file> and are immutable.
+    source: str = ""
 
     @property
     def files(self) -> tuple:
@@ -60,7 +66,11 @@ CANDIDATES: dict[str, ModelSpec] = {s.key: s for s in [
     ModelSpec("bge-small", "Xenova/bge-small-en-v1.5", "ea104dacec62c0de699686887e3f920caeb4f3e3",
               "onnx/model_quantized.onnx", "cls", 384, "MIT", query_prefix=_RETRIEVAL_PROMPT),
     ModelSpec("gte-small", "Xenova/gte-small", "5927d1727bb12db490052a1b33265ad78058de08",
-              "onnx/model_quantized.onnx", "mean", 384, "MIT"),
+              "onnx/model_quantized.onnx", "mean", 384, "MIT",
+              sha256=(("model_quantized.onnx",
+                       "18dec105109b6004369799ca4761fb8fb413c64172c02147bcfac186b5c5f6cb"),
+                      ("tokenizer.json",
+                       "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0"))),
     ModelSpec("e5-small-v2", "Xenova/e5-small-v2", "02af79985278377e65c724a76275707cb0333c70",
               "onnx/model_quantized.onnx", "mean", 384, "MIT",
               query_prefix="query: ", doc_prefix="passage: "),
@@ -125,8 +135,9 @@ def model_dir(spec: ModelSpec) -> Path:
 def fetch_model(spec: ModelSpec) -> Path:
     """Download the pinned model files once (build time) and return the local directory.
 
-    Files land flat in data/models/<key>@<rev12>/ (git-ignored), fetched from the
-    immutable revision URL, so rebuilds are offline and the Dockerfile COPYs one directory.
+    Files land flat in data/models/<key>@<rev12>/ (git-ignored), from the immutable
+    Hugging Face revision URL or, for weights we trained, the release bucket. When the spec
+    pins sha256s, every file (cached or new) is checked and a mismatch raises.
     """
     import urllib.request
 
@@ -136,14 +147,29 @@ def fetch_model(spec: ModelSpec) -> Path:
         if dest.exists() and dest.stat().st_size > 0:
             continue
         target.mkdir(parents=True, exist_ok=True)
-        url = f"https://huggingface.co/{spec.repo}/resolve/{spec.revision}/{f}"
         tmp = dest.with_suffix(dest.suffix + ".part")
-        req = urllib.request.Request(url, headers={"User-Agent": "BibleMVP/1.0"})
-        with urllib.request.urlopen(req, timeout=120) as r, open(tmp, "wb") as out:
-            while chunk := r.read(1 << 20):
-                out.write(chunk)
+        if spec.source.startswith("bucket:"):
+            import os
+
+            import boto3  # build/CI only, as in scripts/fetch_db.py
+            key = f"{spec.source[len('bucket:'):].rstrip('/')}/{Path(f).name}"
+            boto3.client("s3").download_file(os.environ["BUCKET_NAME"], key, str(tmp))
+        else:
+            url = f"https://huggingface.co/{spec.repo}/resolve/{spec.revision}/{f}"
+            req = urllib.request.Request(url, headers={"User-Agent": "BibleMVP/1.0"})
+            with urllib.request.urlopen(req, timeout=120) as r, open(tmp, "wb") as out:
+                while chunk := r.read(1 << 20):
+                    out.write(chunk)
         tmp.rename(dest)
+    verify_model(spec, target)
     return target
+
+
+def verify_model(spec: ModelSpec, directory: Path):
+    for name, want in spec.sha256:
+        got = file_sha256(directory / name)
+        if got != want:
+            raise ValueError(f"{directory / name}: sha256 {got[:12]} != pinned {want[:12]}")
 
 
 def file_sha256(path: Path) -> str:

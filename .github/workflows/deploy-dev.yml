@@ -29,6 +29,14 @@ jobs:
           AWS_ENDPOINT_URL_S3: ${{ secrets.AWS_ENDPOINT_URL_S3 }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+      - name: Fetch the meaning-search model the DB was built with
+        run: python scripts/fetch_model.py
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL_S3: ${{ secrets.AWS_ENDPOINT_URL_S3 }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
       - run: python -m pytest -q
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # master as of 2026-10-05
       - run: flyctl deploy -c fly.dev.toml --remote-only --image-label "$GITHUB_SHA" --build-arg SW_VERSION="${GITHUB_SHA::7}"

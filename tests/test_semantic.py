@@ -288,3 +288,14 @@ def test_meaning_results_cacheable_with_etag(client):
     assert r.json()["fallback"] is False
     assert r.headers["cache-control"] == "public, max-age=3600"
     assert r.headers["etag"].startswith('W/"')
+
+
+def test_fetch_refuses_a_model_file_that_does_not_match_its_pin(tmp_path, monkeypatch):
+    monkeypatch.setattr(semantic, "MODELS_DIR", tmp_path)
+    spec = semantic.CANDIDATES["gte-small"]
+    d = semantic.model_dir(spec)
+    d.mkdir(parents=True)
+    (d / "model_quantized.onnx").write_bytes(b"not the pinned model")
+    (d / "tokenizer.json").write_bytes(b"{}")
+    with pytest.raises(ValueError, match="sha256"):
+        semantic.fetch_model(spec)  # cached files are verified too, no download attempted

@@ -36,9 +36,9 @@ def child(key: str, n_vectors: int) -> dict:
     sys.path.insert(0, str(PROJECT_ROOT))
     import numpy as np
 
-    from backend.semantic import CANDIDATES, Encoder, VectorIndex, fetch_model
+    from backend.semantic import Encoder, VectorIndex, fetch_model, get_spec
     t_import = time.perf_counter() - t0
-    spec = CANDIDATES[key]
+    spec = get_spec(key)
     directory = fetch_model(spec)
     t1 = time.perf_counter()
     enc = Encoder(spec, directory, threads=1)
