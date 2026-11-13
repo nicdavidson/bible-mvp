@@ -116,40 +116,7 @@ def get_parallel_passage(
         conn.close()
 
 
-@router.get("/api/passage/{reference}/commentary")
-def get_commentary(reference: str):
-    """Get commentary entries for a passage."""
-    conn = get_db_connection()
-    try:
-        parsed = parse_reference(reference)
-        if not parsed:
-            raise HTTPException(status_code=400, detail=f"Invalid reference: {reference}")
-
-        book, chapter, verse_start, verse_end, _ = parsed
-
-        # If viewing full chapter (verse_end=999), get all commentary for chapter
-        # Otherwise, get commentary that overlaps with the requested verse range
-        if verse_end == 999:
-            cursor = conn.execute("""
-                SELECT source, content, reference_start, reference_end
-                FROM commentary_entries
-                WHERE book = ? AND chapter = ?
-                ORDER BY reference_start, source
-            """, (book, chapter))
-        else:
-            cursor = conn.execute("""
-                SELECT source, content, reference_start, reference_end
-                FROM commentary_entries
-                WHERE book = ? AND chapter = ?
-                      AND reference_start <= ?
-                      AND COALESCE(reference_end, reference_start) >= ?
-                ORDER BY reference_start, source
-            """, (book, chapter, verse_end, verse_start))
-
-        entries = cursor.fetchall()
-        return {"reference": reference, "entries": [dict(e) for e in entries]}
-    finally:
-        conn.close()
+# /api/passage/{reference}/commentary lives in routers/study.py (effective ranges)
 
 
 @router.get("/api/passage/{reference}/crossrefs")
