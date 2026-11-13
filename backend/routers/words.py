@@ -177,6 +177,91 @@ def get_word(
         conn.close()
 
 
+# Must match scripts/build_alignments.py RENDERING_MIN_CONFIDENCE.
+RENDERING_MIN_CONFIDENCE = 0.5
+
+
+def _group_rendering(words):
+    """Same rule as scripts/aligner/renderings.py: [(position, word)] -> 'in the beginning'."""
+    words = sorted(words)
+    out = words[0][1]
+    for (p0, _), (p1, w) in zip(words, words[1:]):
+        out += (" " if p1 == p0 + 1 else " … ") + w
+    return out.lower()
+
+
+@router.get("/api/word/{strong_number}/renderings")
+def get_word_renderings(
+    strong_number: str,
+    translation: Optional[str] = Query(default=None, description="Limit to one translation"),
+    rendering: Optional[str] = Query(default=None, description="List occurrences of this rendering"),
+    offset: int = Query(default=0, ge=0),
+):
+    """How each translation renders a Hebrew/Greek lemma (from word alignments).
+
+    Without `rendering`: renderings with counts per translation.
+    With `translation` and `rendering`: the verses where that translation renders
+    the lemma that way (200 per page).
+    """
+    m = re.fullmatch(r"([HGhg])0*(\d{1,5})", strong_number.strip())
+    if not m:
+        raise HTTPException(status_code=400, detail="Expected a Strong's number like H430 or G26")
+    plain = f"{m.group(1).upper()}{int(m.group(2))}"
+    padded = f"{plain[0]}{int(m.group(2)):04d}"
+    conn = get_db_connection()
+    try:
+        has_table = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='lemma_renderings'"
+        ).fetchone()
+        if not has_table:
+            return {"strong_number": plain, "translations": {}, "occurrences": []}
+
+        if rendering is None:
+            params = [plain]
+            sql = """SELECT translation_id, rendering, count FROM lemma_renderings
+                     WHERE strong_number = ?"""
+            if translation:
+                sql += " AND translation_id = ?"
+                params.append(translation)
+            sql += " ORDER BY translation_id, count DESC, rendering"
+            by_tr = {}
+            for row in conn.execute(sql, params):
+                by_tr.setdefault(row["translation_id"], []).append(
+                    {"rendering": row["rendering"], "count": row["count"]})
+            return {
+                "strong_number": plain,
+                "min_confidence": RENDERING_MIN_CONFIDENCE,
+                "translations": {tr: {"total": sum(r["count"] for r in rs),
+                                      "renderings": rs[:50]} for tr, rs in by_tr.items()},
+            }
+
+        if not translation:
+            raise HTTPException(status_code=400, detail="`rendering` needs `translation`")
+        cur = conn.execute("""
+            SELECT e.book, e.chapter, e.verse, e.original_word_position AS pos,
+                   e.english_word_position AS epos, e.english_word AS word
+            FROM word_alignments w
+            JOIN english_word_alignments e ON e.translation_id = ? AND e.book = w.book
+                 AND e.chapter = w.chapter AND e.verse = w.verse
+                 AND e.original_word_position = w.word_position
+            JOIN books b ON b.name = w.book
+            WHERE w.strong_number = ? AND e.confidence >= ?
+            ORDER BY b.book_order, w.chapter, w.verse, w.word_position
+        """, (translation, padded, RENDERING_MIN_CONFIDENCE))
+        groups = {}
+        for row in cur:
+            key = (row["book"], row["chapter"], row["verse"], row["pos"])
+            groups.setdefault(key, []).append((row["epos"], row["word"]))
+        want = rendering.strip().lower()
+        hits = [{"book": k[0], "chapter": k[1], "verse": k[2], "original_word_position": k[3],
+                 "english_word_positions": [p for p, _ in sorted(ws)]}
+                for k, ws in groups.items() if _group_rendering(ws) == want]
+        return {"strong_number": plain, "translation": translation, "rendering": want,
+                "total": len(hits), "offset": offset, "occurrences": hits[offset:offset + 200]}
+    finally:
+        conn.close()
+
+
 @router.get("/api/passage/{reference}/interlinear")
 def get_passage_interlinear(
     reference: str,
