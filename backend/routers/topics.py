@@ -100,7 +100,7 @@ def get_topics_for_verse(
             JOIN naves_topic_refs r ON t.id = r.topic_id
             WHERE r.book = ? AND r.chapter = ?
               AND r.verse_start <= ?
-              AND (r.verse_end >= ? OR r.verse_end IS NULL OR r.verse_end = r.verse_start)
+              AND (r.verse_end >= ? OR r.verse_end IS NULL)  -- NULL = whole chapter
             ORDER BY t.topic
             LIMIT 30
         """, (book, chapter, verse, verse))

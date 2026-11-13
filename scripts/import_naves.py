@@ -77,6 +77,14 @@ def create_tables(conn):
     conn.commit()
 
 
+# One chapter spec: "55", "55:22", "6:3-15,50-53", "119:22,28, 107". The chapter number may
+# not run into letters, so "...; 1CH 6:2" ends the group instead of reading chapter "1".
+_SPEC = r"\d+(?![A-Z\d])(?::\s*\d+(?:-\d+)?(?:,\s*\d+(?:-\d+)?)*)?"
+# A book abbreviation followed by one or more specs separated by ";". Later specs without
+# their own book ("PSA 39:6; 127:2", "EXO 28; 29") belong to the same book.
+_REF_GROUP = re.compile(rf"\b([1-3]?[A-Z]{{2,4}})\s+({_SPEC}(?:\s*;\s*{_SPEC})*)")
+
+
 def parse_references(text):
     """Extract Bible references from entry text.
 
@@ -84,59 +92,33 @@ def parse_references(text):
     - GEN 1:1
     - GEN 1:1,2,3
     - GEN 1:1-5
-    - GEN 1:1; 2:3
     - GEN 1:1-5,7,9-11
-    - GEN 1 (whole chapter)
+    - GEN 1 (whole chapter: verse_start 1, verse_end None)
+    - PSA 39:6; 127:2           (same-book continuation; before 2026-11 only 39:6 was kept)
+    - EXO 28; 29; LEV 8          (same-book whole-chapter continuation)
+    - PSA 119:22,28,84, 107      (space after a comma)
     """
     refs = []
-    # Find all book abbreviation + reference patterns
-    # Pattern: BOOK CHAPTER:VERSE[-VERSE][,VERSE[-VERSE]]* or BOOK CHAPTER
-    pattern = re.compile(
-        r'([A-Z1-3][A-Z]{1,4})\s+'
-        r'(\d+)'
-        r'(?::(\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*))?'
-    )
-
-    for match in pattern.finditer(text):
-        book_abbr = match.group(1)
-        chapter = int(match.group(2))
-        verse_part = match.group(3)
-
-        book = NAVES_BOOK_MAP.get(book_abbr)
+    for match in _REF_GROUP.finditer(text):
+        book = NAVES_BOOK_MAP.get(match.group(1))
         if not book:
             continue
-
-        if not verse_part:
-            # Whole chapter reference
-            refs.append({
-                'book': book, 'chapter': chapter,
-                'verse_start': 1, 'verse_end': None
-            })
-        else:
-            # Parse comma-separated verse ranges
-            for segment in verse_part.split(','):
+        for spec in match.group(2).split(";"):
+            chapter_part, _, verse_part = spec.strip().partition(":")
+            chapter = int(chapter_part)
+            if not verse_part:
+                refs.append({'book': book, 'chapter': chapter,
+                             'verse_start': 1, 'verse_end': None})
+                continue
+            for segment in verse_part.split(","):
                 segment = segment.strip()
-                if '-' in segment:
-                    parts = segment.split('-')
-                    try:
-                        vs = int(parts[0])
-                        ve = int(parts[1])
-                        refs.append({
-                            'book': book, 'chapter': chapter,
-                            'verse_start': vs, 'verse_end': ve
-                        })
-                    except ValueError:
-                        continue
-                else:
-                    try:
-                        v = int(segment)
-                        refs.append({
-                            'book': book, 'chapter': chapter,
-                            'verse_start': v, 'verse_end': v
-                        })
-                    except ValueError:
-                        continue
-
+                if not segment:
+                    continue
+                first, _, last = segment.partition("-")
+                vs = int(first)
+                ve = int(last) if last else vs
+                refs.append({'book': book, 'chapter': chapter,
+                             'verse_start': vs, 'verse_end': ve})
     return refs
 
 
