@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meaning Search Probe</title>
+<!--
+  Proof that meaning search can run entirely in the browser (and so offline).
+  NOT part of the app. Serve the repo root and open this page:
+      python scripts/build_embeddings.py --export-browser data/semantic-browser
+      python -m http.server 8765        # from the repo root
+      open http://localhost:8765/tests/browser/semantic_demo.html
+  Measured by tests/browser/measure_semantic_demo.py (Playwright, headless Chromium).
+  Library: transformers.js 3.8.1 (Apache-2.0). Model: Xenova/gte-small
+  onnx/model_quantized.onnx (MIT, from thenlper/gte-small), the same file the server runs.
+-->
+<style>
+  :root { --bg: #fbfaf7; --fg: #1f1d1a; --muted: #6b665e; --line: #e2ded6; --accent: #7a4b1f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171614; --fg: #ece8e1; --muted: #a39d93; --line: #34312c; --accent: #e0a96d; }
+  }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif;
+         margin: 0 auto; max-width: 760px; padding: 16px; }
+  input { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; color: var(--fg);
+          background: transparent; border: 1px solid var(--line); border-radius: 6px; }
+  #stats { color: var(--muted); font-size: 14px; white-space: pre-wrap; }
+  li { margin: 6px 0; } .ref { color: var(--accent); font-weight: 600; } .s { color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Meaning search, in the browser</h1>
+<input id="q" placeholder="where does Scripture talk about waiting on God" disabled>
+<p id="stats">loading…</p>
+<ol id="out"></ol>
+<script type="module">
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1";
+
+const params = new URLSearchParams(location.search);
+const DATA = params.get("data") || "../../data/semantic-browser/";
+const MODEL = "Xenova/gte-small";
+const REVISION = "5927d1727bb12db490052a1b33265ad78058de08";
+const PREFIX = "";  // gte-small: no query prefix, mean pooling
+// For offline use the app would set env.localModelPath to its own /static/models/ and let
+// the service worker cache it; here the model comes from the Hugging Face CDN.
+env.allowLocalModels = false;
+
+const stats = { };
+const t0 = performance.now();
+const [vecBuf, scaleBuf, refs, meta] = await Promise.all([
+  fetch(DATA + "vectors.i8").then(r => r.arrayBuffer()),
+  fetch(DATA + "scales.f32").then(r => r.arrayBuffer()),
+  fetch(DATA + "refs.json").then(r => r.json()),
+  fetch(DATA + "meta.json").then(r => r.json()),
+]);
+const vecs = new Int8Array(vecBuf), scales = new Float32Array(scaleBuf);
+const dim = Number(meta.dim), n = scales.length;
+stats.vectors_ms = Math.round(performance.now() - t0);
+
+const t1 = performance.now();
+const extractor = await pipeline("feature-extraction", MODEL,
+                                 { dtype: "q8", revision: REVISION, device: "wasm" });
+stats.model_load_ms = Math.round(performance.now() - t1);
+
+async function embed(text) {
+  const out = await extractor(PREFIX + text, { pooling: "mean", normalize: true });
+  return out.data;  // Float32Array(dim)
+}
+
+function search(q, k = 10) {
+  const s = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let acc = 0; const o = i * dim;
+    for (let d = 0; d < dim; d++) acc += vecs[o + d] * q[d];
+    s[i] = acc * scales[i];
+  }
+  const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => s[b] - s[a]).slice(0, k);
+  return idx.map(i => ({ ref: `${refs.books[refs.refs[i][0]]} ${refs.refs[i][1]}:${refs.refs[i][2]}`,
+                         score: s[i] }));
+}
+
+async function run(q) {
+  const a = performance.now(); const v = await embed(q);
+  const b = performance.now(); const hits = search(v);
+  const c = performance.now();
+  return { hits, embed_ms: b - a, score_ms: c - b };
+}
+
+const warm = await run("God's promises when afraid");
+stats.first_query_ms = Math.round(warm.embed_ms + warm.score_ms);
+if (performance.memory) stats.js_heap_mb = Math.round(performance.memory.usedJSHeapSize / 1e6);
+
+function render(r) {
+  document.getElementById("out").innerHTML = r.hits.map(h =>
+    `<li><span class="ref">${h.ref}</span> <span class="s">${h.score.toFixed(3)}</span></li>`).join("");
+  document.getElementById("stats").textContent =
+    JSON.stringify(stats) + `\nlast query: embed ${r.embed_ms.toFixed(0)} ms, score ${r.score_ms.toFixed(0)} ms`;
+}
+const box = document.getElementById("q");
+box.disabled = false;
+box.addEventListener("change", async () => render(await run(box.value)));
+render(await run("where does Scripture talk about waiting on God"));
+
+// Hooks for the Playwright measurement script.
+window.semanticProbe = { stats, run, embed: async t => Array.from(await embed(t)), ready: true };
+</script>
+</body>
+</html>
