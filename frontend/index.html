@@ -107,6 +107,10 @@
             <div class="side-menu-divider"></div>
 
             <div class="side-menu-section">
+                <button @click="openFeedbackFromMenu()" class="side-menu-item" x-show="feedbackEnabled" data-testid="menu-feedback">
+                    <span class="side-menu-icon">💬</span>
+                    <span>Send feedback</span>
+                </button>
                 <button @click="openSettingsFromMenu()" class="side-menu-item">
                     <span class="side-menu-icon">⚙️</span>
                     <span>Settings</span>
@@ -1072,10 +1076,20 @@
                                 <p>Your notes are synced across devices.</p>
                                 <p class="auth-notes-count" x-show="notes.length > 0" x-text="notes.length + ' note' + (notes.length === 1 ? '' : 's') + ' saved'"></p>
                             </div>
+                            <div class="auth-error" x-show="authError" x-text="authError"></div>
+                            <div class="auth-success" x-show="authSuccess" x-text="authSuccess"></div>
+                            <form class="auth-fields" @submit.prevent="handleChangePassword()">
+                                <label for="new-password">Change password</label>
+                                <input id="new-password" type="password" x-model="newPassword" placeholder="New password" minlength="6" autocomplete="new-password" class="auth-input">
+                                <button type="submit" class="btn-secondary" :disabled="authLoading || newPassword.length < 6">Change password</button>
+                            </form>
                             <div class="auth-actions">
                                 <button @click="handleSignOut()" class="btn-secondary" :disabled="authLoading">
                                     Sign Out
                                 </button>
+                            </div>
+                            <div class="auth-links">
+                                <button @click="handleDeleteAccount()" class="auth-link" :disabled="authLoading" data-testid="delete-account">Close my account</button>
                             </div>
                         </div>
                     </template>
@@ -1647,12 +1661,8 @@
                 <div class="about-section">
                     <h4>Feedback</h4>
                     <p class="about-text">Found a bug, accuracy issue, or have a feature idea?</p>
-                    <template x-if="authUser">
-                        <button @click="openFeedbackFromAbout()" class="btn-secondary">Submit Feedback</button>
-                    </template>
-                    <template x-if="!authUser">
-                        <p class="about-text-muted">Sign in to submit feedback.</p>
-                    </template>
+                    <button @click="openFeedbackFromAbout()" class="btn-secondary" x-show="feedbackEnabled">Submit Feedback</button>
+                    <p class="about-text-muted" x-show="!feedbackEnabled">Feedback is switched off on this server.</p>
                 </div>
 
                 <div class="about-section about-links">
@@ -2004,8 +2014,15 @@
                         <textarea x-model="feedbackDescription" :placeholder="feedbackCategory === 'accuracy' ? 'What is incorrect and what should it be?' : (feedbackCategory === 'feature' ? 'What would you like to see added?' : 'What happened? What did you expect?')" class="feedback-textarea" rows="4"></textarea>
                     </div>
 
-                    <!-- Screenshot (for bugs only) -->
-                    <template x-if="feedbackCategory === 'bug'">
+                    <template x-if="!authUser">
+                        <div class="feedback-field">
+                            <label for="feedback-contact">Your email (optional, if you would like a reply)</label>
+                            <input id="feedback-contact" type="email" x-model="feedbackContactEmail" maxlength="254" autocomplete="email" class="feedback-input">
+                        </div>
+                    </template>
+
+                    <!-- Screenshot (for bugs only; uploads need an account) -->
+                    <template x-if="authUser && feedbackCategory === 'bug'">
                         <div class="feedback-field">
                             <label>Screenshot (optional)</label>
                             <input type="file" @change="handleScreenshotSelect($event)" accept="image/*" class="feedback-file-input">

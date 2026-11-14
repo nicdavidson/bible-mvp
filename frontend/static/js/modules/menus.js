@@ -115,6 +115,11 @@ window.BibleModules.menus = {
             this.showFeedback = true;
         },
 
+        openFeedbackFromMenu() {
+            this.showSideMenu = false;
+            this.showFeedback = true;
+        },
+
         // Open Share Jesus modal
         openShareJesus() {
             this.showSideMenu = false;

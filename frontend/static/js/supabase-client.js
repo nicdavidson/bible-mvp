@@ -46,6 +46,19 @@ async function resetPassword(email) {
     return data;
 }
 
+async function changePassword(newPassword) {
+    const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+}
+
+// Removes the signed-in user and, by cascade, their notes, tags and plan progress
+// (delete_own_account() in migration 006). Feedback they sent is kept, unlinked.
+async function deleteAccount() {
+    const { error } = await supabaseClient.rpc('delete_own_account');
+    if (error) throw error;
+    await supabaseClient.auth.signOut({ scope: 'local' });
+}
+
 // Notes sync functions
 async function fetchUserNotes() {
     const user = await getUser();
@@ -514,14 +527,16 @@ async function syncLocalPlanProgress(planId, startDate, completedDays) {
 
 // Submit a bug report
 async function submitBugReport(report) {
+    // Signed out is allowed (migration 006): user_id stays null and the email is whatever
+    // the sender chose to leave, if anything.
     const user = await getUser();
-    if (!user) throw new Error('Not authenticated');
 
-    const { data, error } = await supabaseClient
+    // No .select(): signed-out senders have no read access to the table.
+    const { error } = await supabaseClient
         .from('bug_reports')
         .insert({
-            user_id: user.id,
-            user_email: user.email,
+            user_id: user ? user.id : null,
+            user_email: user ? user.email : (report.contactEmail || null),
             category: report.category,
             description: report.description,
             verse_reference: report.verseReference || null,
@@ -530,12 +545,9 @@ async function submitBugReport(report) {
             screenshot_path: report.screenshotPath || null,
             current_url: report.currentUrl || window.location.href,
             user_agent: navigator.userAgent
-        })
-        .select()
-        .single();
+        });
 
     if (error) throw error;
-    return data;
 }
 
 // Upload screenshot to Supabase Storage
@@ -584,6 +596,8 @@ if (supabaseClient) window.SupabaseAuth = {
     signIn,
     signOut,
     resetPassword,
+    changePassword,
+    deleteAccount,
     fetchUserNotes,
     saveUserNote,
     updateUserNote,

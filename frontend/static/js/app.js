@@ -414,6 +414,8 @@ function bibleApp() {
         authEmail: '',
         authPassword: '',
         authPasswordConfirm: '',
+        newPassword: '',
+        feedbackEnabled: !!(window.APP_CONFIG && window.APP_CONFIG.supabaseUrl),
 
         // Tag state
         tags: [],  // User's tags: { id, name, color, sortOrder, synced }
@@ -488,6 +490,7 @@ function bibleApp() {
         feedbackVerseRef: '',
         feedbackTranslation: '',
         feedbackAccuracyType: '',
+        feedbackContactEmail: '',  // optional, signed-out senders only
         feedbackScreenshot: null,  // File object
         feedbackScreenshotPreview: '',  // Data URL for preview
         feedbackSubmitting: false,

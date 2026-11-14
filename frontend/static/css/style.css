@@ -6637,3 +6637,17 @@ svg.action-bar-icon {
         max-height: calc(100dvh - 4px);
     }
 }
+
+/* Base look for buttons that sit outside a styled group (feedback form, About, account).
+   :where() keeps specificity at zero, so every scoped rule above still wins. */
+:where(.btn-primary, .btn-secondary) {
+    padding: 0.625rem 1rem;
+    min-height: 44px;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+:where(.btn-primary) { background: var(--color-primary); color: white; border: none; }
+:where(.btn-secondary) { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); }
+:where(.btn-primary, .btn-secondary):disabled { opacity: 0.5; cursor: not-allowed; }

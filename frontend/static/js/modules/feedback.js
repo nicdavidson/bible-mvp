@@ -30,6 +30,7 @@ window.BibleModules.feedback = {
             this.feedbackVerseRef = '';
             this.feedbackTranslation = '';
             this.feedbackAccuracyType = '';
+            this.feedbackContactEmail = '';
             this.feedbackScreenshot = null;
             this.feedbackScreenshotPreview = '';
             this.feedbackSubmitting = false;
@@ -39,8 +40,8 @@ window.BibleModules.feedback = {
 
         // Submit feedback
         async submitFeedback() {
-            if (!this.authUser) {
-                this.feedbackError = 'Please sign in to submit feedback';
+            if (!window.SupabaseAuth) {
+                this.feedbackError = 'Feedback is switched off on this server';
                 return;
             }
 
@@ -56,7 +57,7 @@ window.BibleModules.feedback = {
                 let screenshotPath = null;
 
                 // Upload screenshot if present (for bugs)
-                if (this.feedbackCategory === 'bug' && this.feedbackScreenshot) {
+                if (this.authUser && this.feedbackCategory === 'bug' && this.feedbackScreenshot) {
                     try {
                         screenshotPath = await SupabaseAuth.uploadBugScreenshot(this.feedbackScreenshot);
                     } catch (err) {
@@ -70,6 +71,7 @@ window.BibleModules.feedback = {
                     category: this.feedbackCategory,
                     description: this.feedbackDescription.trim(),
                     screenshotPath: screenshotPath,
+                    contactEmail: this.feedbackContactEmail.trim() || null,
                     currentUrl: window.location.href
                 };
 
@@ -115,6 +117,10 @@ window.BibleModules.feedback = {
                             this.loadTags();
                             this.loadPlanProgressFromSupabase();
                             this.showToast('Signed in successfully', 'success');
+                        } else if (event === 'PASSWORD_RECOVERY') {
+                            // Arrived from a reset email: signed in, but must pick a new password.
+                            this.openSettingsFromMenu('account');
+                            this.authSuccess = 'Choose a new password below.';
                         } else if (event === 'SIGNED_OUT') {
                             this.loadNotes();
                             this.loadTags();
@@ -182,6 +188,41 @@ window.BibleModules.feedback = {
                 this.showToast('Signed out', 'info');
             } catch (err) {
                 this.showToast('Failed to sign out', 'error');
+            } finally {
+                this.authLoading = false;
+            }
+        },
+
+        async handleChangePassword() {
+            if (this.newPassword.length < 6) {
+                this.authError = 'Use at least 6 characters';
+                return;
+            }
+            this.authLoading = true;
+            this.authError = null;
+            this.authSuccess = null;
+            try {
+                await window.SupabaseAuth.changePassword(this.newPassword);
+                this.newPassword = '';
+                this.authSuccess = 'Password changed';
+            } catch (err) {
+                this.authError = err.message || 'Could not change the password';
+            } finally {
+                this.authLoading = false;
+            }
+        },
+
+        async handleDeleteAccount() {
+            if (!confirm('Close your account? Your synced notes, tags and reading plan progress go with it. This cannot be undone.')) return;
+            this.authLoading = true;
+            this.authError = null;
+            try {
+                await window.SupabaseAuth.deleteAccount();
+                this.authUser = null;
+                await this.loadNotes();
+                this.showToast('Account closed', 'info');
+            } catch (err) {
+                this.authError = err.message || 'Could not close the account';
             } finally {
                 this.authLoading = false;
             }
